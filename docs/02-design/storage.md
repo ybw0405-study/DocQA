@@ -677,11 +677,12 @@ CREATE TABLE reminder_trigger (
 - **没有删除接口、不做归档**。提醒被完成或取消后历史通知仍然保留（事实记录不随规则状态消失），
   这也是 §2.16 不加外键 `ON DELETE CASCADE` 的连带理由。清理属于运维任务，本期不提供。
 
-### 2.17 ai_quota（S9 新增，设计落盘；迁移尚未应用到真实库）
+### 2.17 ai_quota（设计落盘）
 
-DDL 的事实来源是 V9 迁移（S9-5a 落地）；下面的片段与设计一致，改表必须先改迁移，再同步本节。
+DDL 的事实来源是 V9 迁移；下面的片段与迁移一致，改表必须先改迁移，再同步本节。
 
 ```sql
+-- 按用户的 AI 日配额覆盖；缺行表示不设上限
 CREATE TABLE ai_quota (
   user_id               CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   daily_question_limit  INT UNSIGNED NULL,
@@ -702,6 +703,14 @@ CREATE TABLE ai_quota (
   )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COMMENT='按用户的 AI 日配额覆盖；缺行表示不设上限';
+
+ALTER TABLE agent_execution
+  ADD KEY idx_agent_execution_started (started_at)
+    COMMENT '管理面按时间窗聚合问答用量';
+
+ALTER TABLE audit_event
+  ADD KEY idx_audit_occurred (occurred_at, id)
+    COMMENT '管理面最近事件 keyset 查询（时间窗无其它过滤时）';
 ```
 
 | 字段 | 说明 |
@@ -842,13 +851,13 @@ LIMIT :top_k;
   5. 保留旧集合至少一个发布周期，支持回滚。
 - 迁移期间检索必须固定使用一个活动集合/版本；不允许同一次回答混用不同维度的向量。
 
-### 4.4 词法召回索引（S5）
+### 4.4 词法召回索引
 
-向量通道只回答「语义像不像」，回答不了「这个词面在不在」。精确术语（`vector_id`、`RRULE`、`ON CONFLICT`）、专有名词和代码标识符是向量通道的稳定盲区，S5 因此在**同一张表**上增加一条词法召回通道。设计约束来自实测，不是偏好：完整证据与决策见 `docs/06-expansion/phase6-scope.md` §1.6.1（E1–E12）与 §1.6.2（D-78 至 D-94），本节只登记存储面要承担的部分。
+向量通道只回答「语义像不像」，回答不了「这个词面在不在」。精确术语（`vector_id`、`RRULE`、`ON CONFLICT`）、专有名词和代码标识符是向量通道的稳定盲区，因此在**同一张表**上增加一条词法召回通道。
 
 #### 4.4.1 DDL：只加一个表达式 GIN 索引
 
-`ai-python/migrations/002_chunk_lexical_index.sql` 的确切形态（S5 交付迁移文本；**2026-11-02 已由 `docs/06-expansion/s5-apply-002.sh` 对应用库 `docqa_vec` 执行**，落地前后表与 HNSW 的 `relfilenode` 均未变、索引数 `5 → 6`，证据见 `docs/06-expansion/phase6-scope.md` §1.8.4 E64 / E65）：
+`ai-python/migrations/002_chunk_lexical_index.sql` 的确切形态：
 
 ```sql
 -- 词法召回通道：表达式 GIN，零新列、零数据改写、不动 HNSW。

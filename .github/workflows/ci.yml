@@ -4,8 +4,8 @@ name: CI
 # failure cannot mask a Java regression and vice versa.
 #
 # NOTE: every suite here is offline by design (no MySQL / Redis / RocketMQ /
-# MinIO / PGVector required). Real-infrastructure end-to-end checks live in
-# docs/06-expansion/s11-e2e-acceptance-and-load.md and are NOT part of CI.
+# MinIO / PGVector required). Real-infrastructure end-to-end checks are NOT
+# part of CI and must be run manually against a local stack.
 
 on:
   push:

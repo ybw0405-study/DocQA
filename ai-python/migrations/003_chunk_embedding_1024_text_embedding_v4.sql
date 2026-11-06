@@ -1,12 +1,6 @@
--- S6 真实模型向量空间分表；决策面是 docs/06-expansion/phase6-scope.md §1.7.2 的 D-99 / D-100 / D-101 与 §1.9 的 D-117。
+-- 真实模型向量空间分表；决策面见 docs/02-design/storage.md §2 的向量空间设计。
 --
--- ⚠️ 执行状态：本文件在 2026-11-02 立项时**从未对任何数据库执行**；§1.8 的 DDL 放行当时只覆盖 `002_chunk_lexical_index.sql`。
--- **2026-11-05 16:29 已由 D-226 放行后在 `docqa_vec`（PG 16.15 / pgvector 0.8.7）执行**：
--- 8 列、6 个索引（pkey + UNIQUE + document + document_version + hnsw + lexical）、0 行、`embedding = vector(1024)`，
--- 执行前后对账见 `docs/03-review/cr-log-s11-e2e.md`「003_* DDL 执行记录」。本文件全部语句为 `IF NOT EXISTS`，
--- 重复执行不改变结果；**未 INSERT、未搬运旧表 28 行、未切换 `DOCQA_AI_PG_TABLE`**。
--- 空表上的 `EXPLAIN (ANALYZE, BUFFERS)` 与 GIN/HNSW 命中取证属 S11-5，不在本次执行范围内。
--- 初版说明保留如下：本轮交付的是迁移文本 + `tests/test_migrations.py` 的对账断言。
+-- 本文件全部语句为 `IF NOT EXISTS`，重复执行不改变结果。
 --
 -- 为什么要分表（D-99 采纳 ②）：`metadata->>'embedding_model'` 是一个**只写不读**的键（唯一写点
 -- `parse_worker/worker.py`，`src` 全量无读取点），同表覆盖等于把两个向量空间塞进同一个 `vector_cosine_ops` HNSW，

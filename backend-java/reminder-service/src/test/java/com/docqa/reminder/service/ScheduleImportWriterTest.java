@@ -29,7 +29,6 @@ import org.springframework.dao.DuplicateKeyException;
  * <p>事务本身不在这里取证：{@code @Transactional} 由 Spring 代理实现，Mockito 直接调用
  * {@code persist} 不经过代理，回滚行为无法在本测试里观测。这里能证明的是「异常一定外逃」——
  * 这是代理回滚的前置条件；一旦写入器把 SQL 异常吞掉，整批事务就会提交半套课表。
- * 真实的「半套课表不落地」由 {@code docs/03-review/cr-log-s3-schedule.md} 登记为未验证项。
  */
 class ScheduleImportWriterTest {
 

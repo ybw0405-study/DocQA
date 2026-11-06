@@ -15,7 +15,7 @@
 | 统一响应、错误码、ProblemDetail | `docs/02-design/openapi-java.yaml` 的 `components` 与错误码登记表 | `common` Owner | 架构 Owner |
 | 跨语言治理协议 | `docs/02-design/cross-language-protocol.md` | `agent-gateway` Java Owner 与 `ai-python` Owner 共同维护 | 双方 Owner 必须同时批准 |
 | 数据库与存储设计 | `docs/02-design/storage.md` | 架构 Owner + 对应模块 Owner | 架构 Owner |
-| UML 与需求变更 | `docs/01-requirements/` | 需求提出人 + 架构 Owner | 委托方确认 |
+| UML 与需求变更 | `docs/01-requirements/` | 需求提出人 + 架构 Owner | 产品确认 |
 
 接口 Owner 对照：
 

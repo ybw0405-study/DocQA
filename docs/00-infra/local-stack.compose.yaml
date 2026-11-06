@@ -2,7 +2,7 @@
 #
 # 用途：为 S0「后端 Java 运行时验证」提供真实中间件，替代此前的 msw 仿真与离线 Provider。
 # 约束：
-#   - 本文件不含任何凭据。所有密钥经 --env-file 注入，env 文件放在仓库外（见 docs/06-expansion/phase6-scope.md §4）。
+#   - 本文件不含任何凭据。所有密钥经 --env-file 注入，env 文件放在仓库外。
 #   - 全部使用 network_mode: host，因为 WSL2 的 NAT 模式下宿主机(Windows)可直接访问 WSL 网卡 IP；
 #     RocketMQ broker 需要向 namesrv 注册一个**客户端可达**的地址，host 网络下它自动探测到的就是该 IP，
 #     若改用 bridge + 端口映射，broker 会注册容器内网 IP，Windows 侧客户端拿到地址后连不上。

@@ -1,6 +1,5 @@
--- 阶段 6 切片 S1：身份与授权。
--- 迁移仍由 document-service 独占执行（schema owner 单一，避免同一 flyway_schema_history 上的并发迁移）；
--- 域归属与文件位置的偏差已登记在 docs/03-review/cr-log-s1-identity.md。
+-- 身份与授权。
+-- 迁移仍由 document-service 独占执行（schema owner 单一，避免同一 flyway_schema_history 上的并发迁移）。
 CREATE TABLE app_user (
   id              CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   username        VARCHAR(32) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,

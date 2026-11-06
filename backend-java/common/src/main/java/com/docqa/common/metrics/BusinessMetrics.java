@@ -11,9 +11,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * {@code docs/03-review/observability.md} §4.2 业务指标的唯一注册点（F-1）。
+ * 业务指标的唯一注册点。
  *
- * <p>为什么要有这层门面：指标名、标签名与基数约束是**跨服务契约**（§4.1）。若让每个服务直接
+ * <p>为什么要有这层门面：指标名、标签名与基数约束是**跨服务契约**。若让每个服务直接
  * 调 {@code Counter.builder(...)}，同一个序列在不同服务里很容易长出不同标签集，Prometheus 侧
  * 表现为同一个指标名下的多条互不相交的时间序列，{@code sum by (status)} 之类的表达式会静默
  * 少算。所有命名与标签拼装因此收在这一处，调用方只表达语义。

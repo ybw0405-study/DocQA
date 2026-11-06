@@ -96,7 +96,7 @@ powershell -File scripts/verify-all.ps1 -Offline  # Windows PowerShell 5.1
 
 ### 启动服务
 
-完整启动顺序、端口与环境变量清单见 [docs/00-infra/local-runtime-notes.md](docs/00-infra/local-runtime-notes.md)，简略流程：
+完整启动顺序、端口与环境变量清单见 [docs/00-infra/getting-started.md](docs/00-infra/getting-started.md)，简略流程：
 
 ```powershell
 # ① WSL 内启动中间件（RocketMQ / PostgreSQL / MinIO）
@@ -117,7 +117,7 @@ cd frontend-vue && npm install && npm run dev
 
 ### 环境变量
 
-所有连接串与凭据均通过 `DOCQA_*` 环境变量注入，仓库内不含任何真实凭据。变量清单见 [docs/00-infra/local-runtime-notes.md](docs/00-infra/local-runtime-notes.md) 第 4 节。
+所有连接串与凭据均通过 `DOCQA_*` 环境变量注入，仓库内不含任何真实凭据。变量清单见 [docs/00-infra/getting-started.md](docs/00-infra/getting-started.md)。
 
 ## 设计文档
 

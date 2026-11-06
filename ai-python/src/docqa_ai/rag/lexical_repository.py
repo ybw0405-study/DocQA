@@ -161,9 +161,9 @@ def phrase_surfaces(lexical_query: str) -> tuple[str, ...]:
 class InMemoryLexicalRepository:
     """确定性替身，供服务层逻辑测试使用（D-93）。
 
-    它复刻**授权过滤**与 E34 实测过的「相邻二元组 = 精确子串」语义；它**不**复刻 `ts_rank`
-    随词频移动的那一半（E33），名次只按命中词组数排。真实计划形态、索引命中与延迟由
-    `docs/06-expansion/s5-lexical-verify.sh` 在一次性 schema 内取证，不进 CI。
+    它复刻**授权过滤**与实测过的「相邻二元组 = 精确子串」语义；它**不**复刻 `ts_rank`
+    随词频移动的那一半，名次只按命中词组数排。真实计划形态、索引命中与延迟需在一次性
+    schema 内取证，不进 CI。
     """
 
     def __init__(self, chunks: Sequence[ChunkRecord] | None = None) -> None:

@@ -1,4 +1,4 @@
--- S5 词法召回通道；事实源：docs/02-design/storage.md §4.4，决策面是 docs/06-expansion/phase6-scope.md §1.6 的 D-79 / D-97 / D-98。
+-- 词法召回通道；事实源：docs/02-design/storage.md §4.4。
 --
 -- 只建一个表达式 GIN 索引：零新列、零新表、零数据改写，HNSW 向量索引不动。
 -- 上一版方案是 tsvector STORED 生成列，被实测推翻——加生成列会重写整张堆表并**全量重建** idx_chunk_embedding_hnsw

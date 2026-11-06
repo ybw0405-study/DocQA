@@ -13,26 +13,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 
 /**
- * V9 的 DDL 同时存在于迁移脚本、设计文档与存储文档三处。任何一处单独改动都会让它们互相矛盾，
- * 所以这里把脚本与两份文档的 SQL 规范化后逐字比较，而不是靠人工记忆同步。
+ * V9 的 DDL 同时存在于迁移脚本与存储设计文档两处。任何一处单独改动都会让它们互相矛盾，
+ * 所以这里把脚本与文档的 SQL 规范化后逐字比较，而不是靠人工记忆同步。
  */
 class MigrationV9ContractTest {
 
     private static final String MIGRATION = "db/migration/V9__ai_quota_and_admin_indexes.sql";
 
     @Test
-    void migrationMatchesDesignAndStorageDocs() throws IOException {
+    void migrationMatchesStorageDoc() throws IOException {
         String migration = normalize(readClasspath(MIGRATION));
-        String design =
-                normalize(sqlBlock(readRepoFile("docs/06-expansion/s9-governance-ops.md"), "### 5.2 MySQL DDL"));
         String storage = normalize(sqlBlock(readRepoFile("docs/02-design/storage.md"), "### 2.17 ai_quota"));
 
         assertThat(migration)
-                .as("V9 迁移必须与设计文档 §5.2 的 DDL 逐字一致")
-                .isEqualTo(design);
-        assertThat(design)
-                .as("设计文档 §5.2 必须原样包含 storage.md §2.17 的建表语句")
-                .startsWith(storage);
+                .as("V9 迁移必须与存储设计文档 §2.17 的 DDL 逐字一致")
+                .isEqualTo(storage);
     }
 
     @Test
