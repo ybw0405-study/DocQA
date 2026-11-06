@@ -1,0 +1,126 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: agent-gateway
+  servlet:
+    multipart:
+      # 网关只做透传，不能自己解析 multipart：解析后请求被包装成 MultipartHttpServletRequest，
+      # 原始输入流已被消费，转发给文档服务与提醒服务的就成了空 body。
+      enabled: false
+  main:
+    web-application-type: servlet
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  datasource:
+    url: ${DOCQA_DB_URL:jdbc:mysql://127.0.0.1:3306/docqa?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
+    username: ${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:root}}
+    password: ${DOCQA_APP_DB_PASSWORD:${DOCQA_DB_PASSWORD:}}
+    hikari:
+      maximum-pool-size: 10
+      connection-init-sql: "SET time_zone = '+00:00'"
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: ${DOCQA_REDIS_HOST:127.0.0.1}
+      port: ${DOCQA_REDIS_PORT:6379}
+      password: ${DOCQA_REDIS_PASSWORD:}
+      database: ${DOCQA_REDIS_DATABASE:0}
+      timeout: 3s
+      connect-timeout: 3s
+  cloud:
+    gateway:
+      mvc:
+        routes:
+          - id: user-service
+            uri: ${DOCQA_USER_SERVICE_URI:http://127.0.0.1:8081}
+            predicates:
+              - Path=/api/v1/auth/**,/api/v1/users/**
+          - id: document-service
+            uri: ${DOCQA_DOCUMENT_SERVICE_URI:http://127.0.0.1:8082}
+            predicates:
+              - Path=/api/v1/documents/**
+          - id: reminder-service
+            uri: ${DOCQA_REMINDER_SERVICE_URI:http://127.0.0.1:8083}
+            predicates:
+              # 通知与提醒同服务：Path 必须与契约的 /api/v1/notifications 面一起改，配错表现为 404 而非启动失败（D-71）。
+              - Path=/api/v1/reminders/**,/api/v1/notifications/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      # 与三个业务服务对齐：liveness 只看进程自身；readiness 纳入 db/redis（D-163）
+      group:
+        liveness:
+          include: livenessState,ping
+        readiness:
+          include: readinessState,db,redis
+
+docqa:
+  jwt:
+    issuer: docqa-user-service
+    audience: docqa-api
+    secret: ${DOCQA_JWT_SECRET:}
+  agent:
+    rate-limit-window: 120s
+    rate-limit-max-requests: 20
+    conversation-lock-ttl: 30s
+    idempotency-in-progress-ttl: 60s
+    idempotency-result-ttl: 24h
+    qa-cache-ttl: 10m
+    budget-ttl: 30m
+    state-ttl: 30m
+    history-limit: 6
+    history-max-chars: 8000
+    kill-switch-cache-ttl: 30s
+    prompt-version: p1
+    max-citations: 20
+    low-confidence-threshold: 0.55
+  python:
+    base-url: ${DOCQA_PYTHON_BASE_URL:http://127.0.0.1:8000}
+    connect-timeout: 2s
+    response-timeout: 15500ms
+    deadline: 15s
+    token-budget: 8000
+    max-tool-calls: 3
+    max-rounds: 3
+    prompt-version: p1
+    masking-version: pii-v1
+    allowed-tools:
+      - document_search
+      - calculator
+      - current_time
+    circuit-breaker:
+      failure-rate-threshold: 50
+      sliding-window-size: 20
+      minimum-number-of-calls: 10
+      wait-duration-in-open-state: 30s
+      permitted-number-of-calls-in-half-open-state: 3
+  admin:
+    # 管理动作只写这两个键的元数据 / 只读账本；主键 agent:kill-switch 仍由 KillSwitch 统一读写
+    kill-switch-meta-key: agent:kill-switch:meta
+    experiment-budget-key: agent:budget:session-tokens
+  audit:
+    enabled: ${DOCQA_AUDIT_ENABLED:true}
+    namesrv: ${DOCQA_ROCKETMQ_NAMESRV:127.0.0.1:9876}
+    producer-group: agent-gateway-audit-producer
+    topic: audit-event
+    send-timeout: 3s
+    relay-interval-ms: 5000
+    relay-batch-size: 100
+    # 网关也会直接往 audit_event 追加管理端事件（JdbcAdminAuditRepository），
+    # 所以它同样要被这条判据看住：能写，但不能改。
+    append-only-guard: ${DOCQA_AUDIT_APPEND_ONLY_GUARD:warn}
+
+logging:
+  level:
+    com.docqa.agentgateway: INFO

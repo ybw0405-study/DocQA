@@ -1,0 +1,84 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: reminder-service
+  servlet:
+    multipart:
+      # 与业务判定的 2 MiB 同值：容器上限只要不低于业务上限，合法文件就不会先被容器打成异常。
+      # 请求整体留 2 MiB 余量给另外两个文本 Part 与 boundary 开销。
+      max-file-size: 2MB
+      max-request-size: 4MB
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+    serialization:
+      write-dates-as-timestamps: false
+  datasource:
+    url: ${DOCQA_DB_URL:jdbc:mysql://127.0.0.1:3306/docqa?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
+    username: ${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:root}}
+    password: ${DOCQA_APP_DB_PASSWORD:${DOCQA_DB_PASSWORD:}}
+    hikari:
+      maximum-pool-size: 10
+      connection-init-sql: "SET time_zone = '+00:00'"
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: ${DOCQA_REDIS_HOST:127.0.0.1}
+      port: ${DOCQA_REDIS_PORT:6379}
+      password: ${DOCQA_REDIS_PASSWORD:}
+      database: ${DOCQA_REDIS_DATABASE:0}
+      timeout: 3s
+      connect-timeout: 3s
+
+docqa:
+  jwt:
+    issuer: docqa-user-service
+    audience: docqa-api
+    secret: ${DOCQA_JWT_SECRET:}
+  rocketmq:
+    enabled: ${DOCQA_ROCKETMQ_ENABLED:true}
+    namesrv: ${DOCQA_ROCKETMQ_NAMESRV:127.0.0.1:9876}
+    producer-group: reminder-service-producer
+    due-topic: reminder-due
+    consumer-group: reminder-service-reminder-due
+    max-reconsume-times: 8
+    consume-thread-min: 2
+    consume-thread-max: 4
+    send-timeout-ms: 3000
+  reminder:
+    idempotency-result-ttl: 24h
+    idempotency-in-progress-ttl: 60s
+    fired-ttl: 48h
+    fired-claim-ttl: 60s
+    rate-limit-window: 120s
+    rate-limit-max-requests: 20
+    scan-interval-ms: 5000
+    scan-initial-delay-ms: 5000
+    scan-batch-size: 50
+    past-grace: 10m
+    max-exdates: 365
+    mq-idempotency-ttl: 7d
+
+logging:
+  level:
+    com.docqa.reminder: INFO
+
+management:
+  endpoints:
+    web:
+      # 只暴露运维必需的三个端点；env / beans / heapdump 等敏感端点保持关闭
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      # liveness 只看进程自身；readiness 纳入 db/redis，下游不可用时如实摘流（D-163）
+      group:
+        liveness:
+          include: livenessState,ping
+        readiness:
+          include: readinessState,db,redis

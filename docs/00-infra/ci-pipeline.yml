@@ -1,0 +1,58 @@
+# GitHub Actions：Java 质量门禁
+# 落地时将本文件复制为 .github/workflows/java-ci.yml。
+# GitHub Branch Protection 必须把 "Java Quality Gate" 设为 required check。
+name: Java CI Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: java-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend-java
+    shell: bash
+
+jobs:
+  quality-gate:
+    name: Java Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Maven Compile
+        run: mvn -B -ntp -DskipTests compile
+
+      - name: Maven Test
+        run: mvn -B -ntp test
+
+      - name: Checkstyle
+        run: >-
+          mvn -B -ntp -DskipTests checkstyle:check
+          -Dcheckstyle.config.location=config/checkstyle/checkstyle.xml
+
+      - name: ArchUnit
+        run: >-
+          mvn -B -ntp
+          -Dtest='*ArchitectureTest'
+          test
+
+# 拦截的是什么问题：拦截未经编译、测试、风格检查和架构校验的代码进入主干，避免“本地能跑”变成合并后的系统性故障。

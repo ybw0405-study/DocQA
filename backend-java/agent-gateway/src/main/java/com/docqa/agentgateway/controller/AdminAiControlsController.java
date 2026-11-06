@@ -1,0 +1,38 @@
+package com.docqa.agentgateway.controller;
+
+import com.docqa.agentgateway.dto.AdminAiControls;
+import com.docqa.agentgateway.dto.UpdateAiControlsRequest;
+import com.docqa.agentgateway.service.AdminAiControlsService;
+import com.docqa.agentgateway.web.JwtAuthenticationFilter;
+import com.docqa.common.api.ApiResponse;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/admin/ai/controls")
+public class AdminAiControlsController {
+
+    private final AdminAiControlsService controlsService;
+
+    public AdminAiControlsController(AdminAiControlsService controlsService) {
+        this.controlsService = controlsService;
+    }
+
+    @GetMapping
+    public ApiResponse<AdminAiControls> get() {
+        return ApiResponse.ok(controlsService.getControls());
+    }
+
+    @PutMapping
+    public ApiResponse<AdminAiControls> update(
+            @RequestAttribute(JwtAuthenticationFilter.USER_ID_ATTRIBUTE) UUID adminId,
+            @Valid @RequestBody UpdateAiControlsRequest request) {
+        return ApiResponse.ok(controlsService.updateKillSwitch(adminId, request.killSwitchActive()));
+    }
+}

@@ -1,0 +1,68 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: user-service
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  datasource:
+    url: ${DOCQA_DB_URL:jdbc:mysql://127.0.0.1:3306/docqa?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
+    username: ${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:root}}
+    password: ${DOCQA_APP_DB_PASSWORD:${DOCQA_DB_PASSWORD:}}
+    hikari:
+      maximum-pool-size: 5
+      connection-init-sql: "SET time_zone = '+00:00'"
+  data:
+    redis:
+      host: ${DOCQA_REDIS_HOST:127.0.0.1}
+      port: ${DOCQA_REDIS_PORT:6379}
+      password: ${DOCQA_REDIS_PASSWORD:}
+      database: ${DOCQA_REDIS_DATABASE:0}
+      timeout: 3s
+      connect-timeout: 3s
+
+docqa:
+  jwt:
+    issuer: docqa-user-service
+    audience: docqa-api
+    ttl: 15m
+    secret: ${DOCQA_JWT_SECRET:}
+  demo-user:
+    enabled: ${DOCQA_DEMO_USER_ENABLED:true}
+    username: ${DOCQA_DEMO_USERNAME:demo}
+    password-hash: ${DOCQA_DEMO_PASSWORD_HASH:}
+    user-id: ${DOCQA_DEMO_USER_ID:00000000-0000-0000-0000-000000000001}
+    admin: ${DOCQA_DEMO_ADMIN:true}
+  auth:
+    max-login-failures: 5
+    login-failure-window: 60s
+    bcrypt-strength: 12
+    refresh-ttl: 14d
+    idempotency-in-progress-ttl: 60s
+    idempotency-result-ttl: 24h
+    self-registration-enabled: ${DOCQA_SELF_REGISTRATION_ENABLED:true}
+    max-registrations-per-window: 5
+    registration-window: 120s
+    refresh-cookie-name: docqa_refresh
+    refresh-cookie-path: /api/v1/auth
+    cookie-secure: ${DOCQA_COOKIE_SECURE:true}
+    cookie-same-site: Lax
+
+management:
+  endpoints:
+    web:
+      # 只暴露运维必需的三个端点；env / beans / heapdump 等敏感端点保持关闭
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      # liveness 只看进程自身；readiness 纳入 db/redis，下游不可用时如实摘流（D-163）
+      group:
+        liveness:
+          include: livenessState,ping
+        readiness:
+          include: readinessState,db,redis

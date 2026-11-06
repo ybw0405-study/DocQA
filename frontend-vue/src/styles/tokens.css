@@ -1,0 +1,181 @@
+/*
+ * 令牌层：唯一的原始色阶落点，也是唯一的「原始 → 语义」映射落点。
+ * 组件层只允许消费语义别名（--color-* 与下面四组刻度），裸色值只在本文件出现，
+ * 由 tests/design-tokens.spec.ts 逐文件对账。
+ *
+ * 视觉取向：冷控台（Cold Console）。近黑底 + 单一冷青强调 + 发丝线分隔，
+ * 不用阴影承重、不用圆角堆叠、不用渐变填充——层级靠亮度差与线宽差表达。
+ * 强调色只出现在三处：当前导航、主按钮描边、状态点。全部色阶都经过 AA 正文对比度校验。
+ */
+:root {
+  /*
+   * 原始色阶只保留被语义层真正消费的档位：令牌层每多一档，就多一个「看起来可用、
+   * 实际上没人用」的诱惑，守卫也会因为死令牌直接红。
+   */
+  --gray-0: #ffffff;
+  --gray-25: #fafbfc;
+  --gray-50: #f2f3f5;
+  --gray-100: #e8eaee;
+  --gray-200: #d3d7df;
+  --gray-300: #aeb5c0;
+  --gray-400: #8f97a4;
+  --gray-500: #6d7583;
+  --gray-600: #565e6b;
+  --gray-750: #2b313b;
+  --gray-800: #20252d;
+  --gray-900: #12161c;
+  --gray-925: #0d1015;
+  --gray-975: #07080b;
+
+  /* 冷青：全站唯一强调色族。#00e5ff 只用于暗底，浅底一律降到 --teal-700 才够 AA。 */
+  --teal-100: #d6f8ff;
+  --teal-300: #5fe2f7;
+  --teal-500: #00e5ff;
+  --teal-700: #006e7a;
+  --teal-800: #05505a;
+  --teal-950: #03191d;
+
+  /* 危险：偏橙的红，避免与强调青在色环上打成互补对比而显得刺眼。 */
+  --red-100: #ffe0dc;
+  --red-400: #ff6b63;
+  --red-700: #a52a22;
+  --red-900: #3a1210;
+
+  /* 警告：琥珀。只用于「需要注意但没坏」的状态，不参与品牌表达。 */
+  --amber-100: #fff0d1;
+  --amber-300: #ffcc70;
+  --amber-700: #855400;
+  --amber-800: #523400;
+  --amber-950: #1b1204;
+
+  /* ---- 语义颜色：浅色为缺省值，暗色在下方两处覆盖 ---- */
+  --color-bg: var(--gray-50);
+  --color-bg-grid: var(--gray-100);
+  --color-surface: var(--gray-0);
+  --color-surface-raised: var(--gray-25);
+  --color-text: var(--gray-900);
+  --color-text-muted: var(--gray-600);
+  --color-text-faint: var(--gray-500);
+  --color-border: var(--gray-200);
+  --color-border-strong: var(--gray-300);
+  --color-primary: var(--teal-700);
+  --color-primary-soft: var(--teal-100);
+  --color-on-primary: var(--gray-0);
+  --color-danger: var(--red-700);
+  --color-danger-soft: var(--red-100);
+  --color-on-danger: var(--gray-0);
+  --color-ok-text: var(--teal-700);
+  --color-ok-border: var(--teal-300);
+  --color-ok-bg: var(--teal-100);
+  --color-warn-text: var(--amber-700);
+  --color-warn-border: var(--amber-300);
+  --color-warn-bg: var(--amber-100);
+
+  /* ---- 排版 ---- */
+  /* 不引网络字体：首屏多一次阻塞请求，而 Inter 缺失时回落到系统无衬线也不破坏版式。 */
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --text-micro: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --text-xl: 19px;
+  --text-2xl: 26px;
+  --text-3xl: 34px;
+  --leading-tight: 1.3;
+  --leading-base: 1.6;
+  /* 仪表标签的字距：小字号全大写时字距必须拉开，否则读起来是挤在一起的一团。 */
+  --tracking-label: 0.12em;
+
+  /* ---- 间距：4 的倍数，避免出现 5/7/9 这类无法归一的碎值 ---- */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+  --space-9: 32px;
+  --space-10: 40px;
+  --space-11: 56px;
+
+  /* ---- 结构 ---- */
+  --border-width: 1px;
+  --border-width-accent: 2px;
+  --radius: 2px;
+  /* 触控目标下限：小尺寸控件（图标按钮、复选框行）不得低于它 */
+  --tap-target: 32px;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --opacity-disabled: 0.45;
+  --opacity-faint: 0.7;
+  /* 状态点直径：导航选中、流式光标、live 指示共用同一刻度 */
+  --dot-size: 6px;
+  /* 动效：只用于状态切换，不做入场动画 */
+  --duration-fast: 90ms;
+  --duration-base: 160ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  /* 版心：1200 装得下最宽的审计表（900）且两侧仍有余白；再宽正文行长就失控了。 */
+  --content-max-width: 1200px;
+  /* 侧栏宽度：图标 20 + 文字 10 号 + 上下留白，刚好容下两个汉字 */
+  --rail-width: 84px;
+  --header-height: 56px;
+}
+
+/*
+ * 暗色覆盖有两处落点：手动态用属性选择器，无属性（auto 或未脚本化）时由媒体查询决定。
+ * 两块的「语义别名 → 原始色阶」映射必须逐对相同，由 tests/design-tokens.spec.ts 对账；
+ * 改一处漏一处会立刻红，不允许出现第三份值来源。
+ */
+html[data-theme='dark'] {
+  --color-bg: var(--gray-975);
+  --color-bg-grid: var(--gray-925);
+  --color-surface: var(--gray-925);
+  --color-surface-raised: var(--gray-900);
+  --color-text: var(--gray-100);
+  --color-text-muted: var(--gray-400);
+  --color-text-faint: var(--gray-500);
+  --color-border: var(--gray-800);
+  --color-border-strong: var(--gray-750);
+  --color-primary: var(--teal-500);
+  --color-primary-soft: var(--teal-950);
+  --color-on-primary: var(--gray-975);
+  --color-danger: var(--red-400);
+  --color-danger-soft: var(--red-900);
+  --color-on-danger: var(--gray-975);
+  --color-ok-text: var(--teal-300);
+  --color-ok-border: var(--teal-800);
+  --color-ok-bg: var(--teal-950);
+  --color-warn-text: var(--amber-300);
+  --color-warn-border: var(--amber-800);
+  --color-warn-bg: var(--amber-950);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    --color-bg: var(--gray-975);
+    --color-bg-grid: var(--gray-925);
+    --color-surface: var(--gray-925);
+    --color-surface-raised: var(--gray-900);
+    --color-text: var(--gray-100);
+    --color-text-muted: var(--gray-400);
+    --color-text-faint: var(--gray-500);
+    --color-border: var(--gray-800);
+    --color-border-strong: var(--gray-750);
+    --color-primary: var(--teal-500);
+    --color-primary-soft: var(--teal-950);
+    --color-on-primary: var(--gray-975);
+    --color-danger: var(--red-400);
+    --color-danger-soft: var(--red-900);
+    --color-on-danger: var(--gray-975);
+    --color-ok-text: var(--teal-300);
+    --color-ok-border: var(--teal-800);
+    --color-ok-bg: var(--teal-950);
+    --color-warn-text: var(--amber-300);
+    --color-warn-border: var(--amber-800);
+    --color-warn-bg: var(--amber-950);
+  }
+}

@@ -1,0 +1,76 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "docqa-ai"
+version = "1.0.0"
+description = "AI data plane for the DocQA: /agent/ask governance and document parsing worker"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.4",
+    "httpx>=0.27",
+    "redis>=5.0",
+    "psycopg[binary]>=3.2",
+    # langsmith>=0.2 imports xxhash; its cp314 Windows wheel fails to load and the
+    # 3.x source build fails too, so this release pins the last compatible stack.
+    "langgraph>=0.2.60,<0.3",
+    "langchain-core>=0.3.60,<0.3.61",
+    "langsmith>=0.1.125,<0.2",
+    "opentelemetry-api>=1.27",
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
+    # observability.md §4.2 的 9 项 Python 侧业务指标只有 Prometheus 文本格式一条出口；
+    # OTel 的 meter 名与标签和文档不一致，无法充当 §4.3 告警表达式的序列来源。
+    "prometheus-client>=0.20",
+    "pypdf>=5.0",
+    "python-docx>=1.1",
+    "minio>=7.2",
+    # D-147：正文提取与 arXiv Atom 解析复用 venv 内既有 lxml（python-docx 的传递依赖），
+    # 显式声明以避免依赖解析变化时静默消失；本轮未新增任何安装。
+    "lxml>=5.0",
+    # D-132：协议底座来自官方 SDK；治理层（白名单、掩码、预算、审计）仍在自有代码。
+    "mcp==2.3.0",
+]
+
+[project.optional-dependencies]
+mq = ["rocketmq-client-python==2.0.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "fakeredis>=2.24",
+    "respx>=0.21",
+    "ruff>=0.7",
+]
+
+[project.scripts]
+docqa-api = "docqa_ai.api.main:main"
+docqa-parse-worker = "docqa_ai.parse_worker.worker:main"
+docqa-vector-worker = "docqa_ai.parse_worker.vector_worker:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docqa_ai"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]

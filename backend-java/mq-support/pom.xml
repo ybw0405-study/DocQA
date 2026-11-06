@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.docqa</groupId>
+        <artifactId>docqa</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>mq-support</artifactId>
+    <name>mq-support</name>
+    <description>RocketMQ admin adapter for the consumer-lag probe (ConsumerOffsetReader implementation)</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.docqa</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!--
+          org.apache.rocketmq.tools.admin.DefaultMQAdminExt 在 rocketmq-tools 里，不在
+          rocketmq-client。这个模块存在的唯一理由就是隔离这层依赖，所以它必须是 compile
+          而不是 optional：使用方（document/reminder）通过本模块间接拿到它，无需各自声明。
+        -->
+        <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-tools</artifactId>
+            <version>${rocketmq.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

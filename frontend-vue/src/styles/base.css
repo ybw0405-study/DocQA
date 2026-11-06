@@ -1,0 +1,373 @@
+/*
+ * 元素与布局层：只放浏览器复位、正文基线、应用外框，以及全局 `button` 这一处元素级默认值。
+ * 页面级类一律在 components.css，工具类在 utilities.css，色值只能来自 tokens.css 的语义别名。
+ *
+ * 外框形态：顶部一条 56px 的命令条 + 左侧 84px 的工具轨（仅登录后出现），内容区右移。
+ * 不用阴影与浮动卡片承重——层级由「底色亮度差 + 1px 发丝线」表达，滚动时版面不抖动。
+ */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  /* 顶部一层极淡的径向提亮：让内容区像放在台面上，而不是贴在纯色板面上。 */
+  background-image: radial-gradient(1200px 420px at 50% -12%, var(--color-bg-grid), transparent 68%);
+  background-repeat: no-repeat;
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-feature-settings: 'tnum' 1, 'cv05' 1;
+  line-height: var(--leading-base);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 细滚动条：默认的 17px 宽滚槽会把右边缘的表格列压掉。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 var(--space-5);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: var(--text-2xl);
+}
+
+h2 {
+  font-size: var(--text-xl);
+}
+
+h3 {
+  font-size: var(--text-lg);
+}
+
+p {
+  margin: 0 0 var(--space-5);
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* 应用外框：命令条横贯顶部，工具轨固定在左侧，内容区占剩余宽度。 */
+.app-shell {
+  min-height: 100vh;
+}
+
+/* 有工具轨时才让出 84px：未登录页没有轨，留白会变成一条无意义的空带。 */
+.app-shell--with-rail {
+  padding-left: var(--rail-width);
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  height: var(--header-height);
+  padding: 0 var(--space-7);
+  background: var(--color-surface);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.app-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* 品牌标记：4 格点阵里只亮一格，等于「正在运行」的最小表达，不用图形素材。 */
+.app-header__mark {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: var(--border-width) solid var(--color-border-strong);
+  background-image:
+    linear-gradient(var(--color-border-strong), var(--color-border-strong)),
+    linear-gradient(var(--color-border-strong), var(--color-border-strong));
+  background-size: 1px 100%, 100% 1px;
+  background-position: 50% 0, 0 50%;
+  background-repeat: no-repeat;
+}
+
+.app-header__mark::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  background: var(--color-primary);
+}
+
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin-left: auto;
+}
+
+/* 工具轨：竖排入口，选中项靠左侧 2px 青色条与文字提亮标记，不改变底色。 */
+.app-rail {
+  position: fixed;
+  top: var(--header-height);
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: var(--rail-width);
+  padding: var(--space-5) var(--space-3);
+  overflow-y: auto;
+  background: var(--color-surface);
+  border-right: var(--border-width) solid var(--color-border);
+}
+
+.app-rail__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target);
+  padding: var(--space-3) var(--space-1);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  transition:
+    color var(--duration-base) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out);
+}
+
+.app-rail__item:hover {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.app-rail__item.router-link-active {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.app-rail__item.router-link-active::before {
+  content: '';
+  position: absolute;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  left: calc(var(--space-3) * -1);
+  width: var(--border-width-accent);
+  background: var(--color-primary);
+}
+
+.app-rail__icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  opacity: var(--opacity-faint);
+}
+
+.app-rail__item:hover .app-rail__icon,
+.app-rail__item.router-link-active .app-rail__icon {
+  opacity: 1;
+}
+
+/* 分隔线用「上下各一段留白 + 一条线」表达分组，不加分组标题，避免 84px 宽度里塞进两行文字。 */
+.app-rail__divider {
+  height: var(--border-width);
+  margin: var(--space-4) var(--space-3);
+  background: var(--color-border);
+}
+
+/* 账户入口沉底：它不属于学习动线，也不属于治理面。 */
+.app-rail__footer {
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.app-main {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-8) var(--space-11);
+}
+
+/* 全局按钮基准：组件层只在其上叠加语义变体，不再各写一份 padding 与边框。 */
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: var(--tap-target);
+  padding: var(--space-3) var(--space-6);
+  border: var(--border-width) solid var(--color-primary);
+  border-radius: var(--radius);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+button:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+button:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+button.link {
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-weight: 400;
+}
+
+button.link:hover:not(:disabled) {
+  background: none;
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+button.danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+button.danger:hover:not(:disabled) {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-on-danger);
+}
+
+/*
+ * 焦点环的唯一落点（D-193）。`:where()` 让这条规则权重为 0，组件仍可自行覆盖；
+ * 用 `focus-visible` 而不是 `focus`：键盘 Tab 必须看得见环，鼠标点击按钮不必留。
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/*
+ * 三档视口（D-192）：640 与 1024 只能写在自己的 @media 里——媒体查询的条件读不到自定义属性，
+ * 收进令牌层就得到两个没人消费的死令牌（S10-2 实测过）。jsdom 不求值媒体查询，
+ * 因此这三档的可判据只有「规则存在且成三档」，观感归 S10-8 浏览器冒烟。
+ */
+@media (max-width: 639px) {
+  /* 窄屏把工具轨折成横向条：竖轨会吃掉 84px，在 375 宽的屏上是正文宽度的四分之一。 */
+  .app-shell--with-rail {
+    padding-left: 0;
+  }
+
+  .app-header {
+    gap: var(--space-4);
+    padding: 0 var(--space-5);
+  }
+
+  .app-rail {
+    position: static;
+    flex-direction: row;
+    width: auto;
+    padding: var(--space-2) var(--space-4);
+    border-right: none;
+    border-bottom: var(--border-width) solid var(--color-border);
+    overflow-x: auto;
+  }
+
+  .app-rail__item {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .app-rail__item.router-link-active::before {
+    top: auto;
+    right: var(--space-3);
+    bottom: calc(var(--space-3) * -1);
+    left: var(--space-3);
+    width: auto;
+    height: var(--border-width-accent);
+  }
+
+  .app-rail__divider {
+    width: var(--border-width);
+    height: auto;
+    margin: var(--space-2) var(--space-2);
+  }
+
+  .app-rail__footer {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  .app-main {
+    padding: var(--space-6) var(--space-5) var(--space-9);
+  }
+
+  /* 窄屏字号整体提一档：13px 正文在手机上偏小。 */
+  body {
+    font-size: var(--text-lg);
+  }
+
+  h1 {
+    font-size: var(--text-xl);
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1024px) {
+  .app-main {
+    padding: var(--space-7) var(--space-7) var(--space-10);
+  }
+}
+
+@media (min-width: 1025px) {
+  /* 桌面档加宽命令条与首屏留白：1280 版心下这块余量是给「页面标题 + 说明」留呼吸的。 */
+  .app-header {
+    padding: 0 var(--space-8);
+  }
+
+  .app-main {
+    padding-top: var(--space-10);
+  }
+}

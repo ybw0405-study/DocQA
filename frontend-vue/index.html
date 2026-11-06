@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      访问令牌只驻内存，刷新凭据由 HttpOnly Cookie 持有，页面脚本既不读也不写；
+      浏览器存储唯一允许的状态是界面主题偏好，owner 固定为 src/theme.ts（键名与禁现字面量
+      由 tests/redlines.spec.ts 的三重白名单当场对账）。XSS 仍是主要威胁面，因此禁止内联脚本：
+      首帧主题改下面这个独立模块，而不是写在 head 里。style-src 的 unsafe-inline 是
+      Vite dev 注入样式所需的最小放宽。生产环境应由网关下发同名 CSP 头。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws://localhost:5173 ws://127.0.0.1:5173; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
+    <title>智能学习助手</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/theme-bootstrap.ts"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

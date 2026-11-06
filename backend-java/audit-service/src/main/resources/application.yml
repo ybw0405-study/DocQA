@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: audit-service
+  main:
+    web-application-type: none
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+    serialization:
+      write-dates-as-timestamps: false
+  datasource:
+    url: ${DOCQA_DB_URL:jdbc:mysql://127.0.0.1:3306/docqa?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
+    username: ${DOCQA_AUDIT_DB_USERNAME:${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:root}}}
+    password: ${DOCQA_AUDIT_DB_PASSWORD:${DOCQA_APP_DB_PASSWORD:${DOCQA_DB_PASSWORD:}}}
+    hikari:
+      maximum-pool-size: 10
+      connection-init-sql: "SET time_zone = '+00:00'"
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: ${DOCQA_REDIS_HOST:127.0.0.1}
+      port: ${DOCQA_REDIS_PORT:6379}
+      password: ${DOCQA_REDIS_PASSWORD:}
+      database: ${DOCQA_REDIS_DATABASE:0}
+      timeout: 3s
+      connect-timeout: 3s
+
+docqa:
+  rocketmq:
+    enabled: ${DOCQA_ROCKETMQ_ENABLED:true}
+    namesrv: ${DOCQA_ROCKETMQ_NAMESRV:127.0.0.1:9876}
+    consumer-group: audit-service-audit-event
+    topic: audit-event
+    max-reconsume-times: 8
+    consume-thread-min: 2
+    consume-thread-max: 4
+  audit:
+    mq-idempotency-ttl: 7d
+    query-default-limit: 100
+    query-max-limit: 500
+    occurred-at-skew: 5m
+    # 启动自检：读 information_schema 证明本进程的账号改不动 audit_event 的历史行。
+    # off / warn / enforce；默认 warn —— 还没做权限收敛的环境（含仍用 root 的本机）必须能起得来。
+    # 收敛完成后再设 DOCQA_AUDIT_APPEND_ONLY_GUARD=enforce，让漂移在下一次重启就变红。
+    append-only-guard: ${DOCQA_AUDIT_APPEND_ONLY_GUARD:warn}
+
+logging:
+  level:
+    com.docqa.audit: INFO

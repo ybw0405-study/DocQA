@@ -1,0 +1,2200 @@
+/*
+ * 组件层：页面级类的唯一落点。颜色只允许来自 tokens.css 的语义别名，
+ * 尺寸走 --space-* / --text-* 刻度；历史 class 名按 D-188 保留，改名不属于本次视觉重构的收益。
+ *
+ * 三条贯穿全篇的规则：
+ * 1. 层级靠底色亮度差与线宽差，不靠阴影——阴影在深色底上会糊成一团。
+ * 2. 面与面之间只用 1px 发丝线，圆角一律 2px；圆角越大，界面越像通用模板。
+ * 3. 表头、字段标签、角色名统一走「小字号 + 大写字距」的仪表标注体，正文保持常规字重。
+ */
+.card {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-8);
+}
+
+.card + .card {
+  margin-top: var(--space-7);
+}
+
+.card > :last-child {
+  margin-bottom: 0;
+}
+
+/* 说明性段落限宽到 72 字符：再宽就不是「读」而是「扫」。 */
+.card > p {
+  max-width: 72ch;
+}
+
+/*
+ * 文件选择控件：原生 ::file-selector-button 在深色主题下是白底黑字的系统按钮，
+ * 贴在深色卡片里像一块贴纸；这里把它压成与次按钮同款的描边块。
+ */
+input[type='file'] {
+  cursor: pointer;
+}
+
+input[type='file']::file-selector-button {
+  min-height: var(--tap-target);
+  margin-right: var(--space-4);
+  padding: 0 var(--space-5);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+input[type='file']::file-selector-button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/*
+ * 页面标题带：h1 落在卡片内时，让它撑满卡片顶部形成独立一条，
+ * 而不是和正文挤在同一个内边距里。这样「页面」与「页面里的面板」在视觉上分成两层。
+ */
+.card > h1:first-child {
+  margin: calc(var(--space-8) * -1) calc(var(--space-8) * -1) var(--space-7);
+  padding: var(--space-5) var(--space-8);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-raised);
+  font-size: var(--text-xl);
+  letter-spacing: 0.01em;
+}
+
+/*
+ * 卡片标题右侧拉一条延伸线：它把「标题」和「标题下的内容」连成一块，
+ * 比加粗标题更能压住版面——尤其是标题下方只有两三个字段的稀疏面板。
+ */
+.card > h2:first-child {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+  font-size: var(--text-lg);
+  letter-spacing: 0.02em;
+}
+
+.card > h2:first-child::after {
+  content: '';
+  flex: 1;
+  height: var(--border-width);
+  background: var(--color-border);
+}
+
+/*
+ * 问答页的桌面版式：会话管理固定在左栏并随滚动停留，对话与提问在右栏。
+ * 三块内容原本等宽竖排，视觉上像三张互不相干的表单；分栏之后「选会话 → 看对话 → 提问」
+ * 才读得出是一条动线。窄档在下方 @media 里回退成单列。
+ */
+.app-main:has(.ask__new) {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-7);
+}
+
+.app-main:has(.ask__new) > .card {
+  margin-top: 0;
+}
+
+.app-main:has(.ask__new) > .card:first-child {
+  grid-row: 1 / span 2;
+  position: sticky;
+  top: calc(var(--header-height) + var(--space-6));
+}
+
+.app-main:has(.ask__new) .ask__new {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+/*
+ * 问答页的两个主动作（新建会话、提问）用实心：这一页没有并排的次要操作，
+ * 描边按钮在空白面板里会显得「还没准备好」。
+ */
+.ask__new > button,
+.ask__submit {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.ask__new > button:hover:not(:disabled),
+.ask__submit:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* 表单 ---------------------------------------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.field label,
+.field > span {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-4);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-md);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.field textarea {
+  min-height: calc(var(--tap-target) * 4);
+  max-width: 720px;
+  padding: var(--space-3) var(--space-4);
+  resize: vertical;
+}
+
+/*
+ * 下拉框不该跟着表单拉满：一个「全部」选项撑到 1100px 宽，读起来像一条空横条。
+ * 输入框同理，超过 720px 的行长已经不利于核对。
+ * align-self 必须写：`.field` 是纵向 flex，`width: auto` 在 stretch 下依然等于满宽。
+ */
+.field select {
+  width: auto;
+  align-self: flex-start;
+  min-width: 180px;
+  max-width: 100%;
+}
+
+.field input {
+  max-width: 720px;
+}
+
+/* 下拉永远不需要整行宽：选项文本再长，撑到 1000px 也只是几条空横线。 */
+select {
+  max-width: 320px;
+}
+
+.field input:hover,
+.field select:hover,
+.field textarea:hover {
+  border-color: var(--color-border-strong);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  border-color: var(--color-primary);
+  background: var(--color-surface-raised);
+}
+
+.field-error {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+/*
+ * 表单的提交键是这一屏唯一的主动作，用实心填充把它从「一排同款按钮」里拎出来：
+ * 其余按钮保持描边或纯文字，主次差异来自填充而非尺寸。
+ */
+form > button[type='submit'] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 500;
+}
+
+form > button[type='submit']:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  filter: brightness(1.08);
+}
+
+form > button[type='submit']:disabled {
+  background: var(--color-primary);
+}
+
+/* 上传任务 ------------------------------------------------------------ */
+
+.upload-tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.upload-task {
+  border-top: var(--border-width) solid var(--color-border);
+  padding: var(--space-4) 0;
+}
+
+.upload-task__title,
+.upload-task__status {
+  margin: 0 0 var(--space-2);
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.upload-task__title {
+  font-size: var(--text-md);
+}
+
+.upload-task__status {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.upload-task progress {
+  width: 240px;
+  max-width: 100%;
+  height: var(--space-2);
+  margin: var(--space-2) 0;
+  accent-color: var(--color-primary);
+}
+
+/* 表格：六个数据表共用一套骨架 ---------------------------------------- */
+
+.document-table,
+.schedule-table,
+.quota-table,
+.audit-table,
+.usage-table,
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.document-table th,
+.document-table td,
+.schedule-table th,
+.schedule-table td,
+.quota-table th,
+.quota-table td,
+.audit-table th,
+.audit-table td,
+.usage-table th,
+.usage-table td,
+.users-table th,
+.users-table td {
+  text-align: left;
+  padding: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  font-weight: 400;
+  vertical-align: top;
+}
+
+.document-table th,
+.schedule-table th,
+.quota-table th,
+.audit-table th,
+.usage-table th,
+.users-table th {
+  padding-bottom: var(--space-2);
+  border-bottom-color: var(--color-border-strong);
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.document-table tbody tr:hover td,
+.schedule-table tbody tr:hover td,
+.quota-table tbody tr:hover td,
+.audit-table tbody tr:hover td,
+.usage-table tbody tr:hover td,
+.users-table tbody tr:hover td {
+  background: var(--color-surface-raised);
+}
+
+/* 表格的标题统一左移降号：默认的居中粗体会被读成一行表头而不是这段说明。 */
+.document-table caption,
+.schedule-table caption,
+.quota-table caption,
+.audit-table caption,
+.usage-table caption,
+.users-table caption {
+  text-align: left;
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  padding-bottom: var(--space-3);
+}
+
+.document-list__toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-5);
+}
+
+/*
+ * 审计表七列里有三列是 UUID。auto 布局会为了「不换行」把 UUID 铺开、把事件类型挤成
+ * 十几像素宽——恰好把唯一有信息量的一列压没了。fixed 之后按内容重要性分配宽度。
+ */
+.audit-table {
+  table-layout: fixed;
+}
+
+.audit-table th:nth-child(1),
+.audit-table td:nth-child(1) {
+  width: 13%;
+}
+
+.audit-table th:nth-child(2),
+.audit-table td:nth-child(2) {
+  width: 19%;
+}
+
+.audit-table th:nth-child(3),
+.audit-table td:nth-child(3) {
+  width: 7%;
+}
+
+.audit-table th:nth-child(4),
+.audit-table td:nth-child(4) {
+  width: 7%;
+}
+
+.audit-table th:nth-child(5),
+.audit-table td:nth-child(5) {
+  width: 25%;
+}
+
+.audit-table th:nth-child(6),
+.audit-table td:nth-child(6) {
+  width: 23%;
+}
+
+.audit-table th:nth-child(7),
+.audit-table td:nth-child(7) {
+  width: 6%;
+}
+
+/*
+ * 标识符不截断——审计要能整段复制去查日志；但用等宽小字换成「编号」的观感，
+ * 而不是正文里一坨随机字符。`break-all` 让 36 位 UUID 整齐折成两行。
+ */
+.mono-id {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+/* 用户表的六列同样被 auto 布局挤坏：「正常」被压成竖排两字。 */
+.users-table {
+  table-layout: fixed;
+}
+
+.users-table th:nth-child(1),
+.users-table td:nth-child(1) {
+  width: 26%;
+}
+
+.users-table th:nth-child(2),
+.users-table td:nth-child(2) {
+  width: 8%;
+}
+
+.users-table th:nth-child(3),
+.users-table td:nth-child(3) {
+  width: 16%;
+}
+
+.users-table th:nth-child(4),
+.users-table td:nth-child(4) {
+  width: 14%;
+}
+
+.users-table th:nth-child(5),
+.users-table td:nth-child(5) {
+  width: 14%;
+}
+
+.users-table th:nth-child(6),
+.users-table td:nth-child(6) {
+  width: 22%;
+}
+
+/*
+ * 用户名与它的 UUID 是两种东西：一个是人读的、一个是写入键。
+ * 挤在同一行会让「adminprobe01 74080c21-… 当前登录的账号」糊成一团，所以拆成两行。
+ */
+.users-table__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-md);
+}
+
+/* 标签而不是灰字：它是一行状态标记，不是又一段说明。 */
+.users-table__self {
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius);
+  padding: 0 var(--space-2);
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+/* 新建配额的三个字段排在一条线上，写入与取消沉到同一行右侧。 */
+.admin-quotas__create {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(160px, 200px) minmax(160px, 200px);
+  gap: var(--space-5);
+  align-items: start;
+  padding: var(--space-5);
+  margin-top: var(--space-4);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface-raised);
+}
+
+.admin-quotas__create-actions {
+  display: flex;
+  gap: var(--space-3);
+  grid-column: 1 / -1;
+}
+
+/* 一行六个操作按钮若都按主按钮渲染会压垮表格宽度，操作列统一用轻量文字样式。 */
+.document-table__actions button,
+.quota-table__actions button,
+.audit-table__actions button,
+.users-table__actions button {
+  min-height: 0;
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.document-table__actions button:hover:not(:disabled),
+.quota-table__actions button:hover:not(:disabled),
+.audit-table__actions button:hover:not(:disabled),
+.users-table__actions button:hover:not(:disabled) {
+  background: none;
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.document-table__actions button.danger {
+  color: var(--color-danger);
+}
+
+.document-table__expanded td,
+.quota-table__expanded td,
+.audit-table__expanded td,
+.users-table__expanded td {
+  background: var(--color-bg);
+  padding: var(--space-4);
+}
+
+.document-table__detail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-6);
+  margin: 0 0 var(--space-4);
+}
+
+.document-table__detail dt {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+.document-table__detail dd {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+/* 问答 ---------------------------------------------------------------- */
+
+.ask__new {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-5);
+}
+
+.ask__sessions,
+.ask__messages,
+.ask__docs ul {
+  list-style: none;
+  margin: var(--space-5) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/*
+ * 会话行是「标题 / 当前标记 / 时间」三样东西，横排时标题只剩三十来像素，
+ * 于是「线性代数第三章」被挤成竖排的单字。改成两行：标题独占一行，时间沉到标题下面。
+ */
+.ask__sessions li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title current'
+    'time  time';
+  align-items: start;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.ask__sessions li > button {
+  grid-area: title;
+  justify-content: flex-start;
+  padding: 0;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  white-space: normal;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.ask__sessions li > button:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+
+.ask__sessions li > .ask__current {
+  grid-area: current;
+  align-self: start;
+}
+
+.ask__sessions li > .muted {
+  grid-area: time;
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.ask__current {
+  border: var(--border-width) solid var(--color-primary);
+  border-radius: var(--radius);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+}
+
+/* 每条消息上方一条发丝线，角色名用仪表标注体：一眼能分清「谁说的」，但不需要气泡框。 */
+.ask__message {
+  border-top: var(--border-width) solid var(--color-border);
+  padding-top: var(--space-4);
+}
+
+.ask__message-head {
+  display: flex;
+  gap: var(--space-4);
+  align-items: baseline;
+  margin: 0 0 var(--space-2);
+}
+
+.ask__role {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.ask__content {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--text-lg);
+  line-height: 1.7;
+}
+
+.ask__cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: var(--color-primary);
+  animation: ask-cursor-blink 1s steps(2, start) infinite;
+}
+
+@keyframes ask-cursor-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask__cursor {
+    animation: none;
+  }
+}
+
+/* 治理徽章 ------------------------------------------------------------ */
+
+.governance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.governance__chip {
+  border-radius: var(--radius);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-raised);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+}
+
+.governance__chip--ok {
+  color: var(--color-ok-text);
+  border-color: var(--color-ok-border);
+  background: var(--color-ok-bg);
+}
+
+.governance__chip--warn {
+  color: var(--color-warn-text);
+  border-color: var(--color-warn-border);
+  background: var(--color-warn-bg);
+}
+
+.governance__item--faint {
+  opacity: var(--opacity-faint);
+}
+
+/* 引用：左侧 2px 青线，序号等宽。引用是答案的证据，必须比正文更安静、更结构化。 */
+.citations {
+  margin-top: var(--space-5);
+  border-left: var(--border-width-accent) solid var(--color-primary);
+  padding-left: var(--space-5);
+}
+
+.citations ol {
+  margin: 0;
+  padding-left: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.citations__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.citations__name {
+  font-weight: 600;
+}
+
+.citations__snippet {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+
+/* 提醒 ---------------------------------------------------------------- */
+
+.reminders__group {
+  margin-top: var(--space-8);
+}
+
+.reminders__list {
+  list-style: none;
+  margin: var(--space-5) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.reminders__item {
+  border-top: var(--border-width) solid var(--color-border);
+  padding: var(--space-4) 0;
+}
+
+.reminders__head,
+.reminders__times,
+.reminders__rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.reminders__title {
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: var(--text-lg);
+}
+
+.reminders__status {
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius);
+  padding: 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.reminders__desc {
+  margin: 0 0 var(--space-2);
+  white-space: pre-wrap;
+}
+
+/* RRULE 原文是契约字段，等宽展示但不做语义翻译，避免与 Java 的实现产生第二套解释。 */
+.reminders__rrule {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.reminders__kinds {
+  display: flex;
+  gap: var(--space-7);
+  max-width: 560px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-raised);
+  padding: var(--space-3) var(--space-5);
+  margin: 0 0 var(--space-5);
+}
+
+.reminders__created {
+  margin: var(--space-5) 0 0;
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+}
+
+/* 状态机按钮与说明同处一行：动作与「不可回退」的限制必须同屏可读。 */
+.reminders__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+/* 课表导入 ------------------------------------------------------------ */
+
+.schedule-panel__counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+}
+
+/* 同一组数字可能来自预览也可能来自导入，标签就是这两者的唯一区分。 */
+.schedule-panel__stage {
+  border-left: var(--border-width-accent) solid var(--color-primary);
+  padding-left: var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-label);
+}
+
+.schedule-panel__echo {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.schedule-count {
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius);
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* STALE 是「跳过这一个事件」而不是整批失败，但必须显眼，否则部分跳过会被读成全量写入。 */
+.schedule-count--warn {
+  color: var(--color-warn-text);
+  border-color: var(--color-warn-border);
+  background: var(--color-warn-bg);
+}
+
+.schedule-table td > * + * {
+  margin-left: var(--space-3);
+}
+
+/* UID 与 RRULE 是文件原文，等宽展示且允许任意位置断行，避免长 UID 撑破表格。 */
+.schedule-table__code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* 通知 ---------------------------------------------------------------- */
+
+.notifications__filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-5) 0 0;
+}
+
+.notifications__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.notifications__count {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-label);
+}
+
+.notifications__note {
+  margin: var(--space-3) 0;
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+}
+
+.notifications__list {
+  list-style: none;
+  margin: var(--space-5) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.notifications__item {
+  display: flex;
+  gap: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+  padding: var(--space-4) 0;
+}
+
+/* 未读条目只加一条左边框：颜色已经用在徽标上，避免同一行两处强调。 */
+.notifications__item--unread {
+  border-left: var(--border-width-accent) solid var(--color-primary);
+  padding-left: var(--space-4);
+}
+
+.notifications__pick {
+  display: flex;
+  align-items: flex-start;
+  padding-top: var(--space-1);
+}
+
+.notifications__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.notifications__head,
+.notifications__times {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.notifications__title {
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.notifications__badge {
+  border: var(--border-width) solid var(--color-primary);
+  border-radius: var(--radius);
+  background: var(--color-primary-soft);
+  padding: 0 var(--space-2);
+  color: var(--color-primary);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+.notifications__desc {
+  margin: 0 0 var(--space-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 主题选择器：原生 select，不加组件包装层，键盘与读屏行为由浏览器负责。 */
+.theme-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+}
+
+.theme-switch select {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.theme-switch select:hover {
+  border-color: var(--color-border-strong);
+}
+
+/* 首次加载的占位骨架（D-189）：只表示「这里将有内容」，骨架内禁止出现任何数字，否则占位的「0」会被读成真实计数。 */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 520px;
+  margin: var(--space-5) 0;
+}
+
+.skeleton__row {
+  height: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-border);
+  animation: skeleton-pulse 1.6s ease-in-out infinite alternate;
+}
+
+/* 末行短一节：等长的一排条会被读成表格边框，长短差才是「正在加载的内容」的形状。 */
+.skeleton__row:nth-child(3n) {
+  width: 60%;
+}
+
+@keyframes skeleton-pulse {
+  from {
+    opacity: var(--opacity-faint);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton__row {
+    animation: none;
+  }
+}
+
+/*
+ * 跳转链接（D-193）：平时移出视口但仍留在 Tab 序列里，键盘聚焦到它才现身。
+ * 刻意不复用 .visually-hidden——那套 1px 裁剪会让它聚焦后依然看不见，等于把无障碍判据做成装饰。
+ */
+.skip-link {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-5);
+  z-index: 30;
+  transform: translateY(-200%);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border: var(--border-width) solid var(--color-primary);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--text-sm);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.skip-link:focus-visible {
+  top: var(--space-5);
+  transform: none;
+  text-decoration: none;
+}
+
+/*
+ * 宽表格在窄档的统一落点（D-192）：横向滚动而不是把 td 堆成「行 + 卡片」。
+ * 后者要把 table/tr/td 的 display 改掉，浏览器会一并剥掉 role=table/row/cell 与列对应关系——
+ * 等于用响应式判据去换无障碍判据，这两条在本片里不能互相抵消。
+ * 宿主清单由 a11y 守卫按 class 对账，这里不重复记数。
+ */
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* 管理端 -------------------------------------------------------------- */
+
+/*
+ * 工具条把条件字段与按钮排在同一行，窄屏靠 flex-wrap 换行：
+ * 断点只许留在 base/components 已有的两处 @media 里，否则 D-192 的三档会被这一层悄悄扩成四档。
+ * 类名按 D-188 保留；自 S10-7 起账户页的「重新读取」也落在这一条规则上。
+ */
+.admin__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  margin: var(--space-5) 0;
+}
+
+/*
+ * dl 承载「标签 → 服务端字段」的键值对，降列节奏与文档明细同刻度，避免为管理端另开一套栅格。
+ * 账户页的身份块（D-212）用的是同一套栅格，因此这个类名不代表「只有管理端才有的状态」。
+ */
+.admin-state {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-6);
+  margin: var(--space-5) 0;
+}
+
+.admin-state > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.admin-state dt {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.admin-state dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* 写入回执是一次性动作的结果，配色与通知说明一致：加边框会被读成又一枚状态徽章。 */
+.admin-controls__result,
+.admin-quotas__result,
+.admin-users__result,
+.login__notice {
+  margin: var(--space-3) 0;
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+}
+
+/* 二次确认的影响面与确认按钮同屏（D-198）：分居两处就等于允许在没读到后果时按下总闸。 */
+.admin-confirm {
+  border: var(--border-width) solid var(--color-warn-border);
+  border-left: var(--border-width-accent) solid var(--color-warn-border);
+  border-radius: var(--radius);
+  background: var(--color-warn-bg);
+  padding: var(--space-4) var(--space-5);
+  margin: var(--space-5) 0;
+}
+
+.admin-confirm .admin__toolbar {
+  margin: var(--space-3) 0 0;
+}
+
+/* 原文 JSON 默认折叠，展开后仍是文本插值（D-201）；等宽 + 任意断行，长哈希不会撑破表格。 */
+.admin-raw {
+  margin: var(--space-3) 0;
+  font-size: var(--text-sm);
+}
+
+.admin-raw__body {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 护栏说明落在按钮下方：独占一行并与按钮的文字起点对齐，才不会被读成又一颗按钮。 */
+.users-table__actions .muted {
+  display: block;
+  padding-left: var(--space-2);
+}
+
+/* 角色勾选组沿用提醒页那套 fieldset 节奏：边界要包住「这一组是一个整集替换」这个语义。 */
+.users-table__roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-7);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-raised);
+  padding: var(--space-3) var(--space-5);
+  margin: 0 0 var(--space-4);
+}
+
+.users-table__roles legend {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  padding: 0 var(--space-2);
+}
+
+/* D-199 的比例条：宽度由视图按「本列最大值」归一后以行内 style 给出，数字仍逐行文本呈现，条只表达相对高低。 */
+/*
+ * 比例条必须先有一条「轨道」，否则 100% 的那根填充会被读成一行分隔线——
+ * 之前用量页的「按日序列」看起来就是一横一横的表线。
+ */
+.ratio-bar {
+  position: relative;
+  display: block;
+  min-width: 88px;
+  height: var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.ratio-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius);
+  background: var(--color-primary);
+}
+
+/* 登录 -------------------------------------------------------------- */
+
+/*
+ * 登录页：左栏说明书 + 右栏表单。表单卸掉卡片外壳直接落在页面上——
+ * 这里只有一个任务，套一层边框只会让人先看边框再看字段。
+ */
+.login {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: var(--space-10);
+  align-items: center;
+  /* 两栏各贴一边时，中间那块空白会把构图撕开；限宽之后它们是一块面板，留白落在两侧。 */
+  max-width: 880px;
+  margin-inline: auto;
+  min-height: calc(100vh - var(--header-height));
+  padding-block: var(--space-10);
+}
+
+.login__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.login__eyebrow {
+  margin: 0;
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: 0.18em;
+}
+
+.login__claim {
+  margin: 0;
+  max-width: 18ch;
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  line-height: 1.24;
+  letter-spacing: -0.02em;
+}
+
+/* 规格表式的能力说明：编号用等宽字，条目之间只有一条发丝线。 */
+.login__spec {
+  margin: var(--space-6) 0 0;
+  /* 线不跟着网格拉满：一条延伸到 660px 的横线，右边半截是空的，读起来像没填完的表格。 */
+  max-width: 44ch;
+  display: grid;
+  gap: 0;
+}
+
+.login__spec > div {
+  display: grid;
+  grid-template-columns: var(--space-11) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.login__spec > div:last-child {
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.login__spec dt {
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.login__spec dd {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/*
+ * 右栏不再是一张浮在空白里的卡片：左侧一条发丝线把它和规格表连成一组构图，
+ * 中间那块空白才读成「分隔」而不是「没画完」。
+ */
+.login .card {
+  border: none;
+  border-left: var(--border-width) solid var(--color-border-strong);
+  background: none;
+  padding: 0 0 0 var(--space-9);
+}
+
+.login .card > h1 {
+  margin: 0 0 var(--space-7);
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--text-2xl);
+}
+
+.login .card form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 380px;
+}
+
+/* ==========================================================================
+ * S13 版式层
+ *
+ * 上一版的病根不在配色，而在「把接口契约的排版当成了界面的排版」：
+ * 每条数据占一行纯文本、每行四个等权按钮、每页一段契约说明铺在主视觉上。
+ * 这一层不动任何测试挂载点（.reminders__item / tbody tr / .admin-state 等），
+ * 只重做三件事：把数据压进有列宽的表格、把状态变成可扫读的指示灯、把动作分出主次。
+ * 断点仍只落在下方已有的两处 @media 里，不新增第三处。
+ * ========================================================================== */
+
+/* 一、卡片：标题带改成左侧强调线 -------------------------------------- */
+
+.app-main > .card > h1:first-child {
+  margin: calc(var(--space-8) * -1) calc(var(--space-8) * -1) var(--space-7);
+  padding: var(--space-5) var(--space-8) var(--space-5) calc(var(--space-8) - var(--border-width-accent));
+  border-bottom: var(--border-width) solid var(--color-border);
+  border-left: var(--border-width-accent) solid var(--color-primary);
+  background: none;
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+.app-main > .card > h2:first-child {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+}
+
+.card + .card {
+  margin-top: var(--space-6);
+}
+
+/*
+ * 说明性段落统一压到最小一档：它们解释的是「为什么这样」，不是「这里是什么」。
+ * 之前这些段落与正文同字号同颜色，一页里最显眼的三行全是契约条款。
+ */
+.card p.muted {
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--color-text-faint);
+}
+
+/*
+ * 页内说明折叠：保留全文（读屏与检索都能拿到），但默认只露一行摘要。
+ * summary 走与表头同一套仪表标注体，让它看起来是「一个可展开的注」而不是一个标题。
+ */
+.page-note {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.page-note > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  cursor: pointer;
+}
+
+.page-note > summary::-webkit-details-marker {
+  display: none;
+}
+
+.page-note > summary::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 4px solid currentColor;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.page-note[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.page-note > p {
+  max-width: 68ch;
+  margin: var(--space-3) 0 0;
+  padding-left: var(--space-5);
+  border-left: var(--border-width) solid var(--color-border);
+  line-height: 1.8;
+}
+
+/* 二、表格：铺满列宽，数字对齐，状态成灯 ---------------------------------- *//*
+ * 固定列宽是这张表看起来「散」的唯一原因：auto 布局会把每列压到内容宽度，
+ * 于是整张表缩在左边三分之一，右边留下一条空带。百分比按「文档名最长、
+ * 操作列要容下四个文字按钮」分配，合计 100%。
+ */
+.document-table {
+  table-layout: fixed;
+}
+
+.document-table th:nth-child(1) { width: 26%; }
+.document-table th:nth-child(2) { width: 7%; }
+.document-table th:nth-child(3) { width: 12%; }
+.document-table th:nth-child(4) { width: 6%; }
+.document-table th:nth-child(5) { width: 10%; }
+.document-table th:nth-child(6) { width: 7%; }
+.document-table th:nth-child(7) { width: 11%; }
+.document-table th:nth-child(8) { width: 21%; }
+
+.document-table th {
+  border-bottom: var(--border-width-accent) solid var(--color-border-strong);
+  padding-bottom: var(--space-3);
+}
+
+.document-table td {
+  padding: var(--space-4) var(--space-3);
+  color: var(--color-text-muted);
+}
+
+/* 第一列是「这条文档是谁」，给正文色；其余是属性，压低一档。 */
+.document-table td:first-child {
+  color: var(--color-text);
+}
+
+.document-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.document-table td:nth-child(2),
+.document-table td:nth-child(4),
+.document-table td:nth-child(6),
+.document-table td:nth-child(7) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.document-table__actions button {
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+/* 表格说明是给读屏与「这张表是什么」用的，不该和表头抢第一行。 */
+.document-table caption {
+  padding-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+/*
+ * 状态指示灯：一个色点 + 文案。用点而不是胶囊标签，是因为表格里同时有
+ * 六个状态值，六种颜色的胶囊会变成一堵彩墙；点只占 6px，颜色才是唯一信号。
+ */
+.doc-status,
+.reminders__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.doc-status::before,
+.reminders__status::before {
+  content: '';
+  flex: none;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.doc-status[data-status='INDEXED'],
+.reminders__status[data-status='ACTIVE'] {
+  color: var(--color-ok-text);
+}
+
+.doc-status[data-status='PARSING'],
+.doc-status[data-status='PENDING'],
+.doc-status[data-status='QUEUED'],
+.doc-status[data-status='UPLOADED'],
+.reminders__status[data-status='PAUSED'] {
+  color: var(--color-warn-text);
+}
+
+.doc-status[data-status='FAILED'],
+.doc-status[data-status='DEAD'],
+.reminders__status[data-status='CANCELLED'] {
+  color: var(--color-danger);
+}
+
+.reminders__status[data-status='COMPLETED'] {
+  color: var(--color-text-faint);
+}
+
+/* 三、上传：整块虚线区就是选择器 ---------------------------------------- */
+
+.dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 152px;
+  padding: var(--space-8) var(--space-6);
+  border: var(--border-width) dashed var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+/*
+ * 只留 hover：a11y 守卫逐文件扫「焦点落在子元素上」的选择器，只要出现就会判红，
+ * 而键盘焦点环本来就由全局的 focus-visible 规则画在铺满的透明 input 上（等于整块区域），不需要额外一条。
+ */
+.dropzone:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+/* 原生控件铺满并透明化：点击任意处都能唤起文件选择，且它仍是可 Tab 到的真实控件。 */
+.dropzone input[type='file'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropzone__icon {
+  width: 22px;
+  height: 22px;
+  color: var(--color-text-faint);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.dropzone:hover .dropzone__icon {
+  color: var(--color-primary);
+}
+
+.dropzone__title {
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+
+.dropzone__hint {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 上传面板里的空态改成一条注释块，而不是一句悬在卡片中央的话。 */
+.upload-panel > p {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) 0 var(--space-3) var(--space-5);
+  border-left: var(--border-width-accent) solid var(--color-border);
+  font-size: var(--text-sm);
+}
+
+/* 四、提醒：每条规则是一条时间线上的节点 -------------------------------- */
+
+/*
+ * 看板独立成左列，新建 / 课表导入 / 通知沉到右列：
+ * 这三块是「往里加东西」的入口，与「看已经有什么」不是同一条动线，
+ * 四张卡片等宽竖排会让页面读起来像四个并列的表格。
+ */
+.app-main:has(.reminders-board) {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(320px, 1fr);
+  align-items: start;
+  gap: var(--space-6);
+}
+
+.app-main:has(.reminders-board) > .reminders-board {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+}
+
+.app-main:has(.reminders-board) > *:not(.reminders-board) {
+  grid-column: 2;
+  margin-top: 0;
+}
+
+.reminders__group h2 {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.reminders__group > p {
+  max-width: 60ch;
+  font-size: var(--text-xs);
+}
+
+.reminders__list {
+  position: relative;
+  margin-top: var(--space-4);
+}
+
+/* 贯穿整列的竖线：它把「一串独立的卡片」读成「一条时间轴」。 */
+.reminders__list::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--dot-size) / 2 - var(--border-width) / 2);
+  width: var(--border-width);
+  background: var(--color-border);
+}
+
+.reminders__item {
+  position: relative;
+  padding: var(--space-5) 0 var(--space-5) var(--space-7);
+  border-top: none;
+}
+
+/* 节点上的状态点：颜色取自同一份 data-status 语义，与右侧文字同色。 */
+.reminders__item::before {
+  content: '';
+  position: absolute;
+  top: calc(var(--space-5) + 7px);
+  left: 0;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 50%;
+  background: var(--color-text-faint);
+  box-shadow: 0 0 0 3px var(--color-surface);
+}
+
+.reminders__item:has([data-status='ACTIVE'])::before {
+  background: var(--color-ok-text);
+}
+
+.reminders__item:has([data-status='PAUSED'])::before {
+  background: var(--color-warn-text);
+}
+
+.reminders__item:has([data-status='CANCELLED'])::before {
+  background: var(--color-danger);
+}
+
+.reminders__head {
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.reminders__title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+/* 类型名是给「这条规则从哪来」做区分，不是标题的一部分：用小字加一条分隔竖线挂上去。 */
+.reminders__kind {
+  padding-left: var(--space-4);
+  border-left: var(--border-width) solid var(--color-border-strong);
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+.reminders__times {
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+/* 「下次触发」的标签压到最小、值放大：扫一列时读的是时刻，不是「下次触发」四个字。 */
+.reminders__label {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+.reminders__label + .reminders__when {
+  margin-right: var(--space-4);
+}
+
+.reminders__when {
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.reminders__past,
+.reminders__lead {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.reminders__lead {
+  font-size: var(--text-xs);
+}
+
+.reminders__desc {
+  margin-bottom: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 重复规则折进 details：原文保留可查，但不占扫读行。 */
+.reminders__rule {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.reminders__rule > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+  list-style: none;
+  cursor: pointer;
+}
+
+.reminders__rule > summary::-webkit-details-marker {
+  display: none;
+}
+
+.reminders__rule > summary::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 4px solid currentColor;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.reminders__rule[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.reminders__tz {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+.reminders__rrule {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+/*
+ * 状态机按钮降级为轻量描边：同一条目上并排三个「不可回退」的主按钮，
+ * 会把最需要被看见的标题压下去。主次由填充与描边区分，不靠字号。
+ */
+.reminders__actions {
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.reminders__actions button {
+  min-height: 26px;
+  padding: 0 var(--space-4);
+  border-color: var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+
+.reminders__actions button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.reminders__filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.reminders__filter-label {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+/* 五、表单控件：去掉浏览器默认外观 -------------------------------------- */
+
+.field > span:first-child {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-md);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  border-color: var(--color-primary);
+  background-color: var(--color-surface);
+}
+
+/*
+ * 下拉箭头由两个 45° 小方块拼成：Chrome 的原生箭头在深色底上是一条白三角，
+ * 换主题不会跟着变，只能用 appearance: none 自己画。
+ */
+.field select,
+select {
+  appearance: none;
+  padding-right: var(--space-8);
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) calc(50% + 1px),
+    calc(100% - 10px) calc(50% + 1px);
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+textarea {
+  resize: vertical;
+}
+
+/* 六、按钮主次：默认实心仍是「主动作」，重复出现的动作降到描边 ------------- */
+
+/*
+ * 工具条里的按钮（查询 / 清空条件 / 刷新 / 清除已结束）与表单提交按钮同级，
+ * 但它们的语义是「辅助操作」，全部实心会让一屏出现四五个同权重的主按钮。
+ */
+.document-list__toolbar button,
+.upload-panel > button,
+.reminders__footer button {
+  border-color: var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.document-list__toolbar button:hover:not(:disabled),
+.upload-panel > button:hover:not(:disabled),
+.reminders__footer button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+/* 主行动保持实心：一个区块里只应有一个这样的按钮。 */
+form > button[type='submit'],
+.ask__submit {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 600;
+}
+
+form > button[type='submit']:hover:not(:disabled),
+.ask__submit:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  filter: brightness(1.08);
+}
+
+/* 七、首页工作台：三列各回答「这条线上现在有什么」 ---------------------- */
+
+.workbench__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-7);
+}
+
+.workbench__lane {
+  min-width: 0;
+  padding-left: var(--space-5);
+  border-left: var(--border-width) solid var(--color-border);
+}
+
+.workbench__lane:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+
+/* 数量是这一列里唯一该被先读到的数字，所以它比栏目名大一号。 */
+.workbench__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  max-width: none;
+  margin: 0 0 var(--space-4);
+}
+
+.workbench__name {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+.workbench__count {
+  color: var(--color-text);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.workbench__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+}
+
+.workbench__list li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.workbench__label {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench__meta {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.workbench__more {
+  color: var(--color-primary);
+  font-size: var(--text-xs);
+  text-decoration: none;
+}
+
+.workbench__more:hover {
+  text-decoration: underline;
+}
+
+/* 七之二、用量带：数字在上，趋势在下 ------------------------------------- */
+
+.usage__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-6);
+  padding-bottom: var(--space-6);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.usage__stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* 四个数是这一屏的论点，字号跨过正文一级，且必须等宽对齐。 */
+.usage__value {
+  color: var(--color-text);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.usage__label {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+.usage__note {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.usage__bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: end;
+  list-style: none;
+  margin: var(--space-6) 0 0;
+  padding: 0;
+}
+
+.usage__bar-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/*
+ * 柱子立在一根基线上而不是各自居中：没有基线时七根长短不一的色块读不出「同一条时间轴」。
+ * 高度由内联 style 给百分比，这里只负责容器高度与对齐。
+ */
+.usage__bar-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 72px;
+  border-bottom: var(--border-width) solid var(--color-border-strong);
+}
+
+.usage__bar {
+  width: 100%;
+  /* 七列等分时整列宽会变成色块：限宽之后才读得出「柱」。 */
+  max-width: 40px;
+  min-height: var(--space-1);
+  background: var(--color-primary);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+/* 没有执行的那天留一根灰色的贴地标记，让「这天是 0」和「这天没有格」能分开。 */
+.usage__bar[data-empty='true'] {
+  background: var(--color-border-strong);
+}
+
+.usage__tick,
+.usage__bar-value {
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* 八、筛选项与骨架屏 ---------------------------------------------------- */
+
+.document-list__toolbar {
+  align-items: flex-end;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.document-list__toolbar .field {
+  flex: 0 1 auto;
+}
+
+/* 骨架屏不再铺满整行：满宽的灰条会被读成表格线而不是「正在加载」。 */
+.skeleton {
+  max-width: 560px;
+  margin-top: var(--space-5);
+}
+
+.skeleton__row {
+  height: 9px;
+}
+
+.skeleton__row + .skeleton__row {
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 1024px) {
+  /* 两栏在平板档会把对话区压到 400 以下，正文每行只剩十来个字：回退单列。 */
+  .app-main:has(.ask__new) {
+    display: block;
+  }
+
+  /* 提醒看板同理：右列在平板档只剩 300 出头，新建表单的输入框会窄到无法核对。 */
+  .app-main:has(.reminders-board) {
+    display: block;
+  }
+
+  /* 三列工作台在平板档每列不到 300：会话标题会整片截断，改成两列并让提醒跨行。 */
+  .workbench__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-6);
+  }
+
+  .workbench__lane:nth-child(3) {
+    grid-column: 1 / -1;
+    padding-top: var(--space-5);
+    padding-left: 0;
+    border-top: var(--border-width) solid var(--color-border);
+    border-left: none;
+  }
+
+  .app-main:has(.reminders-board) > .reminders-board {
+    grid-row: auto;
+  }
+
+  .app-main:has(.reminders-board) > *:not(.reminders-board) {
+    margin-top: var(--space-6);
+  }
+
+  .app-main:has(.ask__new) > .card {
+    margin-top: var(--space-7);
+  }
+
+  .app-main:has(.ask__new) > .card:first-child {
+    position: static;
+  }
+
+  .document-table__detail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-state {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 639px) {
+  /* 窄屏只保留表单：说明书在手机上会把登录键推到首屏之外。 */
+  .login {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+    min-height: 0;
+  }
+
+  .login__intro {
+    gap: var(--space-4);
+  }
+
+  .login__claim {
+    font-size: var(--text-2xl);
+  }
+
+  .login__spec {
+    display: none;
+  }
+
+  .document-table__detail {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-state {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: var(--space-5);
+  }
+
+  .card > h1:first-child {
+    margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-5);
+    padding: var(--space-4) var(--space-5);
+    font-size: var(--text-lg);
+  }
+
+  /* min-width 让列不被压成竖排字母，超出部分交给 .table-scroll 横向滚动。 */
+  .document-table {
+    min-width: 760px;
+  }
+
+  .schedule-table {
+    min-width: 620px;
+  }
+
+  .quota-table {
+    min-width: 720px;
+  }
+
+  /* 审计表七列里 traceId 与 userId 都是定长哈希，压到 620 以下就只剩断字符。 */
+  .audit-table {
+    min-width: 900px;
+  }
+
+  .usage-table {
+    min-width: 480px;
+  }
+
+  /* 用户表六列里有一个定长标识与两个时刻，压到 820 以下只剩断字符。 */
+  .users-table {
+    min-width: 820px;
+  }
+}

@@ -1,0 +1,315 @@
+from __future__ import annotations
+
+import re
+from typing import Annotated, Literal
+from urllib.parse import urlparse
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# offline 空间的表名（迁移 001）。它同时是 D-117 启动守卫识别「真实向量被写进了 offline 空间」的判据。
+OFFLINE_VECTOR_TABLE = "chunk_embedding_1024"
+
+McpToolName = Annotated[str, Field(pattern=r"^[a-z0-9_]{1,32}$")]
+McpEnvName = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{0,63}$")]
+_HOST_ENTRY = re.compile(
+    r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*"
+    r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+)
+
+
+class McpServerSettings(BaseModel):
+    """D-124 / D-133：一条 Server 配置要么是远程 HTTP，要么是本地 stdio，二者互斥。"""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True, frozen=True)
+
+    name: str = Field(pattern=r"^[a-z0-9_]{1,32}$")
+    transport: Literal["http", "stdio"] = "http"
+    url: str = Field(default="", max_length=2048)
+    # stdio：命令必须是已预置的绝对路径可执行文件，运行期不做 npx/uvx/pip 安装（D-134）。
+    command: str = Field(default="", max_length=1024)
+    args: list[str] = Field(default_factory=list, max_length=32)
+    env: list[McpEnvName] = Field(default_factory=list, max_length=32)
+    cwd: str = Field(default="", max_length=1024)
+    allowed_tools: list[McpToolName] = Field(
+        default_factory=list,
+        max_length=32,
+        validation_alias=AliasChoices("allowedTools", "allowed_tools"),
+    )
+    # 只存环境变量名，令牌本身不进配置、不进日志、不进 redacted_summary。
+    token_env: str = Field(
+        default="",
+        pattern=r"^$|^[A-Z][A-Z0-9_]{0,63}$",
+        validation_alias=AliasChoices("tokenEnv", "token_env"),
+    )
+
+    @model_validator(mode="after")
+    def validate_transport(self) -> McpServerSettings:
+        if self.transport == "http":
+            if not self.url:
+                raise ValueError("url is required when transport=http")
+            if self.command or self.args or self.env or self.cwd:
+                raise ValueError("command/args/env/cwd are only valid when transport=stdio")
+        else:
+            if not self.command:
+                raise ValueError("command is required when transport=stdio")
+            if self.url:
+                raise ValueError("url is only valid when transport=http")
+            if self.token_env:
+                raise ValueError("token_env is only valid when transport=http")
+            if any("\x00" in arg for arg in self.args):
+                raise ValueError("mcp stdio argument is invalid")
+        return self
+
+
+class Settings(BaseSettings):
+    """Runtime configuration. Secrets are read from environment variables only."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="DOCQA_AI_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+        # 声明了 validation_alias 的字段若不开这项，关键字传参会被静默丢弃，
+        # 测试里的 pg_dsn="" 实际读到的仍是环境变量中的真实 DSN。
+        populate_by_name=True,
+    )
+
+    service_name: str = "docqa-ai"
+    environment: Literal["dev", "test", "prod"] = "dev"
+    log_level: str = "INFO"
+    api_host: str = "0.0.0.0"
+    api_port: int = Field(default=8000, ge=1, le=65535)
+
+    redis_url: str = Field(
+        default="redis://127.0.0.1:6379/0",
+        validation_alias=AliasChoices("DOCQA_AI_REDIS_URL", "DOCQA_REDIS_URL"),
+    )
+    redis_socket_timeout_ms: int = Field(default=1000, ge=100, le=10000)
+    kill_switch_key: str = "agent:kill-switch"
+    kill_switch_cache_ms: int = Field(default=5000, ge=0, le=30000)
+    budget_key_prefix: str = "agent:budget:"
+
+    low_confidence_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
+    max_citations: int = Field(default=20, ge=1, le=20)
+    retrieval_top_k: int = Field(default=6, ge=1, le=20)
+    retrieval_min_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    lexical_recall_enabled: bool = True
+    retrieval_lexical_candidate_limit: int = Field(default=50, ge=1, le=500)
+    fusion_rrf_k: int = Field(default=60, ge=1, le=1000)
+    lexical_min_query_chars: int = Field(default=2, ge=1, le=16)
+    history_max_tokens: int = Field(default=2000, ge=1, le=8000)
+    max_prompt_chars: int = Field(default=32000, ge=1000, le=100000)
+    max_observation_chars: int = Field(default=6000, ge=1000, le=20000)
+
+    # D-23 / D-122：MCP 默认关闭。关闭时不构造任何客户端 ⇒ 结构上零外呼。
+    mcp_enabled: bool = False
+    mcp_servers: list[McpServerSettings] = Field(default_factory=list, max_length=8)
+    mcp_call_timeout_ms: int = Field(default=3000, ge=100, le=15000)
+    mcp_discovery_ttl_seconds: int = Field(default=300, ge=1, le=86400)
+    mcp_max_response_bytes: int = Field(default=262144, ge=1024, le=1048576)
+    mcp_max_tools: int = Field(default=20, ge=0, le=100)
+    # D-145：每用户每分钟工具调用上限（Redis 固定窗口）。
+    tool_rate_limit_enabled: bool = True
+    tool_rate_limit_per_minute: int = Field(default=20, ge=1, le=1000)
+    # D-140：stdio 进程治理。启动超时与调用超时分开，冷启动不计入工具预算。
+    mcp_startup_timeout_ms: int = Field(default=5000, ge=100, le=60000)
+    mcp_max_concurrency: int = Field(default=4, ge=1, le=32)
+    mcp_failure_threshold: int = Field(default=3, ge=1, le=20)
+    mcp_circuit_open_seconds: int = Field(default=60, ge=1, le=3600)
+
+    # D-147 / D-149：真实联网工具默认关闭。关闭时四个工具都不注册，客户端也不构造 ⇒ 结构上零外呼。
+    real_tools_enabled: bool = False
+    web_search_provider: Literal["none", "searxng", "tavily"] = "none"
+    searxng_url: str = Field(default="http://127.0.0.1:8888", max_length=2048)
+    # 只存环境变量名，令牌本身不进配置、不进日志（与 mcp 的 token_env 同形）。
+    tavily_key_env: str = Field(default="TAVILY_API_KEY", pattern=r"^[A-Z][A-Z0-9_]{0,63}$")
+    web_fetch_max_bytes: int = Field(default=524288, ge=1024, le=10485760)
+    web_fetch_timeout_ms: int = Field(default=5000, ge=100, le=20000)
+    # 空 = 允许任意公网主机（仍做 SSRF 校验）；非空时主机必须等于条目或以 `.{条目}` 结尾。
+    web_fetch_allowed_hosts: list[str] = Field(default_factory=list, max_length=32)
+    web_tool_max_chars: int = Field(default=4000, ge=200, le=20000)
+    web_tool_max_results: int = Field(default=5, ge=1, le=10)
+    web_robots_cache_seconds: int = Field(default=3600, ge=0, le=86400)
+    academic_mailto: str = Field(default="", max_length=254)
+    # D-139 只开放中英文两个语言面，避免把模型输入直接拼进任意子域。
+    wikipedia_language: Literal["zh", "en"] = "zh"
+
+    embedding_provider: Literal["offline", "openai"] = "offline"
+    embedding_model: str = Field(default="offline-hashing-1024", min_length=1, max_length=64)
+    embedding_dimensions: int = Field(default=1024, ge=1, le=4096)
+    embedding_base_url: str = ""
+    embedding_api_key: SecretStr = SecretStr("")
+    embedding_timeout_ms: int = Field(default=10000, ge=100, le=60000)
+
+    llm_provider: Literal["offline", "openai"] = "offline"
+    llm_model: str = Field(default="offline-extractive", min_length=1, max_length=64)
+    llm_base_url: str = ""
+    llm_api_key: SecretStr = SecretStr("")
+    llm_timeout_ms: int = Field(default=10000, ge=100, le=30000)
+    llm_max_output_tokens: int = Field(default=1024, ge=16, le=4096)
+
+    # rerank 的能力面与 embedding / 生成不同：E46 实测它不在 OpenAI 兼容面上，
+    # 请求与响应都是原生形态，因此取值命名为 dashscope 而不是 openai。
+    rerank_provider: Literal["offline", "dashscope"] = "offline"
+    rerank_model: str = Field(default="offline-noop", min_length=1, max_length=64)
+    rerank_base_url: str = ""
+    rerank_api_key: SecretStr = SecretStr("")
+    rerank_timeout_ms: int = Field(default=3000, ge=100, le=15000)
+
+    # 真实调用额度（D-106）。默认 0 = 一次都不允许，且下面的启动期守卫会拒绝
+    # 「Provider 已切真但额度仍为 0」的组合，避免配置遗漏变成静默放行。
+    experiment_budget: int = Field(default=0, ge=0, le=100000)
+    experiment_token_budget: int = Field(default=0, ge=0, le=20000000)
+
+    pg_dsn: str = Field(
+        default="",
+        validation_alias=AliasChoices("DOCQA_AI_PG_DSN", "DOCQA_PG_DSN"),
+    )
+    pg_table: str = Field(default=OFFLINE_VECTOR_TABLE, pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    pg_connect_timeout_s: int = Field(default=3, ge=1, le=30)
+
+    mq_enabled: bool = False
+    rocketmq_namesrv: str = Field(
+        default="127.0.0.1:9876",
+        validation_alias=AliasChoices("DOCQA_AI_ROCKETMQ_NAMESRV", "DOCQA_ROCKETMQ_NAMESRV"),
+    )
+    parse_consumer_group: str = "ai-python-parse-worker"
+    parse_producer_group: str = "ai-python-parse-producer"
+    vector_consumer_group: str = "ai-python-vector-worker"
+    vector_producer_group: str = "ai-python-vector-producer"
+    audit_producer_group: str = "ai-python-audit-fallback"
+    parse_requested_topic: str = "parse-requested"
+    parse_completed_topic: str = "parse-completed"
+    parse_failed_topic: str = "parse-failed"
+    vector_requested_topic: str = "vector-change-requested"
+    vector_completed_topic: str = "vector-change-completed"
+    audit_topic: str = "audit-event"
+    mq_idempotency_ttl_seconds: int = Field(default=604800, ge=60)
+    mq_send_timeout_ms: int = Field(default=3000, ge=100, le=30000)
+
+    minio_enabled: bool = False
+    minio_endpoint: str = Field(
+        default="http://127.0.0.1:9000",
+        validation_alias=AliasChoices("DOCQA_AI_MINIO_ENDPOINT", "DOCQA_MINIO_ENDPOINT"),
+    )
+    minio_access_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("DOCQA_AI_MINIO_ACCESS_KEY", "DOCQA_MINIO_ACCESS_KEY"),
+    )
+    minio_secret_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("DOCQA_AI_MINIO_SECRET_KEY", "DOCQA_MINIO_SECRET_KEY"),
+    )
+    minio_bucket: str = Field(
+        default="docqa-documents",
+        validation_alias=AliasChoices("DOCQA_AI_MINIO_BUCKET", "DOCQA_MINIO_BUCKET"),
+    )
+    minio_secure: bool | None = None
+    worker_max_file_bytes: int = Field(default=52428800, ge=1024, le=524288000)
+    parse_max_extracted_chars: int = Field(default=2_000_000, ge=10_000, le=20_000_000)
+    parse_processing_ttl_seconds: int = Field(default=900, ge=60, le=86400)
+    vector_processing_ttl_seconds: int = Field(default=120, ge=10, le=3600)
+
+    chunk_size_chars: int = Field(default=800, ge=100, le=4000)
+    chunk_overlap_chars: int = Field(default=100, ge=0, le=1000)
+    embedding_batch_size: int = Field(default=32, ge=1, le=128)
+
+    otel_enabled: bool = False
+    otel_endpoint: str = ""
+    otel_sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+
+    # §4.2 的 9 项 Python 侧业务指标经此端点以 Prometheus 文本格式导出。
+    # 默认开启（否则 F-1 仍然是「查不到」），但它**没有任何鉴权**：部署时若 Python 端口
+    # 可被公网访问，必须置 false 或由反向代理限制来源——指标本身不含 PII，却会暴露业务量。
+    metrics_exposed: bool = True
+
+    @model_validator(mode="after")
+    def validate_consistency(self) -> Settings:
+        if self.chunk_overlap_chars >= self.chunk_size_chars:
+            raise ValueError("chunk_overlap_chars must be smaller than chunk_size_chars")
+        if self.retrieval_lexical_candidate_limit < self.retrieval_top_k:
+            raise ValueError("retrieval_lexical_candidate_limit must not be smaller than retrieval_top_k")
+        if self.embedding_dimensions != 1024:
+            raise ValueError("this release only supports 1024-dimension embeddings")
+        if self.embedding_provider == "openai" and not self.embedding_base_url:
+            raise ValueError("embedding_base_url is required when embedding_provider=openai")
+        if self.llm_provider == "openai" and not self.llm_base_url:
+            raise ValueError("llm_base_url is required when llm_provider=openai")
+        if self.rerank_provider == "dashscope" and not self.rerank_base_url:
+            raise ValueError("rerank_base_url is required when rerank_provider=dashscope")
+        if self.rerank_provider == "dashscope" and not self.rerank_api_key.get_secret_value():
+            raise ValueError("rerank_api_key is required when rerank_provider=dashscope")
+        real_provider_enabled = (
+            self.embedding_provider == "openai" or self.llm_provider == "openai" or self.rerank_provider == "dashscope"
+        )
+        if real_provider_enabled and (self.experiment_budget == 0 or self.experiment_token_budget == 0):
+            raise ValueError(
+                "experiment_budget and experiment_token_budget must be positive when a real provider is enabled"
+            )
+        # D-117：向量空间守卫。放在额度守卫之后——先问「这次能不能花钱」，再问「花完写到哪张表」。
+        # 真实 embedding 写进 offline 表是**无信号**的（`metadata->>'embedding_model'` 没有任何读取点，
+        # HNSW 按 vector_cosine_ops 算距离、不知道向量来自哪个模型），所以只能在启动期拦住。
+        # 名字与模型是否匹配归运维面（S9），本守卫只消掉最容易踩的那一种组合。
+        if self.embedding_provider != "offline" and self.pg_table == OFFLINE_VECTOR_TABLE:
+            raise ValueError(
+                "pg_table must point at a dedicated vector space when embedding_provider is not offline (D-99); "
+                f"{OFFLINE_VECTOR_TABLE} holds offline-hashing vectors and is not comparable"
+            )
+        if self.minio_secure is None:
+            self.minio_secure = self.minio_endpoint.lower().startswith("https://")
+        if self.mq_enabled and not self.rocketmq_namesrv:
+            raise ValueError("rocketmq_namesrv is required when mq_enabled=true")
+        mcp_names = [server.name for server in self.mcp_servers]
+        if len(mcp_names) != len(set(mcp_names)):
+            raise ValueError("mcp_servers names must be unique")
+        if self.web_search_provider == "searxng":
+            parsed = urlparse(self.searxng_url)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                raise ValueError("searxng_url must be an absolute http/https URL")
+            if parsed.username or parsed.password:
+                raise ValueError("searxng_url must not embed credentials")
+        for host in self.web_fetch_allowed_hosts:
+            if not _HOST_ENTRY.fullmatch(host):
+                raise ValueError("web_fetch_allowed_hosts entries must be bare hostnames")
+        return self
+
+    @property
+    def minio_secure_effective(self) -> bool:
+        return bool(self.minio_secure)
+
+    def redacted_summary(self) -> dict[str, object]:
+        """Safe to log at startup: never includes secrets or DSNs."""
+
+        return {
+            "environment": self.environment,
+            "embedding_provider": self.embedding_provider,
+            "embedding_model": self.embedding_model,
+            "llm_provider": self.llm_provider,
+            "llm_model": self.llm_model,
+            "rerank_provider": self.rerank_provider,
+            "rerank_model": self.rerank_model,
+            "rerank_timeout_ms": self.rerank_timeout_ms,
+            "rerank_credentials_configured": bool(self.rerank_api_key.get_secret_value()),
+            "experiment_budget": self.experiment_budget,
+            "experiment_token_budget": self.experiment_token_budget,
+            "mq_enabled": self.mq_enabled,
+            "minio_enabled": self.minio_enabled,
+            "mcp_enabled": self.mcp_enabled,
+            "mcp_server_count": len(self.mcp_servers),
+            "real_tools_enabled": self.real_tools_enabled,
+            "web_search_provider": self.web_search_provider,
+            "web_fetch_allowed_host_count": len(self.web_fetch_allowed_hosts),
+            "web_tool_max_results": self.web_tool_max_results,
+            "tool_rate_limit_enabled": self.tool_rate_limit_enabled,
+            "tool_rate_limit_per_minute": self.tool_rate_limit_per_minute,
+            "retrieval_top_k": self.retrieval_top_k,
+            "lexical_recall_enabled": self.lexical_recall_enabled,
+            "retrieval_lexical_candidate_limit": self.retrieval_lexical_candidate_limit,
+            "fusion_rrf_k": self.fusion_rrf_k,
+            "lexical_min_query_chars": self.lexical_min_query_chars,
+            "otel_enabled": self.otel_enabled,
+            "pg_configured": bool(self.pg_dsn),
+            "pg_table": self.pg_table,
+        }

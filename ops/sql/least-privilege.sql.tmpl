@@ -1,0 +1,139 @@
+-- =============================================================================
+-- 最小权限账号梯子（MySQL 8.4）
+--
+-- 本文件是**模板**：占位符由 ops/sql/apply-least-privilege.ps1 在内存里替换后执行，
+-- 落盘之前就把口令写进了每一处 IDENTIFIED BY。四个占位符依次是
+--   ① 账号主机段（localhost / 127.0.0.1 / %）
+--   ② Flyway 专用账号口令
+--   ③ 四个业务服务共用的运行时账号口令
+--   ④ audit-service 专用账号口令
+-- 这里刻意**不写占位符字面量**：注释里出现字面量，渲染时会被同样替换成明文口令，
+-- 于是 DryRun 输出、CI 日志、工单附件里就会出现一条谁也没打算公开的口令。
+-- 这条规则对任何模板都成立——模板的注释必须与模板的契约保持同一个「不泄密」标准。
+-- 口令含单引号或反斜杠会被 apply 脚本拒绝（本文件不做 SQL 转义，宁可拒跑）。
+--
+-- 本文件**只做加法**（建号 + 授到目标态），减法由 apply 脚本的对账步完成。
+-- 原因是一条实测事实：REVOKE 一个账号并未持有的授权会报
+--   ERROR 1141 (42000): There is no such grant defined for user ...
+-- 而 mysql 客户端在批处理模式下遇错即停，写在后面的 GRANT 根本不会执行。
+-- 把无条件 REVOKE 放进模板 = 第一次执行就中断，且断点位置随现网状态漂移。
+-- 所以「撤多余」必须由「先读现网、只撤真实存在的项」的对账器生成，不能写成静态语句。
+--
+-- 设计要点（改本文件前请读 docs/06-expansion/phase6-scope.md 的 D-240…D-243）：
+--
+-- 1. 三个账号按「能力」切，不按「服务」切。当前五个 Java 服务同宿主、同库、
+--    同生命周期，拆成五份只会把口令轮换面扩大 5 倍而不增加隔离；真正需要拆的是
+--    「能改表结构」「能写业务数据」「只能追加审计」这三种能力。
+-- 2. audit_event 是**按表授权**，不是按库授权。按库给 DML 会把 UPDATE/DELETE
+--    一并送出去，schema 级 GRANT 无法排除单表，所以业务表的授权必须逐表枚举。
+--    代价：新增表要同步加一行 GRANT（verify-least-privilege.ps1 会比对表清单，
+--    漏授权会被判为 GRANT_MISSING，而不是等运行时 500）。
+-- 3. migrator 只拿 DDL + flyway_schema_history 的 DML，**不拿业务表 DML**。
+--    现有 V1–V9 迁移全部是纯 DDL（0 条 INSERT/UPDATE/DELETE），所以这条约束今天成立；
+--    将来若需要回填数据，必须另开一次性 DML 授权，不得把 DML 常驻给 migrator。
+-- 4. 三个账号都不带 GRANT OPTION / SUPER / FILE / PROCESS：它们的权限一旦被拿，
+--    横向提权的路是断的。
+-- 5. 不写 FLUSH PRIVILEGES：CREATE USER / GRANT 走的是权限表的标准通路，
+--    只有直接改 mysql.* 表才需要刷新。写上去会让人误以为存在手工改表的操作。
+-- 6. 不设 FAILED_LOGIN_ATTEMPTS / PASSWORD_LOCK_TIME：本机反复重配账号时会把
+--    自己锁在库外，而锁号的表现与口令错、网络不通同形，排查成本高于收益。
+--    登记为「未采纳」，见 D-243。
+--
+-- 幂等：CREATE USER IF NOT EXISTS 与 GRANT 都可重复执行；口令不随重复执行变化，
+-- 要改口令必须显式用 apply 脚本的 -Rotate。
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 1. 账号
+-- -----------------------------------------------------------------------------
+-- MAX_USER_CONNECTIONS 是**连接数上限**而不是并发上限：一个失控的连接池
+-- （例如 Hikari 被误配成 200）会把 MySQL 的 max_connections 吃光，把故障从
+-- 「某个服务慢」放大成「整库连不上」。这里按服务数留足余量后封顶。
+CREATE USER IF NOT EXISTS 'ss_migrator'@'__ACCOUNT_HOST__'
+    IDENTIFIED BY '__MIGRATOR_PASSWORD__'
+    WITH MAX_USER_CONNECTIONS 5;
+
+CREATE USER IF NOT EXISTS 'ss_app'@'__ACCOUNT_HOST__'
+    IDENTIFIED BY '__APP_PASSWORD__'
+    WITH MAX_USER_CONNECTIONS 40;
+
+CREATE USER IF NOT EXISTS 'ss_audit'@'__ACCOUNT_HOST__'
+    IDENTIFIED BY '__AUDIT_PASSWORD__'
+    WITH MAX_USER_CONNECTIONS 10;
+
+-- -----------------------------------------------------------------------------
+-- 2. ss_migrator：只在迁移窗口存在的能力
+-- -----------------------------------------------------------------------------
+-- schema 级 DDL。注意 schema 级授的 CREATE 是「建表/建视图/建例程」，
+-- **不含建库**（CREATE DATABASE 需要全局 CREATE），所以迁移账号无法凭空建库。
+GRANT CREATE, ALTER, DROP, INDEX, REFERENCES,
+      CREATE VIEW, CREATE ROUTINE, ALTER ROUTINE, EXECUTE, TRIGGER
+    ON `docqa`.* TO 'ss_migrator'@'__ACCOUNT_HOST__';
+
+-- Flyway 自己的账本要增删改查，单独授权。该表必须先存在（首次 migrate 之后），
+-- apply 脚本会在执行前做存在性预检，不存在就拒跑而不是让 GRANT 报 1146。
+GRANT SELECT, INSERT, UPDATE, DELETE
+    ON `docqa`.`flyway_schema_history` TO 'ss_migrator'@'__ACCOUNT_HOST__';
+
+-- -----------------------------------------------------------------------------
+-- 3. ss_app：四个业务服务的运行时账号（user / document / reminder / agent-gateway）
+-- -----------------------------------------------------------------------------
+-- 逐表枚举。**不要**改成 ON `docqa`.*：那会把 audit_event 的 UPDATE/DELETE
+-- 一起授出去，而「审计只追加」正是本脚本要成立的判据。
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`app_user`          TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`app_user_role`     TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`refresh_token`     TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`document`          TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`document_tag`      TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`document_tag_link` TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`chunk`             TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`conversation`      TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`message`           TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`agent_execution`   TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`reminder`          TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`reminder_trigger`  TO 'ss_app'@'__ACCOUNT_HOST__';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`ai_quota`          TO 'ss_app'@'__ACCOUNT_HOST__';
+
+-- 审计表：只读 + 追加。这是全脚本唯一一处「同一张表对不同账号给不同动作」的授权，
+-- 也是 S11-6-M1 的修因本体：UPDATE / DELETE 在授权层就不存在，
+-- 任何注入或误操作都改不动历史行，而不是靠「代码里没写 UPDATE」来保证。
+-- SELECT 仍然要给：GET /api/v1/admin/audit/events 由 agent-gateway 直接读该表。
+GRANT SELECT, INSERT ON `docqa`.`audit_event` TO 'ss_app'@'__ACCOUNT_HOST__';
+
+-- -----------------------------------------------------------------------------
+-- 4. ss_audit：只服务 MQ 消费链路
+-- -----------------------------------------------------------------------------
+-- audit-service 的全部数据库职责就是「读回放、写审计」，因此它的账号连业务表
+-- 都读不到。这一层隔离的价值在于：即使消费端被恶意消息利用，能触达的也只有审计表。
+GRANT SELECT, INSERT ON `docqa`.`audit_event` TO 'ss_audit'@'__ACCOUNT_HOST__';
+
+-- -----------------------------------------------------------------------------
+-- 5. 回执（apply 脚本会把这一段原样打进日志，作为「授权确实生效」的当面证据）
+-- -----------------------------------------------------------------------------
+SELECT 'EFFECTIVE_TABLE_GRANTS' AS section,
+       GRANTEE, TABLE_NAME, PRIVILEGE_TYPE
+  FROM information_schema.TABLE_PRIVILEGES
+ WHERE TABLE_SCHEMA = 'docqa'
+   AND GRANTEE IN (CONCAT('''ss_app''@''', '__ACCOUNT_HOST__', ''''),
+                   CONCAT('''ss_audit''@''', '__ACCOUNT_HOST__', ''''),
+                   CONCAT('''ss_migrator''@''', '__ACCOUNT_HOST__', ''''))
+ ORDER BY GRANTEE, TABLE_NAME, PRIVILEGE_TYPE;
+
+-- 这一行是给「减法做干净了没有」看的：正常结果里 ss_app / ss_audit 只应出现
+-- SELECT,INSERT（来自表级授权），ss_migrator 只应出现 DDL 那十项。
+SELECT 'ACCOUNT_SCHEMA_OR_GLOBAL_PRIVILEGES' AS section, GRANTEE,
+       GROUP_CONCAT(DISTINCT PRIVILEGE_TYPE ORDER BY PRIVILEGE_TYPE SEPARATOR ',') AS privileges
+  FROM (
+        SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES
+         WHERE GRANTEE IN (CONCAT('''ss_app''@''', '__ACCOUNT_HOST__', ''''),
+                           CONCAT('''ss_audit''@''', '__ACCOUNT_HOST__', ''''),
+                           CONCAT('''ss_migrator''@''', '__ACCOUNT_HOST__', ''''))
+        UNION ALL
+        SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES
+         WHERE TABLE_SCHEMA = 'docqa'
+           AND GRANTEE IN (CONCAT('''ss_app''@''', '__ACCOUNT_HOST__', ''''),
+                           CONCAT('''ss_audit''@''', '__ACCOUNT_HOST__', ''''),
+                           CONCAT('''ss_migrator''@''', '__ACCOUNT_HOST__', ''''))
+       ) g
+ GROUP BY GRANTEE
+ ORDER BY GRANTEE;

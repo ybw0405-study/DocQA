@@ -1,0 +1,3 @@
+com.docqa.common.config.CommonWebAutoConfiguration
+com.docqa.common.config.AuditAppendOnlyAutoConfiguration
+com.docqa.common.metrics.BusinessMetricsAutoConfiguration
