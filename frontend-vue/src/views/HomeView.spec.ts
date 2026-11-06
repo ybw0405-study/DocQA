@@ -240,7 +240,9 @@ describe('HomeView', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 1100));
     await flush();
-    expect(view.text()).not.toContain('限流等待');
+    // 断言收窄到口令表单：页面里「最近活动」工作台的课表导入面板同样会渲染「限流等待」文案，
+    // 用整页文本会误命中它，这里只关心本表单的限流提示是否随倒计时归零而消失。
+    expect(view.find('form').text()).not.toContain('限流等待');
     expect(submitButton(view).attributes('disabled')).toBeUndefined();
   }, 8000);
 
