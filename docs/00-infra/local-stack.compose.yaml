@@ -11,7 +11,9 @@
 #
 # 启动（在 WSL2 Ubuntu 内）：
 #   docker compose -f <repo>/docs/00-infra/local-stack.compose.yaml \
-#     --env-file ~/docqa-infra/.env up -d
+#     --env-file /opt/docqa-infra/.env up -d
+# 注意：正常路径是由 prepare-local-stack.sh 渲染到 /opt/docqa-infra/ 再启动；
+# 手工执行时 env 文件也必须在 /opt 下，不能放 ~/docqa-infra（dockerd 的 HOME=/root 是 700）。
 # 内存预算：namesrv 768M + broker 1.5G + pg 512M + minio 512M ≈ 3.3G。
 
 name: docqa-infra

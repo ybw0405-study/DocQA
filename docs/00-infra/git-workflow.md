@@ -91,7 +91,7 @@ Refs: REQ-103
 
 - [ ] 标题符合 Conventional Commits；描述包含背景、改动范围、验证方式与风险。
 - [ ] 目标分支为 `main`，分支已 rebase 到最新 `main`。
-- [ ] GitHub Actions 四项检查全部通过：`Maven Compile`、`Maven Test`、`Checkstyle`、`ArchUnit`。
+- [ ] GitHub Actions 三项检查全部通过：`Java 17 / mvn verify`、`Python 3.12 / pytest + ruff`、`Node 22 / typecheck + lint + test + build`（定义见 `.github/workflows/ci.yml`，门禁清单见 [ci-pipeline.yml](ci-pipeline.yml)）。
 - [ ] 至少 1 名模块 Owner 审批；涉及数据库、鉴权、跨语言契约、审计表结构时需 2 名审批。
 - [ ] 单元测试覆盖新增业务分支；集成测试覆盖跨进程/跨中间件行为。
 - [ ] 涉及数据库结构时，Flyway 迁移脚本与代码在同一分支、同一 MR 中提交。
@@ -108,6 +108,11 @@ Refs: REQ-103
 - 禁止绕过 required checks。
 - 要求 conversation resolved 后才可合并。
 - 要求线性历史或 squash 历史，避免无意义的 merge commit 噪声。
+
+> 现状说明：本仓库目前是私有仓库，GitHub 免费套餐对私有仓库不开放 Branch Protection
+> （API 返回 `Upgrade to GitHub Pro or make this repository public`）。在上面的规则真正生效前，
+> 合并纪律只能靠人工遵守；仓库转为 public 或升级 Pro 后应立即按本节的 required checks 配置保护，
+> 并把 required checks 设为 `.github/workflows/ci.yml` 里的三个作业名（名字改了要同步本节）。
 
 ## 4. Flyway 迁移脚本必须随分支提交
 

@@ -159,6 +159,7 @@ powershell -File scripts/verify-all.ps1 -Offline  # Windows PowerShell 5.1
 | 服务启动报 `Migration checksum mismatch for migration version N` | 已应用的迁移文件被改过（哪怕只改注释） | 本地库执行 Flyway repair：把 `flyway_schema_history` 该版本的 `checksum` 更新为当前文件的 CRC32（对每行内容做 CRC32，首行去 BOM）。生产环境应**禁止**修改已应用的迁移 |
 | `mvn clean verify` 删不掉 `target/*.jar` | jar 正被运行中的 JVM 占用 | 先 `run-local.ps1 -Action stop` |
 | CI 全绿、本机门禁假红 | 本机 `DOCQA_*` 污染了 Spring Boot 宽松绑定 / pydantic-settings | 门禁脚本已自动清理这些变量，无需手工处理 |
+| `git push` / `fetch` 报 `Recv failure: Connection was reset` 或 `Could not connect to server`，而 `gh` 命令正常 | `github.com` 解析到的官方 IP 在部分网络不可达；`api.github.com` 不受影响 | 绑定一个可达 IP（只写本仓库 `.git/config`，不会提交）：`git config --local http.curloptResolve github.com:443:<可达IP>`。或把 `~/.ssh/id_ed25519.pub` 加到 GitHub 后把远程换成 SSH |
 
 ## 数据库最小权限
 

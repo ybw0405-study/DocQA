@@ -35,8 +35,9 @@ Windows 侧 `pip` 能装上 `rocketmq-client-python`，但 `import` 即失败（
 首次启动 Worker 前，在 PGVector 库**按序号**执行迁移（`001` 与 `002` 都要执行）：
 
 ```bash
-psql "$DOCQA_AI_PG_DSN" -f ai-python/migrations/001_chunk_embedding_1024.sql
-psql "$DOCQA_AI_PG_DSN" -f ai-python/migrations/002_chunk_lexical_index.sql
+# 以下命令在 ai-python/ 目录内执行
+psql "$DOCQA_AI_PG_DSN" -f migrations/001_chunk_embedding_1024.sql
+psql "$DOCQA_AI_PG_DSN" -f migrations/002_chunk_lexical_index.sql
 ```
 
 ## 向量表与模型切换

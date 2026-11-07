@@ -20,7 +20,7 @@
 |---|---|
 | 后端（Java 17） | Spring Boot 3.3、Spring Cloud Gateway、Spring Security、MyBatis / JDBC、Flyway |
 | 数据面（Python ≥3.11） | FastAPI、LangChain/LangGraph、Pydantic v2、psycopg3、OpenTelemetry |
-| 前端 | Vue 3.5、TypeScript 5.9、Vite、Pinia、Element Plus |
+| 前端 | Vue 3.5、TypeScript 5.9、Vite、Pinia（无 UI 组件库，样式自持） |
 | 存储与中间件 | MySQL 8、PostgreSQL 16 + pgvector、Redis、RocketMQ 5、MinIO |
 
 ## 架构
@@ -79,8 +79,8 @@ DocQA/
 
 ### 前置依赖
 
-- JDK 17、Maven 3.8+
-- Node.js 20+、pnpm / npm
+- JDK 17、Maven 3.9+（父 POM 的 enforcer 拒绝 3.8）
+- Node.js ≥22.22.2、pnpm / npm（jsdom 30 与 Vite 8 的下限）
 - Python 3.11+（建议 3.13）
 - MySQL 8、Redis、PostgreSQL 16 + pgvector、RocketMQ 5、MinIO
 - WSL2（解析 worker 的 RocketMQ 客户端仅提供 Linux 绑定）

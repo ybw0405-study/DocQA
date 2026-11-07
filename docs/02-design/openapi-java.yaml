@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: 智能学习助手 Java API
+  title: DocQA Java API
   version: 2.5.0
   description: |
     本文件是 Java 对外核心业务接口契约，覆盖 5 个核心业务接口，
@@ -192,13 +192,13 @@ info:
   contact:
     name: DocQA Architecture Owner
   license:
-    name: Proprietary
-    url: https://docqa.internal/license
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
 servers:
   - url: /
     description: 同源部署或本地开发
-  - url: https://api.docqa.internal
-    description: 内网部署地址；部署时替换为真实域名
+  - url: https://api.docqa.example
+    description: 示例域名；部署时替换为真实域名
 tags:
   - name: Auth
     description: 注册、登录、刷新令牌轮换与吊销、改密、当前用户身份与角色查询

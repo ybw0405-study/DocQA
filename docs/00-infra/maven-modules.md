@@ -13,6 +13,8 @@ backend-java/
 ├── pom.xml                         # 父 POM：版本、插件、Checkstyle、Surefire、ArchUnit
 ├── common/                         # 通用契约与横切能力
 │   └── pom.xml
+├── mq-support/                     # RocketMQ admin 采集适配（把 broker 探针隔离出 common）
+│   └── pom.xml
 ├── user-service/                   # 身份与 JWT
 │   └── pom.xml
 ├── document-service/               # 文档上传、秒传、状态机、解析任务投递
@@ -32,6 +34,7 @@ Java 基础包统一为 `com.docqa.<module>`，例如 `com.docqa.document`、`co
 | 模块 | 核心职责 | 允许的 Maven 依赖 | 绝对不放进这个模块的东西 |
 |---|---|---|---|
 | `common` | 统一响应结构、错误码注册表、RFC 9457 `ProblemDetail` 映射、全局异常处理约定、traceId 上下文、通用 DTO/工具 | 仅通用技术库（Spring Web、Validation、Jackson、SLF4J）；不依赖任何业务模块 | 用户/文档/提醒业务逻辑；数据库、Redis、MQ、对象存储访问；对 Python 的 HTTP 客户端 |
+| `mq-support` | RocketMQ admin 客户端与 broker 探针的隔离层：为 `MqConsumerLagProbe` 提供 admin API 适配，避免 `common` 直接引入 `org.apache.rocketmq..` | `common`、RocketMQ 客户端（`rocketmq-tools`） | 任何业务逻辑；不要被 `user-service` / `agent-gateway` / `audit-service` 引入（它们只用普通 client，不需要 admin 探针） |
 | `user-service` | 用户注册登录、密码哈希、JWT 签发与校验、用户身份查询 | `common` | 文档解析、RAG、问答、提醒调度；调用 Python；其他服务的内部实现 |
 | `document-service` | 分片上传会话、MinIO 对象落盘、MD5 秒传、文档元数据、`document` 状态机、RocketMQ 解析任务投递、状态查询 | `common`；MinIO、RocketMQ、数据库客户端 | 文档切分、Embedding、PGVector 检索、LLM 调用；用户密码或用户表写入；同步调用 Python |
 | `agent-gateway` | Spring Cloud Gateway 路由、入口鉴权与限流、问答 API、`conversation`/`message` 控制面元数据、`agent_execution` 记录、治理参数组装、审计事件投递、超时/熔断/降级 | `common`；Spring Cloud Gateway、WebFlux/WebClient、Resilience4j、数据库客户端 | RAG 检索、Prompt 编排、LangGraph、LLM SDK、向量库查询、用户业务写入 |
@@ -51,6 +54,7 @@ Java 基础包统一为 `com.docqa.<module>`，例如 `com.docqa.document`、`co
 
 ```text
 所有业务模块 ──> common
+document-service / reminder-service ──> mq-support ──> common
 ```
 
 除此之外没有服务间的 Maven 依赖。`user-service`、`document-service`、`reminder-service`、`audit-service` 之间不能互相 `import`；`agent-gateway` 也不能依赖业务服务的实现类。

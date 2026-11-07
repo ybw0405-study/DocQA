@@ -97,7 +97,7 @@ async function onSignOut(): Promise<void> {
           class="app-header__mark"
           aria-hidden="true"
         />
-        智能学习助手
+        DocQA
       </span>
       <nav class="app-header__nav">
         <!-- 主题开关与登录态无关：匿名访客也要能选。 -->

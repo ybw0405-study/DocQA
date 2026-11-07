@@ -118,18 +118,34 @@ function Sync-Endpoints([string]$WslIp) {
     }
     $rx = '(' + ($patterns -join '|') + ')'
 
-    $userVars = [Environment]::GetEnvironmentVariables('User')
     $changed = @()
-    foreach ($key in $userVars.Keys) {
-        if ($key -notlike 'DOCQA_*') { continue }
-        $value = [string]$userVars[$key]
-        $newValue = [regex]::Replace($value, $rx, $WslIp)
-        if ($newValue -ne $value) {
-            [Environment]::SetEnvironmentVariable($key, $newValue, 'User')
-            $changed += $key
-            $value = $newValue
+    $effective = @{}
+    # Machine first, then User: when the same key exists in both scopes the User value
+    # wins, matching how Windows resolves the process environment. Writing the Machine
+    # scope needs admin; when that fails we log a warning instead of silently keeping
+    # the stale WSL IP.
+    foreach ($scope in @('Machine', 'User')) {
+        $vars = [Environment]::GetEnvironmentVariables($scope)
+        foreach ($key in $vars.Keys) {
+            if ($key -notlike 'DOCQA_*') { continue }
+            $value = [string]$vars[$key]
+            $newValue = [regex]::Replace($value, $rx, $WslIp)
+            if ($newValue -ne $value) {
+                try {
+                    [Environment]::SetEnvironmentVariable($key, $newValue, $scope)
+                    $changed += ('{0}:{1}' -f $scope, $key)
+                    $value = $newValue
+                }
+                catch {
+                    Write-Log ("WARNING: {0} in {1} scope still points at the old WSL IP; " +
+                        "rewrite needs an elevated shell: {2}" -f $key, $scope, $_.Exception.Message)
+                }
+            }
+            $effective[$key] = $value
         }
-        [Environment]::SetEnvironmentVariable($key, $value, 'Process')
+    }
+    foreach ($key in $effective.Keys) {
+        [Environment]::SetEnvironmentVariable($key, $effective[$key], 'Process')
     }
 
     if ($RedisHost) {
