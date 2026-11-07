@@ -53,7 +53,7 @@
 ## 目录结构
 
 ```
-docqa/
+DocQA/
 ├── backend-java/        # Java 控制面（Maven 多模块）
 │   ├── common/          #   公共模型、指标、架构约束
 │   ├── mq-support/      #   RocketMQ 管理采集适配层
@@ -96,24 +96,34 @@ powershell -File scripts/verify-all.ps1 -Offline  # Windows PowerShell 5.1
 
 ### 启动服务
 
-完整启动顺序、端口与环境变量清单见 [docs/00-infra/getting-started.md](docs/00-infra/getting-started.md)，简略流程：
+完整顺序、端口与环境变量清单见 [docs/00-infra/getting-started.md](docs/00-infra/getting-started.md)。
+以下脚本全部按自身位置推导仓库根，**没有 `<repo>` 占位符，目录改名后也不用改命令**。
+
+首次准备，在 WSL root 终端且当前目录为仓库根时执行：
+
+```bash
+REPO="$(pwd)"
+bash "$REPO/docs/00-infra/prepare-local-stack.sh"          # 中间件
+bash "$REPO/docs/00-infra/setup-parse-worker.sh" install   # venv + C 绑定
+bash "$REPO/docs/00-infra/install-wsl-autostart.sh" install # 注册 WSL 开机自启
+```
+
+日常使用，在仓库根目录开一个 PowerShell：
 
 ```powershell
-# ① WSL 内启动中间件（RocketMQ / PostgreSQL / MinIO）
-wsl -u root bash /mnt/c/<repo>/docs/00-infra/prepare-local-stack.sh /mnt/c/<repo>
+# 推荐：注册登录自启（当前用户，无需管理员），之后开机自动完成全部拉起
+powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -InstallAutostart -IncludeApp
 
-# ② WSL 内启动解析 / 向量 worker
-wsl -u root bash /mnt/c/<repo>/docs/00-infra/setup-parse-worker.sh start all
+# 或：立即启动一次 —— 同步 WSL IP 并拉起中间件、worker、Java、Python API、前端
+powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -IncludeApp
 
-# ③ Windows 启动 Java 控制面（五个服务）
-powershell -File <repo>\docs\00-infra\run-local.ps1
-
-# ④ Windows 启动 Python 数据面 API
-powershell -File <repo>\docs\00-infra\run-ai-local.ps1 -Action start -Component api
-
-# ⑤ 前端开发服务器
-cd frontend-vue && npm install && npm run dev
+# 若 8080/8081 被其它程序占用，整体平移端口
+powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -IncludeApp -PortOffset 10000
 ```
+
+只启动中间件与 worker（不启应用层）：去掉 `-IncludeApp` 即可；
+分步手动启动见 [getting-started.md](docs/00-infra/getting-started.md)。
+命名与改名的边界见 [docs/00-infra/naming.md](docs/00-infra/naming.md)。
 
 ### 环境变量
 

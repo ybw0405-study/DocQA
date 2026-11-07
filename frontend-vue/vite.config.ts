@@ -51,6 +51,13 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['tests/setup.ts'],
       clearMocks: true,
       restoreMocks: true,
+      // 默认 forks 并发数等于 CPU 核数。在 Windows 上同时孵化十几个 jsdom 子进程会
+      // 偶发 "[vitest-pool-runner]: Timeout waiting for worker to respond"，
+      // 表现为所有文件全绿但进程仍以 1 退出。收敛到 4 个即可稳定复跑。
+      // Vitest 4 起 poolOptions 已移除，并发度改为顶层 minWorkers / maxWorkers。
+      pool: 'forks',
+      minWorkers: 1,
+      maxWorkers: 4,
     },
   };
 });

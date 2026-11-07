@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Python worker（解析 + 向量删除）的 WSL2 侧引导与运行脚本（幂等，可重复执行）
 #
-#   wsl -u root bash /mnt/c/<用户>/.../docqa/docs/00-infra/setup-parse-worker.sh install <WSL 内的仓库路径>
+#   wsl -u root bash <repo>/docs/00-infra/setup-parse-worker.sh install [WSL 内的仓库路径]
+#        （仓库路径可省略，按脚本自身位置推导；目录改名不影响）
 #   wsl -u root bash <同上> start            # 后台拉起解析 worker，日志 /root/parse-worker.log
 #   wsl -u root bash <同上> start vector     # 后台拉起向量删除 worker，日志 /root/vector-worker.log
 #   wsl -u root bash <同上> start all        # 两个 worker 都要跑：S2 之后缺 vector worker 就没人消费删除请求
@@ -25,6 +26,8 @@
 # /opt/docqa-infra/.env（仓库外），Redis 口令从 stdin 读入。
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_REPO_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 VENV=/root/docqa-venv
 ENV_FILE=/root/parse-worker.env
 LOG_FILE=/root/parse-worker.log
@@ -40,7 +43,7 @@ port_open() {
 }
 
 install() {
-  local repo_dir="${1:?用法: setup-parse-worker.sh install <repo 在 WSL 内的路径>}"
+  local repo_dir="${1:-${DEFAULT_REPO_DIR}}"
   [ -d "${repo_dir}/ai-python" ] || { echo "仓库路径不对：${repo_dir}/ai-python 不存在"; exit 1; }
   [ -f "${INFRA_ENV}" ] || { echo "缺少 ${INFRA_ENV}，请先执行 prepare-local-stack.sh"; exit 1; }
 
@@ -79,25 +82,32 @@ gen_env() {
   # Redis 口令走 stdin，不进 argv，也不落到进程列表
   local redis_pw
   read -r redis_pw
+  # 口令常由 Windows PowerShell 管道喂入，行尾会带 \r；它会嵌进 URL 变成
+  # "redis://:pw\r@host:port"。bash source 时只是多了个字符，但 systemd 的
+  # EnvironmentFile 会在 \r 处截断，把 "redis://:<口令>" 当成完整 URL 并报
+  # "Port out of range 0-65535"。这里在生成端就掐掉。
+  redis_pw="${redis_pw%$'\r'}"
   [ -n "${redis_pw}" ] || { echo "stdin 未读到 Redis 口令"; exit 1; }
   set -a
   # shellcheck disable=SC1090
   . "${INFRA_ENV}"
   set +a
   umask 077
+  # 纯 KEY=VALUE，不带 export：systemd 的 EnvironmentFile 不接受 export 前缀，
+  # 而本脚本 status/start 在 source 前都执行了 `set -a`，两种用法可以共用同一份文件。
   cat > "${ENV_FILE}" <<EOF
-export DOCQA_AI_PG_DSN=postgresql://docqa:${DOCQA_PG_PASSWORD}@127.0.0.1:5432/docqa_vec
-export DOCQA_AI_REDIS_URL=redis://:${redis_pw}@${REDIS_HOSTPORT}/0
-export DOCQA_AI_ROCKETMQ_NAMESRV=127.0.0.1:9876
-export DOCQA_AI_MINIO_ENDPOINT=http://127.0.0.1:9100
-export DOCQA_AI_MINIO_ACCESS_KEY=${DOCQA_MINIO_ACCESS_KEY}
-export DOCQA_AI_MINIO_SECRET_KEY=${DOCQA_MINIO_SECRET_KEY}
-export DOCQA_AI_MINIO_BUCKET=docqa-documents
-export DOCQA_AI_MQ_ENABLED=true
-export DOCQA_AI_MINIO_ENABLED=true
-export DOCQA_AI_EMBEDDING_PROVIDER=offline
-export DOCQA_AI_LLM_PROVIDER=offline
-export DOCQA_AI_LOG_LEVEL=INFO
+DOCQA_AI_PG_DSN=postgresql://docqa:${DOCQA_PG_PASSWORD}@127.0.0.1:5432/docqa_vec
+DOCQA_AI_REDIS_URL=redis://:${redis_pw}@${REDIS_HOSTPORT}/0
+DOCQA_AI_ROCKETMQ_NAMESRV=127.0.0.1:9876
+DOCQA_AI_MINIO_ENDPOINT=http://127.0.0.1:9100
+DOCQA_AI_MINIO_ACCESS_KEY=${DOCQA_MINIO_ACCESS_KEY}
+DOCQA_AI_MINIO_SECRET_KEY=${DOCQA_MINIO_SECRET_KEY}
+DOCQA_AI_MINIO_BUCKET=docqa-documents
+DOCQA_AI_MQ_ENABLED=true
+DOCQA_AI_MINIO_ENABLED=true
+DOCQA_AI_EMBEDDING_PROVIDER=offline
+DOCQA_AI_LLM_PROVIDER=offline
+DOCQA_AI_LOG_LEVEL=INFO
 EOF
   chmod 600 "${ENV_FILE}"
   echo "已写入 ${ENV_FILE}（权限 $(stat -c %a "${ENV_FILE}")）"
@@ -191,9 +201,32 @@ ensure_topics() {
   done
 }
 
+# 装了 systemd 自启单元后，worker 的生命周期归 systemd 管；此处只做转发，
+# 避免「systemd 拉起一个 + 手工 nohup 再拉起一个」造成重复消费。
+systemd_managed() {
+  command -v systemctl >/dev/null 2>&1 || return 1
+  [ -d /run/systemd/system ] || return 1
+  systemctl list-unit-files --no-legend 2>/dev/null | grep -q '^docqa-parse-worker\.service' || return 1
+  return 0
+}
+
+worker_unit() {
+  echo "docqa-${1}-worker.service"
+}
+
 start() {
   [ -f "${ENV_FILE}" ] || { echo "${ENV_FILE} 不存在，先执行 env"; exit 1; }
   ensure_topics
+  if systemd_managed; then
+    for target in $(resolve_targets "${1:-parse}"); do
+      unit="$(worker_unit "${target}")"
+      systemctl start "${unit}"
+      echo "${target} worker -> systemctl start ${unit}"
+      sleep 2
+      journalctl -u "${unit}" -n 20 --no-pager 2>/dev/null | tail -20 || true
+    done
+    return 0
+  fi
   set -a
   # shellcheck disable=SC1090
   . "${ENV_FILE}"
@@ -218,6 +251,14 @@ case "${1:-status}" in
   env) gen_env ;;
   start) start "${2:-parse}" ;;
   stop)
+    if systemd_managed; then
+      for target in $(resolve_targets "${2:-all}"); do
+        unit="$(worker_unit "${target}")"
+        systemctl stop "${unit}"
+        echo "${target} worker -> systemctl stop ${unit}"
+      done
+      exit 0
+    fi
     stopped=0
     for target in $(resolve_targets "${2:-all}"); do
       if pkill -f "$(worker_bin "${target}")"; then

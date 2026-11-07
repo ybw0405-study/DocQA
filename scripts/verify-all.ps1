@@ -81,6 +81,16 @@ function Invoke-Step {
     })
 }
 
+# Same reason as verify-all.sh: runtime DOCQA_* variables on a developer
+# machine leak into Spring Boot / pydantic-settings and produce false local failures
+# that never happen in CI. Scrub them for the duration of this process only.
+$vars = [Environment]::GetEnvironmentVariables('Process')
+foreach ($key in @($vars.Keys)) {
+    if ($key -like 'DOCQA_*' -or $key -in @('SERVER__PORT', 'SERVER_PORT')) {
+        [Environment]::SetEnvironmentVariable($key, $null, 'Process')
+    }
+}
+
 Write-Host 'DocQA - gate runner' -ForegroundColor White
 Write-Host ("Repo   : {0}" -f $root)
 Write-Host ("Commit : {0} ({1})" -f $commit, $branch)

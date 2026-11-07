@@ -72,6 +72,9 @@ switch ($Action) {
     'stop' { Stop-Component }
     'status' { "{0} :{1} {2}" -f $Component, $Port, $(if (Test-Port $Port) { 'LISTEN' } else { 'DOWN' }) }
     'start' {
+        # 幂等：重复执行时先收掉上一个同组件进程，否则新进程会因端口占用静默失败，
+        # 而旧进程仍占着端口让 readiness 探测误判为「启动成功」。
+        if ($Component -eq 'api' -and (Test-Port $Port)) { Stop-Component; Start-Sleep -Seconds 1 }
         if ($Component -eq 'worker') {
             & $Py -c "import rocketmq" 2>$null
             if ($LASTEXITCODE -ne 0) {

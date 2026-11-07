@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # 本地中间件栈引导脚本（WSL2 Ubuntu 内执行）
 #
-#   bash <repo>/docs/00-infra/prepare-local-stack.sh <repo 在 WSL 内的路径>
+#   bash <repo>/docs/00-infra/prepare-local-stack.sh [repo 在 WSL 内的路径]
+#
+# 仓库路径可省略：默认按脚本自身位置上溯两级推导，因此仓库目录改名/移动后无需改任何参数。
 #
 # 做四件事：
 #   1) 在**仓库外**的 /opt/docqa-infra/.env 生成一次性本地密钥（已存在则复用，不覆盖）；
@@ -20,11 +22,18 @@
 #     compose 运行时不再依赖任何插值。
 set -euo pipefail
 
-REPO_DIR="${1:?用法: prepare-local-stack.sh <repo 在 WSL 内的路径>}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_REPO_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_DIR="${1:-${DEFAULT_REPO_DIR}}"
 INFRA_DIR="${DOCQA_INFRA_DIR:-/opt/docqa-infra}"
 ENV_FILE="${INFRA_DIR}/.env"
 COMPOSE_SRC="${REPO_DIR}/docs/00-infra/local-stack.compose.yaml"
 BROKER_TMPL="${REPO_DIR}/docs/00-infra/rocketmq-broker.conf"
+
+if [ ! -f "${COMPOSE_SRC}" ] || [ ! -f "${BROKER_TMPL}" ]; then
+  echo "仓库路径无效：${REPO_DIR} 下找不到 docs/00-infra 的 compose / broker 模板" >&2
+  exit 1
+fi
 
 mkdir -p "${INFRA_DIR}"
 chmod 755 "${INFRA_DIR}"

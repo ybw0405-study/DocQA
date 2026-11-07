@@ -7,7 +7,10 @@ param(
     [ValidateSet('start', 'stop', 'status')]
     [string]$Action = 'start',
     [string[]]$Modules = @('user-service', 'document-service', 'reminder-service', 'audit-service', 'agent-gateway'),
-    [int]$PortTimeoutSec = 90
+    [int]$PortTimeoutSec = 90,
+    # 本机 8080/8081 被其它常驻程序占用时，整体平移端口（例如 10000 -> 18080..18083）。
+    # 网关的上游地址用 DOCQA_*_SERVICE_URI 同步覆盖，见 application.yml。
+    [int]$PortOffset = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,6 +24,21 @@ $PortMap = @{
     'reminder-service' = 8083
     'audit-service'    = 0
     'agent-gateway'    = 8080
+}
+
+if ($PortOffset -ne 0) {
+    if ($PortOffset -lt 0 -or (8083 + $PortOffset) -gt 65000) { throw 'PortOffset 超出可用范围' }
+    foreach ($name in @($PortMap.Keys)) {
+        if ($PortMap[$name] -gt 0) { $PortMap[$name] += $PortOffset }
+    }
+    $upstream = @{
+        'DOCQA_USER_SERVICE_URI'     = $PortMap['user-service']
+        'DOCQA_DOCUMENT_SERVICE_URI' = $PortMap['document-service']
+        'DOCQA_REMINDER_SERVICE_URI' = $PortMap['reminder-service']
+    }
+    foreach ($key in $upstream.Keys) {
+        [Environment]::SetEnvironmentVariable($key, "http://127.0.0.1:$($upstream[$key])", 'Process')
+    }
 }
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path

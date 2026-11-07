@@ -64,7 +64,18 @@ run_step() {
   return 0
 }
 
-echo "智能学习助手 · 三端门禁复跑"
+# 离线门禁必须使用干净环境。开发机往往在 User 环境变量里配了运行期的 DOCQA_*
+# （审计守卫、实验预算、LLM 凭据……），Spring Boot 宽松绑定与 pydantic-settings 会自动
+# 读取它们；而 CI 上这些变量根本不存在，于是出现「CI 全绿、本机假红」。
+# 典型症状：AuditAppendOnlyAutoConfigurationTest.disabledWithoutProperty 被
+# DOCQA_AUDIT_APPEND_ONLY_GUARD=enforce 激活、实验预算用例断言 2000 == 0。
+for _env_name in $(compgen -e); do
+  case "${_env_name}" in
+    DOCQA_*|SERVER__PORT|SERVER_PORT) unset "${_env_name}" ;;
+  esac
+done
+
+echo "DocQA · 三端门禁复跑"
 echo "仓库：$ROOT"
 echo "提交：$COMMIT ($BRANCH)"
 echo "时间：$(date '+%Y-%m-%d %H:%M:%S %z')"

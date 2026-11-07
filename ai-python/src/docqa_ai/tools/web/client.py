@@ -95,7 +95,7 @@ class BoundedHttpClient:
         timeout_s: float = 5.0,
         max_bytes: int = 524288,
         allowed_hosts: Sequence[str] = (),
-        user_agent: str = "docqa/1.0",
+        user_agent: str = "DocQA/1.0",
         allow_private: bool = False,
         robots_ttl_s: float = _ROBOTS_TTL_SECONDS,
         # None = 系统解析器；validate_url 内部回退，不能把 None 当成「跳过 DNS 校验」。
