@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "docqa-ai"
 version = "1.0.0"
-description = "AI data plane for the DocQA: /agent/ask governance and document parsing worker"
+description = "AI data plane for DocQA: /agent/ask governance and document parsing worker"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
