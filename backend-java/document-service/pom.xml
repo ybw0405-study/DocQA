@@ -16,7 +16,7 @@
 
     <properties>
         <jjwt.version>0.12.6</jjwt.version>
-        <minio.version>8.5.17</minio.version>
+        <minio.version>8.6.0</minio.version>
         <redisson.version>3.34.1</redisson.version>
     </properties>
 
