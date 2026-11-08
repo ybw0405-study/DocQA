@@ -41,7 +41,7 @@
           RocketMQ 不在 Boot BOM 的管理范围内，版本只能自己管。S11-3-M3 的教训是「同一个库
           在多个模块里各写一份版本」迟早会漂：统一提到父 POM，子模块只引用属性。
         -->
-        <rocketmq.version>5.3.1</rocketmq.version>
+        <rocketmq.version>5.5.1</rocketmq.version>
         <archunit.version>1.3.0</archunit.version>
         <checkstyle.version>10.17.0</checkstyle.version>
 
