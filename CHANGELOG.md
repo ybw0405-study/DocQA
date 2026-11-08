@@ -5,14 +5,26 @@
 
 ## [Unreleased]
 
-### Added
+## [1.0.1] - 2026-11-08
 
-- 补全开源社区文件：贡献指南、行为准则、安全策略、Issue/PR 模板、CODEOWNERS、Dependabot 配置
-- README 增加徽章、目录、Mermaid 架构图与文档索引
+### Security
+
+- Python 依赖升级到无已知漏洞版本：LangGraph 1.2、LangChain Core 1.7、LangSmith 0.14、
+  langgraph-checkpoint 4.3、langgraph-sdk 0.4，修复 checkpoint 反序列化、缓存 pickle
+  fallback、prompt pull 与 tracing 文件读取等 28 项已知漏洞
+- MinIO Java 客户端 8.5.17 → 8.6.0，修复 CVE-2025-59952（XML 标签值替换）
+- 前端通过 npm overrides 固定 `minimatch` 11.0.5 / `glob` 14.0.4，修复
+  CVE-2026-118764 / CVE-2026-118773（仅影响开发工具链）
+
+### Fixed
+
+- 修复 README Mermaid 架构图在 GitHub 上渲染失败的问题
+- 关闭 Dependabot 初次启用时产生的一次性批量 PR，并清理 10 个残留分支
 
 ### Changed
 
-- 统一各端版本号到 `1.0.0`
+- Dependabot 改为按月分组升级、忽略主版本，每个生态最多 2 个 PR
+- 版本号统一到 1.0.1
 
 ## [1.0.0] - 2026-11-08
 
@@ -27,6 +39,9 @@
 - **治理与可观测**：AI 调用开关、按用户配额、审计事件、用量统计、Prometheus 指标
 - **工程化**：Maven 多模块 + ArchUnit + Checkstyle，Ruff + Pytest，ESLint + vue-tsc + Vitest，三端 CI 门禁
 - **本地运行**：WSL2 中间件编排、Windows 一键启动、systemd 开机自启
+- **开源社区文件**：CONTRIBUTING、CODE_OF_CONDUCT、SECURITY、SUPPORT、CHANGELOG、
+  Issue/PR 模板、CODEOWNERS、Dependabot、`.editorconfig`
+- **README 重设计**：徽章、目录、Mermaid 架构图、功能矩阵与文档索引
 
 ### Changed
 
@@ -35,6 +50,7 @@
   MinIO 桶 `docqa-documents`
 - CI Action 升级到 Node 24 版本（`checkout@v5`、`setup-java@v5`、`setup-python@v6`、
   `setup-node@v5`、`upload-artifact@v5`）
+- 各端版本号统一为 `1.0.0`
 
 ### Fixed
 
@@ -47,5 +63,6 @@
 - 数据库最小权限：`audit_event` 对运行时账号只允许 `SELECT` / `INSERT`
 - 审计只追加守卫支持 `off` / `warn` / `enforce` 三种模式
 
-[Unreleased]: https://github.com/ybw0405-study/DocQA/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/ybw0405-study/DocQA/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/ybw0405-study/DocQA/releases/tag/v1.0.1
 [1.0.0]: https://github.com/ybw0405-study/DocQA/releases/tag/v1.0.0

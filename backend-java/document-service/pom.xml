@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.docqa</groupId>
         <artifactId>docqa</artifactId>
-        <version>1.0.0</version>
+        <version>1.0.1</version>
     </parent>
 
     <artifactId>document-service</artifactId>
@@ -16,7 +16,7 @@
 
     <properties>
         <jjwt.version>0.12.6</jjwt.version>
-        <minio.version>8.5.17</minio.version>
+        <minio.version>8.6.0</minio.version>
         <redisson.version>3.34.1</redisson.version>
     </properties>
 
@@ -97,7 +97,7 @@
             <artifactId>rocketmq-client</artifactId>
             <version>${rocketmq.version}</version>
         </dependency>
-        <!-- consumer lag 探针的 RocketMQ admin 适配（DefaultMQAdminExt 隔离在 mq-support 里）。 -->
+        <!-- consumer lag 鎺㈤拡鐨?RocketMQ admin 閫傞厤锛圖efaultMQAdminExt 闅旂鍦?mq-support 閲岋級銆?-->
         <dependency>
             <groupId>com.docqa</groupId>
             <artifactId>mq-support</artifactId>

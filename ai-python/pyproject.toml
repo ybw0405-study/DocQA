@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docqa-ai"
-version = "1.0.0"
+version = "1.0.1"
 description = "AI data plane for DocQA: /agent/ask governance and document parsing worker"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,11 +17,11 @@ dependencies = [
     "httpx>=0.27",
     "redis>=5.0",
     "psycopg[binary]>=3.2",
-    # langsmith>=0.2 imports xxhash; its cp314 Windows wheel fails to load and the
-    # 3.x source build fails too, so this release pins the last compatible stack.
-    "langgraph>=0.2.60,<0.3",
-    "langchain-core>=0.3.60,<0.3.61",
-    "langsmith>=0.1.125,<0.2",
+    # 安全基线：LangGraph 1.x / LangChain Core 1.x / LangSmith 0.8+ 修复了
+    # checkpoint 反序列化、缓存 pickle fallback、prompt pull 与 tracing 相关漏洞。
+    "langgraph>=1.0.10,<2",
+    "langchain-core>=1.3.3,<2",
+    "langsmith>=0.8.18,<1",
     "opentelemetry-api>=1.27",
     "opentelemetry-sdk>=1.27",
     "opentelemetry-instrumentation-fastapi>=0.48b0",

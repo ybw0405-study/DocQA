@@ -4,7 +4,7 @@
 
 本文固定 `backend-java` 的 Maven 模块划分、每个模块的职责，以及允许的依赖方向。后续编码阶段如果出现"为了省事直接依赖另一个服务"或"在业务模块里临时调一下 Python"的情况，以本文为唯一裁决依据。
 
-父工程坐标：`com.docqa:docqa:1.0.0-SNAPSHOT`，打包方式为 `pom`。统一使用 Java 17、Maven 3.9+、Spring Boot 3.3.x 与 Spring Cloud 2023.0.x。
+父工程坐标：`com.docqa:docqa:1.0.1`，打包方式为 `pom`。统一使用 Java 17、Maven 3.9+、Spring Boot 3.3.x 与 Spring Cloud 2023.0.x。
 
 ## 2. 工程结构
 
