@@ -1,53 +1,80 @@
 version: 2
 updates:
+  # 依赖升级策略：
+  # - 每个生态按月检查，最多同时 2 个 PR；
+  # - 次版本/补丁版本按生态聚合成一个 PR；
+  # - Maven / pip / npm 忽略主版本升级（由维护者手工评估），
+  #   GitHub Actions 的主版本升级仍自动跟进。
   - package-ecosystem: "maven"
     directory: "/backend-java"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 2
     commit-message:
       prefix: "build(java)"
     labels:
       - "dependencies"
+    groups:
+      maven-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "pip"
     directory: "/ai-python"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 2
     commit-message:
       prefix: "build(python)"
     labels:
       - "dependencies"
+    groups:
+      pip-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "npm"
     directory: "/frontend-vue"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 2
     commit-message:
       prefix: "build(frontend)"
     labels:
       - "dependencies"
+    groups:
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 2
     commit-message:
       prefix: "ci(actions)"
     labels:
       - "dependencies"
+    groups:
+      actions:
+        patterns:
+          - "*"
