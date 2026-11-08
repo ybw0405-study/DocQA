@@ -55,20 +55,20 @@
 
 ```mermaid
 flowchart LR
-    FE["frontend-vue<br/>Vue 3 + Vite"] -->|"/api/v1"| GW["agent-gateway<br/>:8080"]
-    GW --> US["user-service<br/>:8081"]
-    GW --> DS["document-service<br/>:8082"]
-    GW --> RS["reminder-service<br/>:8083"]
-    GW -->|"/agent/*"| AI["ai-api<br/>:8000"]
-    DS -->|"parse-requested"| MQ[("RocketMQ")]
-    MQ --> PW["parse-worker"]
-    PW -->|"parse-completed"| MQ
+    FE[frontend-vue] -->|/api/v1| GW[agent-gateway 8080]
+    GW --> US[user-service 8081]
+    GW --> DS[document-service 8082]
+    GW --> RS[reminder-service 8083]
+    GW -->|/agent| AI[ai-api 8000]
+    DS -->|parse-requested| MQ[(RocketMQ)]
+    MQ --> PW[parse-worker]
+    PW -->|parse-completed| MQ
     MQ --> DS
-    MQ --> AUD["audit-service"]
-    AI --> PG[("PostgreSQL<br/>pgvector")]
-    AI --> REDIS[("Redis")]
-    DS --> MINIO[("MinIO")]
-    US --> MYSQL[("MySQL")]
+    MQ --> AUD[audit-service]
+    AI --> PG[(PostgreSQL pgvector)]
+    AI --> REDIS[(Redis)]
+    DS --> MINIO[(MinIO)]
+    US --> MYSQL[(MySQL)]
     DS --> MYSQL
     RS --> MYSQL
     GW --> MQ
