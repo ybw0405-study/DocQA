@@ -1,0 +1,15 @@
+# CODEOWNERS
+#
+# 默认由维护者负责所有路径；后续按模块拆分时在此追加具体路径。
+# 语法：<path> <owner...>
+# 文档：https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+* @ybw0405-study
+
+/backend-java/ @ybw0405-study
+/ai-python/ @ybw0405-study
+/frontend-vue/ @ybw0405-study
+/docs/ @ybw0405-study
+/ops/ @ybw0405-study
+/scripts/ @ybw0405-study
+/.github/ @ybw0405-study

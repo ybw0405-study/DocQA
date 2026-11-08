@@ -1,0 +1,49 @@
+name: 问题咨询
+description: 安装、配置或使用过程中遇到的问题
+title: "[Question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提问前请先看 [docs/00-infra/getting-started.md](https://github.com/ybw0405-study/DocQA/blob/main/docs/00-infra/getting-started.md)
+        与 [SUPPORT.md](https://github.com/ybw0405-study/DocQA/blob/main/SUPPORT.md)。
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 你的问题
+      description: 描述你正在做什么、卡在哪一步
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已经尝试过什么
+      description: 查过哪些文档、执行过哪些命令、结果如何
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      value: |
+        - OS:
+        - JDK:
+        - Node.js:
+        - Python:
+        - Docker / WSL:
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 请先脱敏
+      render: shell
+    validations:
+      required: false

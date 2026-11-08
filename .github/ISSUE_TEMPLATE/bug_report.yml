@@ -1,0 +1,78 @@
+name: Bug 报告
+description: 报告一个可复现的缺陷
+title: "[Bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。提交前请先搜索现有 Issue，并确认问题可以稳定复现。
+        安全漏洞请不要走这里，见 [SECURITY.md](https://github.com/ybw0405-study/DocQA/blob/main/SECURITY.md)。
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+      description: 实际发生了什么？你期望发生什么？
+      placeholder: 简要描述现象与影响
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 越具体越好；如果涉及数据，请说明文件类型与大小
+      placeholder: |
+        1. 启动 ...
+        2. 打开 ...
+        3. 点击 ...
+        4. 看到 ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: 受影响组件
+      options:
+        - 前端（frontend-vue）
+        - Java 控制面（gateway / user / document / reminder / audit）
+        - Python 数据面（ai-api / parse-worker / vector-worker）
+        - 中间件与运维（MySQL / PostgreSQL / Redis / RocketMQ / MinIO）
+        - 文档与脚本
+        - 不确定
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本或提交
+      description: 例如 v1.0.0 或 `git rev-parse --short HEAD` 的结果
+      placeholder: v1.0.0 / d98364b
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      value: |
+        - OS:
+        - JDK:
+        - Node.js:
+        - Python:
+        - Docker / WSL:
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 请先脱敏（去掉 Token、口令、连接串、个人数据）
+      render: shell
+    validations:
+      required: false

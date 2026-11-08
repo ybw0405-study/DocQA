@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用文档
+    url: https://github.com/ybw0405-study/DocQA/blob/main/docs/README.md
+    about: 安装、启动、端口与环境变量先看这里
+  - name: 安全漏洞
+    url: https://github.com/ybw0405-study/DocQA/security/advisories/new
+    about: 请勿在公开 Issue 中披露安全问题
