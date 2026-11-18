@@ -30,6 +30,13 @@ class TenantIsolationContractTest {
     /** 跨租户运维任务：按全局游标清理过期行，不按单租户过滤。 */
     private static final List<String> GLOBAL_MAINTENANCE_METHODS = List.of("deleteExpiredTerminal");
 
+    /**
+     * 不适用「必须含 tenant_id」判定的仓库：tenant 表本身就是租户清单，
+     * 它的行没有「所属租户」这个属性。除此之外不接受任何豁免。
+     */
+    private static final List<String> TENANT_AGNOSTIC_REPOSITORIES =
+            List.of("JdbcTenantBootstrapRepository.java");
+
     @Test
     void everyJdbcRepositoryDeclaresTenantPredicate() throws IOException {
         List<String> offenders = new ArrayList<>();
@@ -46,6 +53,9 @@ class TenantIsolationContractTest {
                         .filter(p -> p.getFileName().toString().endsWith("Repository.java"))
                         .toList()) {
                     checked++;
+                    if (TENANT_AGNOSTIC_REPOSITORIES.contains(file.getFileName().toString())) {
+                        continue;
+                    }
                     String source = Files.readString(file, StandardCharsets.UTF_8);
                     if (!source.contains("tenant_id")) {
                         offenders.add(REPO_ROOT.relativize(file).toString());
@@ -54,8 +64,8 @@ class TenantIsolationContractTest {
             }
         }
         assertThat(checked)
-                .as("必须实际扫描到 17 个 Jdbc 仓库，扫描数为 0 说明测试路径写错了")
-                .isEqualTo(17);
+                .as("必须实际扫描到 18 个 Jdbc 仓库，扫描数为 0 说明测试路径写错了")
+                .isEqualTo(18);
         assertThat(offenders)
                 .as("每个业务仓库都必须出现 tenant_id 谓词/列；遗漏即跨租户数据泄漏")
                 .isEmpty();

@@ -234,6 +234,53 @@ frontend-vue: eslint . → 0；vitest run → 52 files 全过；vite build → �
 ai-python / frontend-vue → 本轮零代码改动，无需验收
 ```
 
+### 5.6 迁移在真实 MySQL 8.4 上的两次失败（P0 收尾修正）
+
+**这是 P0 最值钱的一条教训**：五道契约测试全部通过、1218 个单测全绿，V10 仍然在真库上
+连续失败两次。静态测试比对的是文本，比对不了 SQL 语义。
+
+**失败一：`INSERT command denied to user 'ss_migrator'`**
+
+- 现象：V10 在 `CREATE TABLE tenant` 之后插一行默认租户。
+- 根因：`ss_migrator` 只有 schema 级 DDL + `flyway_schema_history` 的 DML，业务表
+  写权限为 0（`ops/sql/README.md` 明确规定，V1–V9 全是纯 DDL）。**V10 是第一个含 DML 的迁移**。
+- 后果：MySQL 的 DDL 不参与事务，崩溃点之前的语句已提交 → 库停在「`tenant` 表已建、
+  14 张业务表一条没动」的半迁移态，且 `flyway_schema_history` 留下 `success=0`。
+- 修法：
+  1. V10 改为**纯 DDL**，默认租户行移到 `document-service` 启动期的
+     `DefaultTenantInitializer`，用 app 账号 `INSERT IGNORE` 幂等写入。
+  2. 新增断言 `MigrationV10ContractTest.migrationStaysPureDdl`：迁移里出现
+     `INSERT/UPDATE/DELETE/REPLACE` 就红。把 `ops/sql` 里那句「迁移不需要写业务数据」
+     从口头约定变成会失败的测试。
+  3. `least-privilege.sql.tmpl` 给 `ss_app` 补 `tenant` 的 `SELECT/INSERT/UPDATE`
+     ——**故意不给 `DELETE`**：注销租户走 `status='DELETED'` 软删，`chk_tenant_status`
+     约束里已经有这个状态，硬删会打断所有存量行的归属。
+
+**失败二：`ERROR 1826 Duplicate foreign key constraint name`**
+
+- 现象：`ALTER TABLE app_user_role DROP FOREIGN KEY fk_app_user_role_user,
+  ADD CONSTRAINT fk_app_user_role_user FOREIGN KEY (tenant_id, user_id) ...` 被拒。
+- 根因：MySQL 在一条 `ALTER` 内**先校验约束名唯一性，再应用 DROP**，所以同名重建必冲突。
+- 修法：7 个复合外键改为 `fk_<表>_tenant_<目标>`。语义上也该换名——约束已从单列外键
+  变成带租户维度的复合外键，沿用旧名会让排障时误解结构。
+
+**半迁移的手工回滚（两次都用到了）**
+
+```sql
+DROP TABLE IF EXISTS tenant;
+ALTER TABLE app_user
+  DROP INDEX uk_app_user_tenant_username,
+  DROP INDEX uk_app_user_tenant_id,
+  DROP INDEX idx_app_user_tenant_created,
+  DROP COLUMN tenant_id,
+  ADD UNIQUE KEY uk_app_user_username (username);
+DELETE FROM flyway_schema_history WHERE version = '10' AND success = 0;
+```
+
+**由此得出的 P1 硬要求**：必须引入 **Testcontainers 集成测试**（本机已有 `mysql:8.0` /
+`mysql:8.4` 镜像且 Docker 可用，可离线跑），把「V1→V10 全链路能在真 MySQL 上跑通」
+变成 CI 的一部分。P0 的三道契约测试补不上这个洞——它们只证明文本一致，不证明能执行。
+
 ---
 
 ## 6. 待确认事项

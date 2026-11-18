@@ -42,7 +42,7 @@ class MigrationV10ContractTest {
     }
 
     @Test
-    void migrationCreatesDefaultTenantAndTenantizesUniqueKeys() throws IOException {
+    void migrationCreatesTenantTableAndTenantizesUniqueKeys() throws IOException {
         String migration = normalize(readClasspath(MIGRATION)).toUpperCase(Locale.ROOT);
         assertThat(migration).contains("CREATE TABLE TENANT");
         assertThat(migration).contains(DEFAULT_TENANT.toUpperCase(Locale.ROOT));
@@ -51,6 +51,36 @@ class MigrationV10ContractTest {
         assertThat(migration).doesNotContain("UNIQUE KEY UK_APP_USER_USERNAME (USERNAME)");
         // 用户隔离最直接的冲突点：文档 md5 也必须租户化
         assertThat(migration).contains("UK_DOCUMENT_TENANT_USER_MD5 (TENANT_ID, USER_ID, MD5)");
+    }
+
+    /**
+     * 迁移必须保持纯 DDL。
+     *
+     * <p>这不是洁癖：迁移账号 {@code ss_migrator} 只持有 schema 级 DDL 与
+     * {@code flyway_schema_history} 的 DML，没有任何业务表的写权限（ops/sql/README.md）。
+     * V10 初版曾在文件中间插了一行 {@code INSERT INTO tenant} 来种默认租户，结果在
+     * MySQL 8.4 上直接报 {@code INSERT command denied}，且因为 DDL 不参与事务，
+     * 迁移停在「tenant 表已建、其余一条没跑」的半迁移状态。这条断言把那次事故钉死。
+     *
+     * <p>需要种子数据时放到启动期的 Runner 里（参考 DefaultTenantInitializer），
+     * 用 app 账号写。
+     */
+    @Test
+    void migrationStaysPureDdl() throws IOException {
+        String migration = normalize(readClasspath(MIGRATION)).toUpperCase(Locale.ROOT);
+        assertThat(Arrays.stream(migration.split("\\R"))
+                        .filter(MigrationV10ContractTest::startsWithDmlKeyword)
+                        .toList())
+                .as("迁移不得含 INSERT/UPDATE/DELETE/REPLACE：迁移账号没有业务表写权限")
+                .isEmpty();
+    }
+
+    /** 只看语句首词，避免 ON UPDATE CURRENT_TIMESTAMP、ON DELETE CASCADE 这类误判。 */
+    private static boolean startsWithDmlKeyword(String statement) {
+        return statement.startsWith("INSERT ")
+                || statement.startsWith("UPDATE ")
+                || statement.startsWith("DELETE ")
+                || statement.startsWith("REPLACE ");
     }
 
     @Test

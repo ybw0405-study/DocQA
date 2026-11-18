@@ -10,9 +10,20 @@
 --    数据库层保证 tenant_id 不能被写错；追加写表（audit_event / agent_execution）
 --    保持无外键的既有约定，靠租户谓词与审计约束保证。
 -- 5. app_user.id 仍为主键，但另加 (tenant_id, id) 唯一键供复合外键引用。
+-- 6. 新的复合外键一律**另起名字**（fk_<表>_tenant_<目标>），不复用旧名。原因：
+--    MySQL 在一条 ALTER 里先校验名字唯一性再应用 DROP，所以
+--    「DROP FOREIGN KEY fk_x, ADD CONSTRAINT fk_x ...」会直接报
+--    ERROR 1826 Duplicate foreign key constraint name。语义上也该换名——
+--    约束从单列外键变成了带租户维度的复合外键。
 --
 -- 本迁移包含 DROP INDEX / DROP FOREIGN KEY：只删「约束」不删「数据」，
 -- 且删除的旧约束均在本文件内以租户化版本重建。
+--
+-- 本迁移是**纯 DDL**（0 条 INSERT/UPDATE/DELETE）。迁移账号 ss_migrator 只持有
+-- schema 级 DDL 与 flyway_schema_history 的 DML，没有业务表的写权限（见
+-- ops/sql/README.md）。默认租户那一行因此不在这里种，改由 document-service 启动期的
+-- DefaultTenantInitializer 幂等写入（用 app 账号），MigrationV10ContractTest 会拦住
+-- 任何把 DML 塞回迁移的改动。
 
 CREATE TABLE tenant (
   id             CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
@@ -34,10 +45,6 @@ CREATE TABLE tenant (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COMMENT='租户控制面；存量数据归属默认租户，id 固定全 1 UUID';
 
-INSERT INTO tenant (id, slug, name, tier, isolation, status, owner_user_id)
-VALUES ('11111111-1111-1111-1111-111111111111', 'default', 'Default Workspace',
-        'ENTERPRISE', 'SHARED', 'ACTIVE', NULL);
-
 ALTER TABLE app_user
   ADD COLUMN tenant_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL
     DEFAULT '11111111-1111-1111-1111-111111111111' COMMENT '所属租户',
@@ -50,14 +57,14 @@ ALTER TABLE app_user_role
   ADD COLUMN tenant_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL
     DEFAULT '11111111-1111-1111-1111-111111111111' COMMENT '所属租户',
   DROP FOREIGN KEY fk_app_user_role_user,
-  ADD CONSTRAINT fk_app_user_role_user FOREIGN KEY (tenant_id, user_id)
+  ADD CONSTRAINT fk_app_user_role_tenant_user FOREIGN KEY (tenant_id, user_id)
     REFERENCES app_user (tenant_id, id) ON DELETE CASCADE;
 
 ALTER TABLE refresh_token
   ADD COLUMN tenant_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL
     DEFAULT '11111111-1111-1111-1111-111111111111' COMMENT '所属租户',
   DROP FOREIGN KEY fk_refresh_token_user,
-  ADD CONSTRAINT fk_refresh_token_user FOREIGN KEY (tenant_id, user_id)
+  ADD CONSTRAINT fk_refresh_token_tenant_user FOREIGN KEY (tenant_id, user_id)
     REFERENCES app_user (tenant_id, id) ON DELETE CASCADE;
 
 ALTER TABLE ai_quota
@@ -66,7 +73,7 @@ ALTER TABLE ai_quota
   DROP PRIMARY KEY,
   ADD PRIMARY KEY (tenant_id, user_id),
   DROP FOREIGN KEY fk_ai_quota_user,
-  ADD CONSTRAINT fk_ai_quota_user FOREIGN KEY (tenant_id, user_id)
+  ADD CONSTRAINT fk_ai_quota_tenant_user FOREIGN KEY (tenant_id, user_id)
     REFERENCES app_user (tenant_id, id) ON DELETE CASCADE;
 
 ALTER TABLE document
@@ -82,7 +89,7 @@ ALTER TABLE chunk
   ADD COLUMN tenant_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL
     DEFAULT '11111111-1111-1111-1111-111111111111' COMMENT '所属租户',
   DROP FOREIGN KEY fk_chunk_document,
-  ADD CONSTRAINT fk_chunk_document FOREIGN KEY (tenant_id, document_id)
+  ADD CONSTRAINT fk_chunk_tenant_document FOREIGN KEY (tenant_id, document_id)
     REFERENCES document (tenant_id, id) ON DELETE CASCADE;
 
 ALTER TABLE document_tag
@@ -103,9 +110,9 @@ ALTER TABLE document_tag_link
   ADD PRIMARY KEY (tenant_id, document_id, tag_id),
   ADD KEY idx_document_tag_link_tenant_tag (tenant_id, tag_id, document_id)
     COMMENT '按标签过滤文档列表（搜索的 tag 参数）',
-  ADD CONSTRAINT fk_document_tag_link_document FOREIGN KEY (tenant_id, document_id)
+  ADD CONSTRAINT fk_document_tag_link_tenant_document FOREIGN KEY (tenant_id, document_id)
     REFERENCES document (tenant_id, id) ON DELETE CASCADE,
-  ADD CONSTRAINT fk_document_tag_link_tag FOREIGN KEY (tenant_id, tag_id)
+  ADD CONSTRAINT fk_document_tag_link_tenant_tag FOREIGN KEY (tenant_id, tag_id)
     REFERENCES document_tag (tenant_id, id) ON DELETE CASCADE;
 
 ALTER TABLE conversation
@@ -119,7 +126,7 @@ ALTER TABLE message
   ADD COLUMN tenant_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL
     DEFAULT '11111111-1111-1111-1111-111111111111' COMMENT '所属租户',
   DROP FOREIGN KEY fk_message_conversation,
-  ADD CONSTRAINT fk_message_conversation FOREIGN KEY (tenant_id, conversation_id)
+  ADD CONSTRAINT fk_message_tenant_conversation FOREIGN KEY (tenant_id, conversation_id)
     REFERENCES conversation (tenant_id, id) ON DELETE CASCADE,
   DROP INDEX uk_message_client_request,
   ADD UNIQUE KEY uk_message_tenant_client_request
