@@ -281,6 +281,44 @@ DELETE FROM flyway_schema_history WHERE version = '10' AND success = 0;
 `mysql:8.4` 镜像且 Docker 可用，可离线跑），把「V1→V10 全链路能在真 MySQL 上跑通」
 变成 CI 的一部分。P0 的三道契约测试补不上这个洞——它们只证明文本一致，不证明能执行。
 
+### 5.7 P1-A：真库迁移集成测试（已落地，2026-11-18）
+
+`document-service/src/test/java/com/docqa/document/migration/MigrationOnRealMysqlTest.java`。
+起一个 `mysql:8.4` 容器，**逐字复刻 `ops/sql/least-privilege.sql.tmpl` 的授权**后跑 V1→V10，
+六个用例钉住六件事：
+
+| 用例 | 钉住什么 |
+|---|---|
+| `appliesAllMigrationsOnRealMysql` | 10 份脚本全部执行、账本无 `success=0`、版本序列 1→10 完整 |
+| `everyBusinessTableCarriesTenantId` | 14 张表都有 `tenant_id`，且 `NOT NULL`、默认值指向默认租户 |
+| `migrationStaysPureDdlOnRealMysql` | 迁移后 `tenant` 表为空；**用 migrator 账号真发一条 INSERT 验证被拒**（1142） |
+| `rebuildsKeysAndForeignKeysPerTenant` | 10 个租户化唯一键就位、7 个旧单列外键全部消失、复合外键恰好 7 个 |
+| `seedsDefaultTenantIdempotently` | 走**生产代码** `DefaultTenantInitializer` + `JdbcTenantBootstrapRepository`（不是测试里另写 SQL），重复执行两次只有一行 |
+| `rejectsCrossTenantReferences` | 复合外键真的拦截跨租户写入：租户 B 的 chunk/app_user_role 挂到租户 A 的 document/app_user 上报 1452，且报错里能看到 `fk_*_tenant_*` 约束名；同租户写入必须照常通过 |
+
+它补上了 §5.6 暴露的全部缺口：权限模型（migrator 能不能写业务表）不再靠正则猜，
+跨租户隔离第一次有了**行为级**证据。无 Docker 的机器整类跳过，需要强制关闭设
+`DOCQA_DB_IT=off`；`mvn test` 与 `scripts/verify-all.sh` 都会自动带上它。
+
+**排障记录（值得留档，别的地方还会踩）**
+
+1. **Docker Desktop 的 Windows 管道拒绝老版本 API 路径**。testcontainers/docker-java
+   默认从 `GET /v1.32/info` 起步协商，而 Docker Desktop 的管道代理对 `/v1.32/*` 直接回
+   `400 Bad Request`（无版本的 `/info` 却是 200）。表现为 `Could not find a valid Docker
+   environment`，且整类被**静默跳过、构建仍绿**——最危险的形状。诊断方法：把
+   `DOCKER_HOST` 指向自建 HTTP 服务器与字节级 TCP→命名管道桥，抓到实际请求。
+   修法：测试类的 static 块把 `api.version` 系统属性设为 `1.44`（尊重已显式指定的
+   `API_VERSION` 环境变量）；同时移除了 `~/.testcontainers.properties` 里过期的
+   `docker.client.strategy=NpipeSocketClientProviderStrategy` 钉死（该策略不读
+   `api.version`，备份在 `~/.testcontainers.properties.bak`）。
+2. **`MySQLContainer.configure()` 会覆盖 `MYSQL_ROOT_PASSWORD`** 为 `withPassword` 的值，
+   `withEnv` 设不进去；且 1.20.4 不再代设 `MYSQL_ROOT_HOST`，缺它则 root 只授权给容器内
+   localhost，宿主机 JDBC 报 `Access denied for 'root'@'172.17.0.1'`。两者都已在测试里注释说明。
+3. **依赖钉版**：Boot 3.3.5 BOM 导入 testcontainers-bom 1.19.8，其 jar 不在离线仓库，
+   且 BOM import 的属性不可被本 POM 覆盖——根 pom 里逐条直接声明 1.20.4
+   （`testcontainers/jdbc/database-commons/mysql` 四条缺一不可，只钉第一条时传递依赖
+   仍会落回 1.19.8）。
+
 ---
 
 ## 6. 待确认事项

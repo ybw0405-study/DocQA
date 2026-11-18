@@ -115,6 +115,21 @@
             <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
+        <!--
+          真库迁移测试（MigrationOnRealMysqlTest）：起一个 MySQL 容器，用与生产一致的
+          最小权限账号跑 V1→V10。契约测试比对的是文本，比对不了 SQL 语义——V10 初版
+          五道契约测试全绿却在真库上连挂两次，就是这个缺口。
+        -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mysql</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

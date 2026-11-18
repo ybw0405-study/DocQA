@@ -44,6 +44,19 @@
         <rocketmq.version>5.3.1</rocketmq.version>
         <archunit.version>1.3.0</archunit.version>
         <checkstyle.version>10.17.0</checkstyle.version>
+        <!--
+          Testcontainers 版本必须显式钉死，不能交给 Boot BOM。两条实测事实：
+          1. spring-boot-dependencies 3.3.5 导入的是 testcontainers-bom 1.19.8，
+             而 BOM import 的内部属性无法被本 POM 的 <properties> 覆盖（import 前
+             已完成插值），所以改属性不会生效；
+          2. 本机 ~/.m2 里只有 1.20.4 / 1.21.4 的 jar，1.19.8 只有 BOM 的 pom。
+             离线门禁（scripts/verify-all.sh 的离线模式）会因此直接解析失败。
+          因此下面在 dependencyManagement 里**逐条直接声明** 1.20.4。直接声明优先于
+          导入的 BOM，且必须把 testcontainers / jdbc / database-commons / mysql
+          四条都列全：只钉 testcontainers 的话，mysql 传递依赖的 jdbc 仍会落回
+          1.19.8，离线构建同样断。
+        -->
+        <testcontainers.version>1.20.4</testcontainers.version>
 
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
@@ -53,6 +66,30 @@
 
     <dependencyManagement>
         <dependencies>
+            <!--
+              直接声明先于 import 生效，用于压过 testcontainers-bom 1.19.8。
+              四条缺一不可，原因见 <testcontainers.version> 处的注释。
+            -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers</artifactId>
+                <version>${testcontainers.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>jdbc</artifactId>
+                <version>${testcontainers.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>database-commons</artifactId>
+                <version>${testcontainers.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>mysql</artifactId>
+                <version>${testcontainers.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
