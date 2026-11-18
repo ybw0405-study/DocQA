@@ -2,6 +2,7 @@ package com.docqa.document.service;
 
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.document.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -40,6 +41,10 @@ public class JwtAuthenticator {
     }
 
     public UUID authenticate(String authorizationHeader) {
+        return authenticateIdentity(authorizationHeader).userId();
+    }
+
+    public AuthenticatedUser authenticateIdentity(String authorizationHeader) {
         String token = bearerToken(authorizationHeader);
         try {
             Jws<Claims> parsed = Jwts.parser()
@@ -63,8 +68,20 @@ public class JwtAuthenticator {
             if (revocationStore.isRevoked(tokenId, userId, issuedAt.toInstant())) {
                 throw new BusinessException(ErrorCode.USR_AUTH_001);
             }
-            return userId;
+            return new AuthenticatedUser(userId, parseTenantId(claims));
         } catch (JwtException | IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.USR_AUTH_001);
+        }
+    }
+
+    private UUID parseTenantId(Claims claims) {
+        Object raw = claims.get(TenantContext.CLAIM_NAME);
+        if (!(raw instanceof String value) || value.isBlank()) {
+            throw new BusinessException(ErrorCode.USR_AUTH_001);
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ex) {
             throw new BusinessException(ErrorCode.USR_AUTH_001);
         }
     }

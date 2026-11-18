@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.config.ReminderProperties;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.domain.ReminderStatus;
@@ -34,6 +35,7 @@ import org.mockito.ArgumentCaptor;
  */
 class ScheduleEvaluatorTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID STORED_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final Instant NOW = Instant.parse("2026-09-01T00:00:00Z");
@@ -192,16 +194,17 @@ class ScheduleEvaluatorTest {
                 event(MON_0800, 1, WEEKLY_MONDAY, MONDAY_CLASS),
                 event("discrete-math-wed-1000", 2, "FREQ=WEEKLY;BYDAY=WE", Instant.parse("2026-09-09T02:00:00Z")));
 
-        verify(repository, times(1)).findByUserAndSourceUids(eq(USER_ID), eq("COURSE"), uids.capture());
+        verify(repository, times(1)).findByUserAndSourceUids(
+                eq(TENANT_ID), eq(USER_ID), eq("COURSE"), uids.capture());
         assertThat(uids.getValue()).containsExactly(MON_0800, "discrete-math-wed-1000");
     }
 
     private List<ScheduleDecision> evaluate(int leadMinutes, IcsEvent... events) {
-        return evaluator.evaluate(USER_ID, REQUEST_KEY, leadMinutes, List.of(events));
+        return evaluator.evaluate(TENANT_ID, USER_ID, REQUEST_KEY, leadMinutes, List.of(events));
     }
 
     private void givenStored(ReminderRow row) {
-        when(repository.findByUserAndSourceUids(any(), any(), anyList())).thenReturn(List.of(row));
+        when(repository.findByUserAndSourceUids(any(), any(), any(), anyList())).thenReturn(List.of(row));
     }
 
     private IcsEvent event(String uid, int sequence, String rrule, Instant dtstart) {

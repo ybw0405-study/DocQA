@@ -56,12 +56,14 @@ public class ScheduleEvaluator {
     }
 
     public List<ScheduleDecision> evaluate(
+            UUID tenantId,
             UUID userId,
             String requestKey,
             int leadMinutes,
             List<IcsEvent> events) {
         Map<String, ReminderRow> existingByUid = reminderRepository
-                .findByUserAndSourceUids(userId, SOURCE_TYPE_COURSE, events.stream().map(IcsEvent::uid).toList())
+                .findByUserAndSourceUids(tenantId, userId, SOURCE_TYPE_COURSE,
+                        events.stream().map(IcsEvent::uid).toList())
                 .stream()
                 .collect(Collectors.toMap(ReminderRow::sourceUid, row -> row));
         Instant now = clock.instant();

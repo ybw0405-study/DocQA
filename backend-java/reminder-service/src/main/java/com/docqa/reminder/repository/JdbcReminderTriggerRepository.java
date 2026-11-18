@@ -30,14 +30,15 @@ public class JdbcReminderTriggerRepository implements ReminderTriggerRepository 
     }
 
     @Override
-    public void insert(ReminderTriggerRow row) {
+    public void insert(UUID tenantId, ReminderTriggerRow row) {
         jdbcTemplate.update("""
                         INSERT INTO reminder_trigger (
-                            id, user_id, reminder_id, title, description, source_type,
+                            tenant_id, id, user_id, reminder_id, title, description, source_type,
                             planned_trigger_at, next_trigger_at, trace_id, delivered_at, read_at,
                             created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
+                tenantId.toString(),
                 row.id().toString(),
                 row.userId().toString(),
                 row.reminderId().toString(),
@@ -54,12 +55,13 @@ public class JdbcReminderTriggerRepository implements ReminderTriggerRepository 
     }
 
     @Override
-    public List<ReminderTriggerRow> findUserPage(UUID userId, boolean unreadOnly, Instant beforePlannedTriggerAt,
-            UUID beforeId, int limit) {
+    public List<ReminderTriggerRow> findUserPage(UUID tenantId, UUID userId, boolean unreadOnly,
+            Instant beforePlannedTriggerAt, UUID beforeId, int limit) {
         StringBuilder sql = new StringBuilder("SELECT ")
                 .append(COLUMNS)
-                .append(" FROM reminder_trigger WHERE user_id = ?");
+                .append(" FROM reminder_trigger WHERE tenant_id = ? AND user_id = ?");
         List<Object> args = new ArrayList<>();
+        args.add(tenantId.toString());
         args.add(userId.toString());
         if (unreadOnly) {
             sql.append(" AND read_at IS NULL");
@@ -77,22 +79,24 @@ public class JdbcReminderTriggerRepository implements ReminderTriggerRepository 
     }
 
     @Override
-    public int markAllUnreadAsRead(UUID userId, Instant now) {
+    public int markAllUnreadAsRead(UUID tenantId, UUID userId, Instant now) {
         return jdbcTemplate.update(
-                "UPDATE reminder_trigger SET read_at = ? WHERE user_id = ? AND read_at IS NULL",
+                "UPDATE reminder_trigger SET read_at = ? WHERE tenant_id = ? AND user_id = ? AND read_at IS NULL",
                 Timestamp.from(now),
+                tenantId.toString(),
                 userId.toString());
     }
 
     @Override
-    public int markRead(UUID userId, List<UUID> notificationIds, Instant now) {
+    public int markRead(UUID tenantId, UUID userId, List<UUID> notificationIds, Instant now) {
         String placeholders = notificationIds.stream().map(id -> "?").collect(Collectors.joining(", "));
         List<Object> args = new ArrayList<>();
         args.add(Timestamp.from(now));
+        args.add(tenantId.toString());
         args.add(userId.toString());
         notificationIds.forEach(id -> args.add(id.toString()));
         return jdbcTemplate.update(
-                "UPDATE reminder_trigger SET read_at = ? WHERE user_id = ? AND read_at IS NULL"
+                "UPDATE reminder_trigger SET read_at = ? WHERE tenant_id = ? AND user_id = ? AND read_at IS NULL"
                         + " AND id IN (" + placeholders + ")",
                 args.toArray());
     }

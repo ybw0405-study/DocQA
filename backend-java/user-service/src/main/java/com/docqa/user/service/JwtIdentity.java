@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public record JwtIdentity(
         UUID userId,
+        UUID tenantId,
         Set<UserRole> roles,
         String tokenId,
         Instant issuedAt,

@@ -7,14 +7,14 @@ import java.util.UUID;
 
 public interface ConversationRepository {
 
-    boolean existsById(UUID id);
+    boolean existsById(UUID tenantId, UUID id);
 
-    boolean existsByIdAndUser(UUID id, UUID userId);
+    boolean existsByIdAndUser(UUID tenantId, UUID id, UUID userId);
 
-    boolean createOwned(UUID id, UUID userId, String title, List<UUID> documentScopeIds, Instant now);
+    boolean createOwned(UUID tenantId, UUID id, UUID userId, String title, List<UUID> documentScopeIds, Instant now);
 
-    void touch(UUID id, Instant now);
+    void touch(UUID tenantId, UUID id, Instant now);
 
-    List<ConversationListRow> findUserPage(UUID userId, Instant beforeLastMessageAt, UUID beforeId,
+    List<ConversationListRow> findUserPage(UUID tenantId, UUID userId, Instant beforeLastMessageAt, UUID beforeId,
             boolean beforeNullGroup, int limit);
 }

@@ -30,6 +30,7 @@ public class JdbcMessageRepository implements MessageRepository {
 
     @Override
     public void insert(
+            UUID tenantId,
             UUID id,
             UUID conversationId,
             String role,
@@ -41,10 +42,11 @@ public class JdbcMessageRepository implements MessageRepository {
             Instant createdAt) {
         jdbcTemplate.update("""
                         INSERT INTO message (
-                            id, conversation_id, role, content, token_count,
+                            tenant_id, id, conversation_id, role, content, token_count,
                             client_request_id, trace_id, metadata, created_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
+                tenantId.toString(),
                 id.toString(),
                 conversationId.toString(),
                 role,
@@ -57,15 +59,16 @@ public class JdbcMessageRepository implements MessageRepository {
     }
 
     @Override
-    public List<StoredMessage> findRecent(UUID conversationId, int limit) {
+    public List<StoredMessage> findRecent(UUID tenantId, UUID conversationId, int limit) {
         List<StoredMessage> messages = new ArrayList<>(jdbcTemplate.query("""
                         SELECT id, role, content, created_at
                         FROM message
-                        WHERE conversation_id = ?
+                        WHERE tenant_id = ? AND conversation_id = ?
                         ORDER BY created_at DESC, id DESC
                         LIMIT ?
                         """,
                 ROW_MAPPER,
+                tenantId.toString(),
                 conversationId.toString(),
                 limit));
         Collections.reverse(messages);
@@ -73,13 +76,15 @@ public class JdbcMessageRepository implements MessageRepository {
     }
 
     @Override
-    public List<MessageHistoryRow> findPage(UUID conversationId, Instant beforeCreatedAt, UUID beforeId, int limit) {
+    public List<MessageHistoryRow> findPage(UUID tenantId, UUID conversationId, Instant beforeCreatedAt,
+            UUID beforeId, int limit) {
         StringBuilder sql = new StringBuilder("""
                         SELECT id, role, content, token_count, trace_id, created_at
                         FROM message
-                        WHERE conversation_id = ?
+                        WHERE tenant_id = ? AND conversation_id = ?
                         """);
         List<Object> args = new ArrayList<>();
+        args.add(tenantId.toString());
         args.add(conversationId.toString());
         if (beforeCreatedAt != null && beforeId != null) {
             sql.append(" AND (created_at < ? OR (created_at = ? AND id < ?))");

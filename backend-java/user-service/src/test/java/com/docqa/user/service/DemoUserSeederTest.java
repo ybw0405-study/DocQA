@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.config.DemoUserProperties;
 import com.docqa.user.domain.NewUser;
 import com.docqa.user.domain.UserRole;
@@ -48,7 +49,8 @@ class DemoUserSeederTest {
         seeder().run(arguments);
 
         ArgumentCaptor<NewUser> userCaptor = ArgumentCaptor.forClass(NewUser.class);
-        verify(userRepository).insert(userCaptor.capture(), eq(EnumSet.of(UserRole.USER, UserRole.ADMIN)));
+        verify(userRepository).insert(eq(TenantContext.DEFAULT_TENANT_ID),
+                userCaptor.capture(), eq(EnumSet.of(UserRole.USER, UserRole.ADMIN)));
         NewUser user = userCaptor.getValue();
         assertThat(user.id()).isEqualTo(USER_ID);
         assertThat(user.username()).isEqualTo("demo");
@@ -63,16 +65,17 @@ class DemoUserSeederTest {
 
         seeder().run(arguments);
 
-        verify(userRepository).insert(any(), eq(Set.of(UserRole.USER)));
+        verify(userRepository).insert(
+                eq(TenantContext.DEFAULT_TENANT_ID), any(), eq(Set.of(UserRole.USER)));
     }
 
     @Test
     void skipsWhenTheAccountAlreadyExists() {
-        when(userRepository.existsByUsername("demo")).thenReturn(true);
+        when(userRepository.existsByUsername(TenantContext.DEFAULT_TENANT_ID, "demo")).thenReturn(true);
 
         seeder().run(arguments);
 
-        verify(userRepository, never()).insert(any(), any());
+        verify(userRepository, never()).insert(any(), any(), any());
     }
 
     @Test
@@ -82,8 +85,8 @@ class DemoUserSeederTest {
 
         seeder().run(arguments);
 
-        verify(userRepository, never()).existsByUsername(any());
-        verify(userRepository, never()).insert(any(), any());
+        verify(userRepository, never()).existsByUsername(any(), any());
+        verify(userRepository, never()).insert(any(), any(), any());
     }
 
     @Test
@@ -92,7 +95,7 @@ class DemoUserSeederTest {
 
         seeder().run(arguments);
 
-        verify(userRepository, never()).insert(any(), any());
+        verify(userRepository, never()).insert(any(), any(), any());
     }
 
     @Test
@@ -102,7 +105,7 @@ class DemoUserSeederTest {
         assertThatThrownBy(() -> seeder().run(arguments))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("BCrypt");
-        verify(userRepository, never()).insert(any(), any());
+        verify(userRepository, never()).insert(any(), any(), any());
     }
 
     @Test

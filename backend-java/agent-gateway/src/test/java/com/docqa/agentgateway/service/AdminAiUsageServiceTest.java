@@ -16,6 +16,7 @@ import com.docqa.agentgateway.repository.AiUsageRepository;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -55,10 +56,11 @@ class AdminAiUsageServiceTest {
         assertThat(summary.from()).isEqualTo(NOW.minus(Duration.ofHours(24)));
         assertThat(summary.to()).isEqualTo(NOW);
         assertThat(summary.bucket()).isEqualTo("day");
-        verify(usageRepository).totals(NOW.minus(Duration.ofHours(24)), NOW);
-        verify(usageRepository).byDay(NOW.minus(Duration.ofHours(24)), NOW);
-        verify(usageRepository).byStatus(NOW.minus(Duration.ofHours(24)), NOW);
-        verify(usageRepository).topUsers(NOW.minus(Duration.ofHours(24)), NOW, 10);
+        verify(usageRepository).totals(TenantContext.DEFAULT_TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
+        verify(usageRepository).byDay(TenantContext.DEFAULT_TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
+        verify(usageRepository).byStatus(TenantContext.DEFAULT_TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
+        verify(usageRepository)
+                .topUsers(TenantContext.DEFAULT_TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW, 10);
     }
 
     @Test
@@ -70,7 +72,7 @@ class AdminAiUsageServiceTest {
 
         assertThat(summary.from()).isEqualTo(FROM);
         assertThat(summary.to()).isEqualTo(TO);
-        verify(usageRepository).topUsers(FROM, TO, 25);
+        verify(usageRepository).topUsers(TenantContext.DEFAULT_TENANT_ID, FROM, TO, 25);
     }
 
     @Test
@@ -82,14 +84,14 @@ class AdminAiUsageServiceTest {
 
     @Test
     void sortsStatusesInTheContractOrder() {
-        when(usageRepository.totals(any(), any())).thenReturn(totals());
-        when(usageRepository.byDay(any(), any())).thenReturn(List.of());
-        when(usageRepository.byStatus(any(), any())).thenReturn(List.of(
+        when(usageRepository.totals(any(), any(), any())).thenReturn(totals());
+        when(usageRepository.byDay(any(), any(), any())).thenReturn(List.of());
+        when(usageRepository.byStatus(any(), any(), any())).thenReturn(List.of(
                 new UsageStatusCount("FAILED", 9),
                 new UsageStatusCount("SUCCESS", 113),
                 new UsageStatusCount("BUDGET_EXHAUSTED", 6),
                 new UsageStatusCount("RUNNING", 1)));
-        when(usageRepository.topUsers(any(), any(), anyInt())).thenReturn(List.of());
+        when(usageRepository.topUsers(any(), any(), any(), anyInt())).thenReturn(List.of());
 
         UsageSummary summary = service.summarize(null, null, null, 10);
 
@@ -100,12 +102,12 @@ class AdminAiUsageServiceTest {
 
     @Test
     void keepsUnknownStatusesAfterTheKnownOnes() {
-        when(usageRepository.totals(any(), any())).thenReturn(totals());
-        when(usageRepository.byDay(any(), any())).thenReturn(List.of());
-        when(usageRepository.byStatus(any(), any())).thenReturn(List.of(
+        when(usageRepository.totals(any(), any(), any())).thenReturn(totals());
+        when(usageRepository.byDay(any(), any(), any())).thenReturn(List.of());
+        when(usageRepository.byStatus(any(), any(), any())).thenReturn(List.of(
                 new UsageStatusCount("ZZZ", 1),
                 new UsageStatusCount("SUCCESS", 2)));
-        when(usageRepository.topUsers(any(), any(), anyInt())).thenReturn(List.of());
+        when(usageRepository.topUsers(any(), any(), any(), anyInt())).thenReturn(List.of());
 
         assertThat(service.summarize(null, null, null, 10).byStatus())
                 .extracting(UsageStatusCount::status)
@@ -115,10 +117,10 @@ class AdminAiUsageServiceTest {
     @Test
     void preservesTheNullAverageWhenTheWindowIsEmpty() {
         UsageTotals empty = new UsageTotals(0, 0, 0, 0, 0, 0, 0, 0, null);
-        when(usageRepository.totals(any(), any())).thenReturn(empty);
-        when(usageRepository.byDay(any(), any())).thenReturn(List.of());
-        when(usageRepository.byStatus(any(), any())).thenReturn(List.of());
-        when(usageRepository.topUsers(any(), any(), anyInt())).thenReturn(List.of());
+        when(usageRepository.totals(any(), any(), any())).thenReturn(empty);
+        when(usageRepository.byDay(any(), any(), any())).thenReturn(List.of());
+        when(usageRepository.byStatus(any(), any(), any())).thenReturn(List.of());
+        when(usageRepository.topUsers(any(), any(), any(), anyInt())).thenReturn(List.of());
 
         UsageSummary summary = service.summarize(null, null, null, 10);
 
@@ -131,10 +133,10 @@ class AdminAiUsageServiceTest {
     void returnsTheAggregatedRowsUnchanged() {
         UsageDayPoint day = new UsageDayPoint("2026-11-02", 61, 198_402, 5);
         UsageTopUser user = new UsageTopUser(USER_ID, "zhang.wei", 44, 142_731);
-        when(usageRepository.totals(any(), any())).thenReturn(totals());
-        when(usageRepository.byDay(any(), any())).thenReturn(List.of(day));
-        when(usageRepository.byStatus(any(), any())).thenReturn(List.of(new UsageStatusCount("SUCCESS", 113)));
-        when(usageRepository.topUsers(any(), any(), anyInt())).thenReturn(List.of(user));
+        when(usageRepository.totals(any(), any(), any())).thenReturn(totals());
+        when(usageRepository.byDay(any(), any(), any())).thenReturn(List.of(day));
+        when(usageRepository.byStatus(any(), any(), any())).thenReturn(List.of(new UsageStatusCount("SUCCESS", 113)));
+        when(usageRepository.topUsers(any(), any(), any(), anyInt())).thenReturn(List.of(user));
 
         UsageSummary summary = service.summarize(null, null, null, 10);
 
@@ -166,10 +168,10 @@ class AdminAiUsageServiceTest {
     }
 
     private void stubEmpty() {
-        when(usageRepository.totals(any(), any())).thenReturn(totals());
-        when(usageRepository.byDay(any(), any())).thenReturn(List.of());
-        when(usageRepository.byStatus(any(), any())).thenReturn(List.of());
-        when(usageRepository.topUsers(any(), any(), anyInt())).thenReturn(List.of());
+        when(usageRepository.totals(any(), any(), any())).thenReturn(totals());
+        when(usageRepository.byDay(any(), any(), any())).thenReturn(List.of());
+        when(usageRepository.byStatus(any(), any(), any())).thenReturn(List.of());
+        when(usageRepository.topUsers(any(), any(), any(), anyInt())).thenReturn(List.of());
     }
 
     private static UsageTotals totals() {

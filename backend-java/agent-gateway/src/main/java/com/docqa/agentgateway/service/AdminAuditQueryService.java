@@ -8,6 +8,7 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
@@ -63,7 +64,10 @@ public class AdminAuditQueryService {
         AdminQueryWindow window = AdminQueryWindow.resolve(from, to, clock, !hasFilter);
         KeysetCursor cursor = parseCursor(cursorToken);
 
+        // P0: 管理面跨租户聚合暂用默认租户，P1 改为按管理员可见租户集过滤
+        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
         List<AuditEventItem> rows = auditRepository.findPage(
+                tenantId,
                 new AuditQueryFilter(
                         normalizedTraceId,
                         targetUserId,

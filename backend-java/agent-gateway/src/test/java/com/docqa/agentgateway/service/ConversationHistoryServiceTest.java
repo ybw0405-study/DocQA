@@ -16,9 +16,11 @@ import com.docqa.agentgateway.repository.MessageRepository;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class ConversationHistoryServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID CONVERSATION_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID FIRST_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -46,13 +49,19 @@ class ConversationHistoryServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.set(TENANT_ID);
         service = new ConversationHistoryService(conversationRepository, messageRepository, new PiiMasker());
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test
     void masksStoredContentWhenReadingHistoryBack() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(true);
-        when(messageRepository.findPage(eq(CONVERSATION_ID), isNull(), isNull(), eq(3)))
+        when(conversationRepository.existsByIdAndUser(TENANT_ID, CONVERSATION_ID, USER_ID)).thenReturn(true);
+        when(messageRepository.findPage(eq(TENANT_ID), eq(CONVERSATION_ID), isNull(), isNull(), eq(3)))
                 .thenReturn(List.of(
                         row(FIRST_ID, "user", "请联系 zhangwei@example.com 或 13800138000", FIRST_CREATED),
                         row(SECOND_ID, "assistant", "已在笔记中定位到该公式", SECOND_CREATED)));
@@ -71,7 +80,7 @@ class ConversationHistoryServiceTest {
 
     @Test
     void checksOwnershipBeforeTouchingTheMessageTable() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(false);
+        when(conversationRepository.existsByIdAndUser(TENANT_ID, CONVERSATION_ID, USER_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> service.list(USER_ID, CONVERSATION_ID, null, 20))
                 .isInstanceOf(BusinessException.class)
@@ -82,8 +91,8 @@ class ConversationHistoryServiceTest {
 
     @Test
     void readsOwnershipThenPagesMessagesInThatOrder() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(true);
-        when(messageRepository.findPage(eq(CONVERSATION_ID), isNull(), isNull(), eq(21)))
+        when(conversationRepository.existsByIdAndUser(TENANT_ID, CONVERSATION_ID, USER_ID)).thenReturn(true);
+        when(messageRepository.findPage(eq(TENANT_ID), eq(CONVERSATION_ID), isNull(), isNull(), eq(21)))
                 .thenReturn(List.of());
 
         MessageHistoryData data = service.list(USER_ID, CONVERSATION_ID, null, 20);
@@ -91,14 +100,14 @@ class ConversationHistoryServiceTest {
         assertThat(data.items()).isEmpty();
         assertThat(data.nextCursor()).isNull();
         InOrder inOrder = inOrder(conversationRepository, messageRepository);
-        inOrder.verify(conversationRepository).existsByIdAndUser(CONVERSATION_ID, USER_ID);
-        inOrder.verify(messageRepository).findPage(CONVERSATION_ID, null, null, 21);
+        inOrder.verify(conversationRepository).existsByIdAndUser(TENANT_ID, CONVERSATION_ID, USER_ID);
+        inOrder.verify(messageRepository).findPage(TENANT_ID, CONVERSATION_ID, null, null, 21);
     }
 
     @Test
     void encodesNextCursorFromTheLastReturnedRow() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(true);
-        when(messageRepository.findPage(eq(CONVERSATION_ID), isNull(), isNull(), eq(3)))
+        when(conversationRepository.existsByIdAndUser(TENANT_ID, CONVERSATION_ID, USER_ID)).thenReturn(true);
+        when(messageRepository.findPage(eq(TENANT_ID), eq(CONVERSATION_ID), isNull(), isNull(), eq(3)))
                 .thenReturn(List.of(
                         row(FIRST_ID, "user", "第一问", FIRST_CREATED),
                         row(SECOND_ID, "assistant", "第一答", SECOND_CREATED),
@@ -116,8 +125,8 @@ class ConversationHistoryServiceTest {
     @Test
     void passesDecodedCursorDownToTheRepository() {
         String token = KeysetCursor.of(SECOND_CREATED, SECOND_ID).encode();
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(true);
-        when(messageRepository.findPage(CONVERSATION_ID, SECOND_CREATED, SECOND_ID, 11))
+        when(conversationRepository.existsByIdAndUser(TENANT_ID, CONVERSATION_ID, USER_ID)).thenReturn(true);
+        when(messageRepository.findPage(TENANT_ID, CONVERSATION_ID, SECOND_CREATED, SECOND_ID, 11))
                 .thenReturn(List.of());
 
         assertThat(service.list(USER_ID, CONVERSATION_ID, token, 10).items()).isEmpty();

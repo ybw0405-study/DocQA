@@ -6,15 +6,16 @@ import com.docqa.agentgateway.dto.UsageTopUser;
 import com.docqa.agentgateway.dto.UsageTotals;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /** 管理面用量聚合的只读仓库，数据源是 `agent_execution` 的终态快照（D-159）。 */
 public interface AiUsageRepository {
 
-    UsageTotals totals(Instant from, Instant to);
+    UsageTotals totals(UUID tenantId, Instant from, Instant to);
 
-    List<UsageDayPoint> byDay(Instant from, Instant to);
+    List<UsageDayPoint> byDay(UUID tenantId, Instant from, Instant to);
 
-    List<UsageStatusCount> byStatus(Instant from, Instant to);
+    List<UsageStatusCount> byStatus(UUID tenantId, Instant from, Instant to);
 
-    List<UsageTopUser> topUsers(Instant from, Instant to, int limit);
+    List<UsageTopUser> topUsers(UUID tenantId, Instant from, Instant to, int limit);
 }

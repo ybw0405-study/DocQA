@@ -3,6 +3,7 @@ package com.docqa.user.service;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.config.AuthProperties;
 import com.docqa.user.domain.AppUserRow;
 import com.docqa.user.domain.IdempotencyOperation;
@@ -101,7 +102,7 @@ public class AuthService {
             throw new RateLimitedException(ErrorCode.USR_RATE_LIMIT_001, decision.retryAfterSeconds());
         }
 
-        UserCredentials credentials = userRepository.findCredentialsByUsername(username).orElse(null);
+        UserCredentials credentials = userRepository.findCredentialsByUsername(tenantId(), username).orElse(null);
         String hash = credentials == null ? unknownUserPasswordHash : credentials.passwordHash();
         if (!passwordEncoder.matches(password, hash) || credentials == null) {
             loginRateLimiter.recordFailure(username, remote);
@@ -112,7 +113,7 @@ public class AuthService {
         }
 
         loginRateLimiter.reset(username, remote);
-        userRepository.touchLastLogin(credentials.id(), clock.instant());
+        userRepository.touchLastLogin(tenantId(), credentials.id(), clock.instant());
         return startSession(credentials.id());
     }
 
@@ -160,12 +161,12 @@ public class AuthService {
             throw new BusinessException(ErrorCode.USR_REFRESH_001);
         }
         RefreshTokenService.IssuedRefreshToken rotated = refreshTokenService.rotate(rawRefreshToken);
-        UserCredentials credentials = userRepository.findCredentialsById(rotated.userId()).orElse(null);
+        UserCredentials credentials = userRepository.findCredentialsById(tenantId(), rotated.userId()).orElse(null);
         if (credentials == null || credentials.status() != UserStatus.ACTIVE) {
             refreshTokenService.revokeFamily(rotated.familyId());
             throw new BusinessException(ErrorCode.USR_REFRESH_001);
         }
-        String accessToken = jwtService.issue(credentials.id(), roleRepository.findRoles(credentials.id()));
+        String accessToken = jwtService.issue(credentials.id(), roleRepository.findRoles(tenantId(), credentials.id()));
         return new IssuedSession(
                 new IssuedToken(accessToken, TOKEN_TYPE, jwtService.expiresInSeconds()),
                 rotated.value());
@@ -208,7 +209,7 @@ public class AuthService {
     }
 
     public CurrentUserData currentUser(JwtIdentity identity) {
-        AppUserRow row = userRepository.findById(identity.userId())
+        AppUserRow row = userRepository.findById(tenantId(), identity.userId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USR_AUTH_001));
         if (row.status() != UserStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.USR_DISABLED_001);
@@ -218,7 +219,7 @@ public class AuthService {
     }
 
     private IssuedSession createUser(String username, String password) {
-        if (userRepository.existsByUsername(username)) {
+        if (userRepository.existsByUsername(tenantId(), username)) {
             throw usernameTaken();
         }
         UUID userId = UUID.randomUUID();
@@ -230,7 +231,7 @@ public class AuthService {
                 UserStatus.ACTIVE,
                 now);
         try {
-            userRepository.insert(user, Set.of(UserRole.USER));
+            userRepository.insert(tenantId(), user, Set.of(UserRole.USER));
         } catch (DuplicateKeyException ex) {
             // 预检查之后仍可能被并发注册抢先落库，唯一键是最后一道防线。
             throw usernameTaken();
@@ -239,7 +240,7 @@ public class AuthService {
     }
 
     private IssuedSession startSession(UUID userId) {
-        String accessToken = jwtService.issue(userId, roleRepository.findRoles(userId));
+        String accessToken = jwtService.issue(userId, roleRepository.findRoles(tenantId(), userId));
         RefreshTokenService.IssuedRefreshToken refreshToken = refreshTokenService.startFamily(userId);
         return new IssuedSession(
                 new IssuedToken(accessToken, TOKEN_TYPE, jwtService.expiresInSeconds()),
@@ -247,7 +248,7 @@ public class AuthService {
     }
 
     private void applyPasswordChange(UUID userId, ChangePasswordRequest request, String remote) {
-        UserCredentials credentials = userRepository.findCredentialsById(userId)
+        UserCredentials credentials = userRepository.findCredentialsById(tenantId(), userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USR_AUTH_001));
         if (credentials.status() != UserStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.USR_DISABLED_001);
@@ -273,7 +274,7 @@ public class AuthService {
         }
 
         Instant now = clock.instant();
-        userRepository.updatePasswordHash(userId, passwordEncoder.encode(request.newPassword()), now);
+        userRepository.updatePasswordHash(tenantId(), userId, passwordEncoder.encode(request.newPassword()), now);
         // 改密通常正因为怀疑凭据泄露：其他设备上的在途 access 与刷新令牌都必须一并作废。
         refreshTokenService.revokeAllForUser(userId);
         accessTokenAuthenticator.revokeAllIssuedBefore(userId, now);
@@ -335,5 +336,13 @@ public class AuthService {
                 ErrorCode.COM_VALIDATION_001,
                 null,
                 List.of(FieldViolation.of(field, message)));
+    }
+
+    /**
+     * P0 阶段登录/注册尚未接入租户解析（无 JWT 可依据），全部归属 V10 回填的默认租户。
+     * P1 接入登录域名路由后改为从域名解析，调用点无需再改。
+     */
+    private UUID tenantId() {
+        return TenantContext.DEFAULT_TENANT_ID;
     }
 }

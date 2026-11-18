@@ -6,5 +6,5 @@ import java.util.UUID;
 
 public interface DocumentScopeRepository {
 
-    List<DocumentRecord> findByUserAndIds(UUID userId, List<UUID> documentIds);
+    List<DocumentRecord> findByUserAndIds(UUID tenantId, UUID userId, List<UUID> documentIds);
 }

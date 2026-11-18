@@ -6,10 +6,12 @@ import com.docqa.audit.dto.AuditEventMessage;
 import com.docqa.audit.idempotency.MqIdempotencyStore;
 import com.docqa.audit.repository.AuditEventRepository;
 import com.docqa.common.trace.TraceIdContext;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -51,8 +53,10 @@ public class AuditEventService {
             LOGGER.debug("Duplicate audit event ignored from Redis: eventId={}", event.id());
             return IngestOutcome.DUPLICATE;
         }
+        // P0: MQ 消息尚未携带 tenant_id，P1 随消息传递；当前全部审计事件归属默认租户。
+        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
         try {
-            repository.insert(event);
+            repository.insert(tenantId, event);
         } catch (DuplicateKeyException ex) {
             idempotencyStore.markProcessed(event.id());
             LOGGER.debug("Duplicate audit event ignored from the database: eventId={}", event.id());
@@ -77,7 +81,8 @@ public class AuditEventService {
             throw new IllegalArgumentException(
                     "limit must be between 1 and " + properties.getQueryMaxLimit());
         }
-        return repository.findByTraceId(normalizedTraceId, effectiveLimit);
+        // P0: MQ 消息尚未携带 tenant_id，P1 随消息传递；当前全部审计事件归属默认租户。
+        return repository.findByTraceId(TenantContext.DEFAULT_TENANT_ID, normalizedTraceId, effectiveLimit);
     }
 
     public enum IngestOutcome {

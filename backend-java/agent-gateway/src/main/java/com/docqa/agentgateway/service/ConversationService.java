@@ -6,6 +6,7 @@ import com.docqa.agentgateway.repository.ConversationRepository;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -45,6 +46,7 @@ public class ConversationService {
     }
 
     public ConversationData create(UUID userId, String idempotencyKey, CreateConversationRequest request) {
+        UUID tenantId = TenantContext.require();
         String key = IdempotencyKeys.validate(idempotencyKey);
         String title = normalizeTitle(request == null ? null : request.title());
         List<UUID> scope = normalizeScope(request == null ? null : request.documentScopeIds());
@@ -67,7 +69,8 @@ public class ConversationService {
 
         UUID conversationId = UUID.randomUUID();
         Instant now = clock.instant();
-        if (!conversationRepository.createOwned(conversationId, userId, title, scope, now)) {
+        if (!conversationRepository.createOwned(
+                tenantId, conversationId, userId, title, scope, now)) {
             creationStore.clear(userId, key);
             throw new BusinessException(ErrorCode.COM_INTERNAL_001, "Unable to create conversation");
         }
@@ -81,21 +84,23 @@ public class ConversationService {
     }
 
     public void requireAccessible(UUID conversationId, UUID userId) {
-        if (conversationRepository.existsByIdAndUser(conversationId, userId)) {
+        UUID tenantId = TenantContext.require();
+        if (conversationRepository.existsByIdAndUser(tenantId, conversationId, userId)) {
             return;
         }
-        if (conversationRepository.existsById(conversationId)) {
+        if (conversationRepository.existsById(tenantId, conversationId)) {
             throw new BusinessException(ErrorCode.AGT_NOT_FOUND_001);
         }
     }
 
     public void ensureOwned(UUID conversationId, UUID userId, List<UUID> documentScopeIds) {
-        if (conversationRepository.existsByIdAndUser(conversationId, userId)) {
+        UUID tenantId = TenantContext.require();
+        if (conversationRepository.existsByIdAndUser(tenantId, conversationId, userId)) {
             return;
         }
         if (!conversationRepository.createOwned(
-                conversationId, userId, DEFAULT_TITLE, documentScopeIds, clock.instant())) {
-            if (conversationRepository.existsByIdAndUser(conversationId, userId)) {
+                tenantId, conversationId, userId, DEFAULT_TITLE, documentScopeIds, clock.instant())) {
+            if (conversationRepository.existsByIdAndUser(tenantId, conversationId, userId)) {
                 return;
             }
             throw new BusinessException(ErrorCode.AGT_NOT_FOUND_001);

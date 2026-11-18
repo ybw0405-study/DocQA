@@ -13,6 +13,7 @@ import java.util.UUID;
  */
 public record PreparedAsk(
         UUID userId,
+        UUID tenantId,
         UUID conversationId,
         String key,
         String fingerprint,

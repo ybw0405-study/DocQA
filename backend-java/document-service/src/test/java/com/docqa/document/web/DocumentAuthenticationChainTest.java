@@ -16,6 +16,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.docqa.common.config.CommonWebAutoConfiguration;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
+import com.docqa.document.service.AuthenticatedUser;
 import com.docqa.document.service.DocumentService;
 import com.docqa.document.service.JwtAuthenticator;
 import java.util.Set;
@@ -55,6 +57,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 class DocumentAuthenticationChainTest {
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final String DOCUMENTS = "/api/v1/documents";
     private static final String DOCUMENT_STATUS = "/api/v1/documents/{documentId}/status";
@@ -75,7 +78,7 @@ class DocumentAuthenticationChainTest {
 
     @Test
     void listWithoutTokenIsRejectedBeforeTheController() throws Exception {
-        when(jwtAuthenticator.authenticate(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
+        when(jwtAuthenticator.authenticateIdentity(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
 
         mockMvc.perform(get(DOCUMENTS))
                 .andExpect(status().isUnauthorized())
@@ -89,7 +92,7 @@ class DocumentAuthenticationChainTest {
 
     @Test
     void statusWithoutTokenIsRejectedBeforeTheController() throws Exception {
-        when(jwtAuthenticator.authenticate(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
+        when(jwtAuthenticator.authenticateIdentity(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
 
         mockMvc.perform(get("/api/v1/documents/" + DOCUMENT_ID + "/status"))
                 .andExpect(status().isUnauthorized())
@@ -101,7 +104,8 @@ class DocumentAuthenticationChainTest {
     /** 带合法令牌时属性由过滤器写入，{@code @RequestAttribute} 绑定成功，控制器拿到同一个用户。 */
     @Test
     void listWithTokenBindsUserIdFromTheFilter() throws Exception {
-        when(jwtAuthenticator.authenticate("Bearer token")).thenReturn(USER_ID);
+        when(jwtAuthenticator.authenticateIdentity("Bearer token"))
+                .thenReturn(new AuthenticatedUser(USER_ID, TENANT_ID));
 
         mockMvc.perform(get(DOCUMENTS).header(HttpHeaders.AUTHORIZATION, "Bearer token"))
                 .andExpect(status().isOk());
@@ -111,7 +115,8 @@ class DocumentAuthenticationChainTest {
 
     @Test
     void statusWithTokenBindsUserIdFromTheFilter() throws Exception {
-        when(jwtAuthenticator.authenticate("Bearer token")).thenReturn(USER_ID);
+        when(jwtAuthenticator.authenticateIdentity("Bearer token"))
+                .thenReturn(new AuthenticatedUser(USER_ID, TENANT_ID));
 
         mockMvc.perform(get("/api/v1/documents/" + DOCUMENT_ID + "/status")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer token"))
@@ -126,7 +131,7 @@ class DocumentAuthenticationChainTest {
      */
     @Test
     void uploadInitWithoutTokenIsRejectedBeforeHeaderValidation() throws Exception {
-        when(jwtAuthenticator.authenticate(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
+        when(jwtAuthenticator.authenticateIdentity(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
 
         mockMvc.perform(post(UPLOAD_INIT).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized())

@@ -5,6 +5,7 @@ import com.docqa.common.error.ErrorCode;
 import com.docqa.user.config.AuthProperties;
 import com.docqa.user.domain.RefreshTokenRow;
 import com.docqa.user.domain.RefreshTokenStatus;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.repository.RefreshTokenRepository;
 import com.docqa.user.support.Fingerprints;
 import java.security.SecureRandom;
@@ -52,7 +53,7 @@ public class RefreshTokenService {
     @Transactional
     public IssuedRefreshToken rotate(String rawToken) {
         Instant now = clock.instant();
-        RefreshTokenRow row = repository.findByHash(Fingerprints.sha256(rawToken))
+        RefreshTokenRow row = repository.findByHash(tenantId(), Fingerprints.sha256(rawToken))
                 .orElseThrow(RefreshTokenService::rejected);
         if (row.status() != RefreshTokenStatus.ACTIVE) {
             revokeFamilyAndReject(row);
@@ -60,24 +61,24 @@ public class RefreshTokenService {
         if (!row.expiresAt().isAfter(now)) {
             throw rejected();
         }
-        if (repository.consumeActive(row.id(), now) != 1) {
+        if (repository.consumeActive(tenantId(), row.id(), now) != 1) {
             revokeFamilyAndReject(row);
         }
         return insert(row.userId(), row.familyId());
     }
 
     public void revokeFamily(UUID familyId) {
-        int revoked = repository.revokeFamily(familyId, clock.instant());
+        int revoked = repository.revokeFamily(tenantId(), familyId, clock.instant());
         LOGGER.info("Revoked refresh token family: familyId={} count={}", familyId, revoked);
     }
 
     public void revokeAllForUser(UUID userId) {
-        int revoked = repository.revokeAllActiveForUser(userId, clock.instant());
+        int revoked = repository.revokeAllActiveForUser(tenantId(), userId, clock.instant());
         LOGGER.info("Revoked all refresh tokens for user: count={}", revoked);
     }
 
     public Optional<UUID> familyOf(String rawToken) {
-        return repository.findByHash(Fingerprints.sha256(rawToken)).map(RefreshTokenRow::familyId);
+        return repository.findByHash(tenantId(), Fingerprints.sha256(rawToken)).map(RefreshTokenRow::familyId);
     }
 
     public long cookieMaxAgeSeconds() {
@@ -100,7 +101,7 @@ public class RefreshTokenService {
                 RefreshTokenStatus.ACTIVE,
                 now.plus(properties.getRefreshTtl()),
                 now);
-        repository.insert(row);
+        repository.insert(tenantId(), row);
         return new IssuedRefreshToken(raw, row.userId(), familyId, row.expiresAt());
     }
 
@@ -115,5 +116,10 @@ public class RefreshTokenService {
     }
 
     public record IssuedRefreshToken(String value, UUID userId, UUID familyId, Instant expiresAt) {
+    }
+
+    /** P0：刷新令牌路径尚无租户上下文，统一归属默认租户；P1 由登录域名解析后替换。 */
+    private UUID tenantId() {
+        return TenantContext.DEFAULT_TENANT_ID;
     }
 }

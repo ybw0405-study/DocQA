@@ -30,6 +30,7 @@ import com.docqa.common.metrics.BusinessMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -64,6 +65,7 @@ import reactor.core.publisher.Flux;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AskServiceStreamTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID CONVERSATION_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -120,6 +122,7 @@ class AskServiceStreamTest {
     @BeforeEach
     void setUp() {
         TraceIdContext.set(TRACE_ID);
+        TenantContext.set(TENANT_ID);
         auditEventFactory = new AuditEventFactory(Clock.fixed(NOW, ZoneOffset.UTC));
         sseKeepAliveScheduler = new ThreadPoolTaskScheduler();
         sseKeepAliveScheduler.setPoolSize(1);
@@ -160,7 +163,7 @@ class AskServiceStreamTest {
         }).when(transactionRunner).execute(any(Runnable.class));
         lenient().when(auditEventValidator.validateError(any(), anyString(), any(), any()))
                 .thenReturn(new AuditValidation(List.of(), false));
-        lenient().when(messageRepository.findRecent(any(), anyInt())).thenReturn(List.of());
+        lenient().when(messageRepository.findRecent(any(), any(), anyInt())).thenReturn(List.of());
         lenient().when(killSwitch.isActive()).thenReturn(false);
         lenient().when(documentScopeService.resolve(eq(USER_ID), anyList()))
                 .thenReturn(List.of(new AuthorizedDocument(DOCUMENT_ID, "v1")));
@@ -169,6 +172,7 @@ class AskServiceStreamTest {
     @AfterEach
     void tearDown() {
         TraceIdContext.clear();
+        TenantContext.clear();
         sseKeepAliveScheduler.shutdown();
     }
 
@@ -197,7 +201,7 @@ class AskServiceStreamTest {
                 .contains("\"tokenUsed\":120");
         InOrder order = inOrder(messageRepository, idempotencyStore);
         order.verify(messageRepository).insert(
-                any(), eq(CONVERSATION_ID), eq("ASSISTANT"), anyString(), anyInt(),
+                any(), any(), eq(CONVERSATION_ID), eq("ASSISTANT"), anyString(), anyInt(),
                 any(), any(), any(), any());
         order.verify(idempotencyStore).complete(
                 eq(USER_ID), eq(CONVERSATION_ID), eq(KEY), anyString(), any(), any());
@@ -255,7 +259,7 @@ class AskServiceStreamTest {
                 .contains("\"cacheHit\":true");
         verify(pythonAgentClient, never()).openStream(any(), anyString());
         ArgumentCaptor<AgentExecution> execution = ArgumentCaptor.forClass(AgentExecution.class);
-        verify(agentExecutionRepository).insert(execution.capture());
+        verify(agentExecutionRepository).insert(any(), execution.capture());
         assertThat(execution.getValue().status()).isEqualTo("SUCCESS");
         assertThat(execution.getValue().cacheHit()).isTrue();
         verify(conversationLock).unlock(eq(CONVERSATION_ID), anyString());
@@ -273,7 +277,7 @@ class AskServiceStreamTest {
                 .isEqualTo(ErrorCode.AGT_UPSTREAM_001);
 
         ArgumentCaptor<AgentExecution> execution = ArgumentCaptor.forClass(AgentExecution.class);
-        verify(agentExecutionRepository).insert(execution.capture());
+        verify(agentExecutionRepository).insert(any(), execution.capture());
         assertThat(execution.getValue().status()).isEqualTo("FAILED");
         assertThat(execution.getValue().errorCode()).isEqualTo("AGT-UPSTREAM-001");
         verify(idempotencyStore).fail(
@@ -299,7 +303,7 @@ class AskServiceStreamTest {
                 .contains("\"code\":\"AGT-UPSTREAM-001\"")
                 .contains(TRACE_ID);
         ArgumentCaptor<AgentExecution> execution = ArgumentCaptor.forClass(AgentExecution.class);
-        verify(agentExecutionRepository).insert(execution.capture());
+        verify(agentExecutionRepository).insert(any(), execution.capture());
         assertThat(execution.getValue().status()).isEqualTo("FAILED");
         assertThat(execution.getValue().errorCode()).isEqualTo("AGT-UPSTREAM-001");
         verify(idempotencyStore).fail(
@@ -323,7 +327,7 @@ class AskServiceStreamTest {
                 .contains("event:error")
                 .contains("AGT-UPSTREAM-004");
         ArgumentCaptor<AgentExecution> execution = ArgumentCaptor.forClass(AgentExecution.class);
-        verify(agentExecutionRepository).insert(execution.capture());
+        verify(agentExecutionRepository).insert(any(), execution.capture());
         assertThat(execution.getValue().status()).isEqualTo("FAILED");
         assertThat(execution.getValue().errorCode()).isEqualTo("AGT-UPSTREAM-004");
         verify(conversationLock).unlock(eq(CONVERSATION_ID), anyString());
@@ -346,7 +350,7 @@ class AskServiceStreamTest {
 
         assertThat(cancelled).isTrue();
         ArgumentCaptor<AgentExecution> execution = ArgumentCaptor.forClass(AgentExecution.class);
-        verify(agentExecutionRepository).insert(execution.capture());
+        verify(agentExecutionRepository).insert(any(), execution.capture());
         assertThat(execution.getValue().status()).isEqualTo("FAILED");
         assertThat(execution.getValue().errorCode()).isEqualTo("AGT-UPSTREAM-002");
         verify(idempotencyStore).fail(

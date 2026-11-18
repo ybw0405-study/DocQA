@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.common.web.GlobalExceptionHandler;
 import com.docqa.common.web.TraceIdFilter;
@@ -100,12 +101,14 @@ class AuthControllerTest {
 
         UserCredentials credentials = new UserCredentials(
                 USER_ID, USERNAME, passwordEncoder.encode(PASSWORD), UserStatus.ACTIVE);
-        when(userRepository.findCredentialsByUsername(USERNAME)).thenReturn(Optional.of(credentials));
-        when(userRepository.findCredentialsById(USER_ID)).thenReturn(Optional.of(credentials));
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
+        when(userRepository.findCredentialsByUsername(TenantContext.DEFAULT_TENANT_ID, USERNAME))
+                .thenReturn(Optional.of(credentials));
+        when(userRepository.findCredentialsById(TenantContext.DEFAULT_TENANT_ID, USER_ID))
+                .thenReturn(Optional.of(credentials));
+        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, USER_ID)).thenReturn(Optional.of(
                 new AppUserRow(USER_ID, USERNAME, UserStatus.ACTIVE, null, NOW)));
-        when(userRepository.existsByUsername(any())).thenReturn(false);
-        when(roleRepository.findRoles(any())).thenReturn(Set.of(UserRole.USER));
+        when(userRepository.existsByUsername(any(), any())).thenReturn(false);
+        when(roleRepository.findRoles(any(), any())).thenReturn(Set.of(UserRole.USER));
 
         authProperties = new AuthProperties();
         authProperties.setMaxLoginFailures(5);

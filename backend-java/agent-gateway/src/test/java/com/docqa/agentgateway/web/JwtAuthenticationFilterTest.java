@@ -29,6 +29,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 class JwtAuthenticationFilterTest {
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID TENANT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
     @Mock
     private JwtAuthenticator jwtAuthenticator;
@@ -144,6 +145,6 @@ class JwtAuthenticationFilterTest {
     }
 
     private static AuthenticatedUser identity(String... roles) {
-        return new AuthenticatedUser(USER_ID, Set.of(roles));
+        return new AuthenticatedUser(USER_ID, TENANT_ID, Set.of(roles));
     }
 }

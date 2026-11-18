@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.domain.IdempotencyOperation;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.domain.ReminderStatus;
@@ -32,6 +33,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,6 +48,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class ReminderStatusServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID REMINDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final String IDEMPOTENCY_KEY = "idem-key-0001";
@@ -76,6 +79,12 @@ class ReminderStatusServiceTest {
                 objectMapper);
         lenient().when(idempotencyStore.find(any(), any(), any())).thenReturn(Optional.empty());
         lenient().when(idempotencyStore.tryStart(any(), any(), any(), any(), any())).thenReturn(true);
+        TenantContext.set(TENANT_ID);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test
@@ -92,7 +101,7 @@ class ReminderStatusServiceTest {
         assertThat(data.version()).isEqualTo(4L);
         assertThat(data.idempotentReplay()).isFalse();
         verify(rateLimiter).check(USER_ID);
-        verify(reminderRepository).updateStatus(REMINDER_ID, USER_ID, 3L, ReminderStatus.PAUSED, PAUSED_CURSOR, NOW);
+        verify(reminderRepository).updateStatus(TENANT_ID, REMINDER_ID, USER_ID, 3L, ReminderStatus.PAUSED, PAUSED_CURSOR, NOW);
         verify(idempotencyStore).complete(
                 eq(USER_ID),
                 eq(IdempotencyOperation.REMINDER_UPDATE),
@@ -114,7 +123,7 @@ class ReminderStatusServiceTest {
             assertThat(data.status()).isEqualTo(terminal.name());
             assertThat(data.nextTriggerAt()).isNull();
             assertThat(data.version()).isEqualTo(6L);
-            verify(reminderRepository).updateStatus(REMINDER_ID, USER_ID, 5L, terminal, null, NOW);
+            verify(reminderRepository).updateStatus(TENANT_ID, REMINDER_ID, USER_ID, 5L, terminal, null, NOW);
         }
     }
 
@@ -142,7 +151,7 @@ class ReminderStatusServiceTest {
 
     @Test
     void aReminderOwnedBySomeoneElseLooksExactlyLikeItDoesNotExist() {
-        when(reminderRepository.findOwned(USER_ID, REMINDER_ID)).thenReturn(Optional.empty());
+        when(reminderRepository.findOwned(TENANT_ID, USER_ID, REMINDER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.update(
                 USER_ID, REMINDER_ID, IDEMPOTENCY_KEY, request(ReminderStatus.PAUSED, 0L)))
@@ -179,7 +188,8 @@ class ReminderStatusServiceTest {
         assertThat(data.nextTriggerAt()).isEqualTo(RESUMED_TRIGGER);
         assertThat(data.status()).isEqualTo("ACTIVE");
         assertThat(data.version()).isEqualTo(3L);
-        verify(reminderRepository).updateStatus(REMINDER_ID, USER_ID, 2L, ReminderStatus.ACTIVE, RESUMED_TRIGGER, NOW);
+        verify(reminderRepository).updateStatus(
+                TENANT_ID, REMINDER_ID, USER_ID, 2L, ReminderStatus.ACTIVE, RESUMED_TRIGGER, NOW);
     }
 
     @Test
@@ -202,7 +212,7 @@ class ReminderStatusServiceTest {
         given(row(ReminderStatus.ACTIVE, "FREQ=WEEKLY;BYDAY=MO", MONDAY_CLASS, 0, PAUSED_CURSOR, 3L));
         // 后声明的精确桩覆盖 given() 里的通用成功桩：这一条要的正是 0 行。
         when(reminderRepository.updateStatus(
-                REMINDER_ID, USER_ID, 3L, ReminderStatus.PAUSED, PAUSED_CURSOR, NOW)).thenReturn(0);
+                TENANT_ID, REMINDER_ID, USER_ID, 3L, ReminderStatus.PAUSED, PAUSED_CURSOR, NOW)).thenReturn(0);
 
         assertThatThrownBy(() -> service.update(
                 USER_ID, REMINDER_ID, IDEMPOTENCY_KEY, request(ReminderStatus.PAUSED, 3L)))
@@ -223,7 +233,8 @@ class ReminderStatusServiceTest {
 
         ArgumentCaptor<Long> expected = ArgumentCaptor.forClass(Long.class);
         verify(reminderRepository).updateStatus(
-                eq(REMINDER_ID), eq(USER_ID), expected.capture(), eq(ReminderStatus.PAUSED), eq(PAUSED_CURSOR), any());
+                eq(TENANT_ID), eq(REMINDER_ID), eq(USER_ID), expected.capture(),
+                eq(ReminderStatus.PAUSED), eq(PAUSED_CURSOR), any());
         assertThat(expected.getValue()).isEqualTo(2L);
         assertThat(data.version()).isEqualTo(3L);
     }
@@ -237,7 +248,7 @@ class ReminderStatusServiceTest {
                 USER_ID, REMINDER_ID, IDEMPOTENCY_KEY, request(ReminderStatus.PAUSED, 0L));
 
         assertThat(data.updatedAt()).isEqualTo(NOW);
-        verify(reminderRepository).updateStatus(REMINDER_ID, USER_ID, 0L, ReminderStatus.PAUSED, PAUSED_CURSOR, NOW);
+        verify(reminderRepository).updateStatus(TENANT_ID, REMINDER_ID, USER_ID, 0L, ReminderStatus.PAUSED, PAUSED_CURSOR, NOW);
     }
 
     @Test
@@ -373,13 +384,13 @@ class ReminderStatusServiceTest {
     }
 
     private void given(ReminderRow row) {
-        when(reminderRepository.findOwned(USER_ID, REMINDER_ID)).thenReturn(Optional.of(row));
+        when(reminderRepository.findOwned(TENANT_ID, USER_ID, REMINDER_ID)).thenReturn(Optional.of(row));
         // CAS 默认赢：各用例只在自己关心结果时才覆盖这条桩。
-        lenient().when(reminderRepository.updateStatus(any(), any(), anyLong(), any(), any(), any())).thenReturn(1);
+        lenient().when(reminderRepository.updateStatus(any(), any(), any(), anyLong(), any(), any(), any())).thenReturn(1);
     }
 
     private void verifyNoWrite() {
-        verify(reminderRepository, never()).updateStatus(any(), any(), anyLong(), any(), any(), any());
+        verify(reminderRepository, never()).updateStatus(any(), any(), any(), anyLong(), any(), any(), any());
     }
 
     private ReminderStatusUpdateRequest request(ReminderStatus status, long version) {

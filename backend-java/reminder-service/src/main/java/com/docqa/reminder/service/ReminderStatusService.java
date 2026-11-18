@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.domain.IdempotencyOperation;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.domain.ReminderStatus;
@@ -68,6 +69,7 @@ public class ReminderStatusService {
             UUID reminderId,
             String idempotencyKey,
             ReminderStatusUpdateRequest request) {
+        UUID tenantId = TenantContext.require();
         String key = IdempotencyKeys.requireValid(idempotencyKey);
         rateLimiter.check(userId);
         String fingerprint = fingerprint(reminderId, request);
@@ -87,7 +89,7 @@ public class ReminderStatusService {
 
         boolean finished = false;
         try {
-            ReminderStatusUpdateData data = transition(userId, reminderId, request);
+            ReminderStatusUpdateData data = transition(tenantId, userId, reminderId, request);
             completeIdempotency(userId, key, fingerprint, data);
             finished = true;
             return data;
@@ -98,9 +100,10 @@ public class ReminderStatusService {
         }
     }
 
-    private ReminderStatusUpdateData transition(UUID userId, UUID reminderId, ReminderStatusUpdateRequest request) {
+    private ReminderStatusUpdateData transition(UUID tenantId, UUID userId, UUID reminderId,
+            ReminderStatusUpdateRequest request) {
         ReminderStatus target = request.status();
-        ReminderRow row = reminderRepository.findOwned(userId, reminderId)
+        ReminderRow row = reminderRepository.findOwned(tenantId, userId, reminderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REM_NOT_FOUND_001, null, List.of()));
         long expectedVersion = request.version();
 
@@ -115,7 +118,8 @@ public class ReminderStatusService {
 
         Instant nextTriggerAt = resolveNextTriggerAt(row, target);
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
-        int updated = reminderRepository.updateStatus(reminderId, userId, expectedVersion, target, nextTriggerAt, now);
+        int updated = reminderRepository.updateStatus(
+                tenantId, reminderId, userId, expectedVersion, target, nextTriggerAt, now);
         if (updated == 0) {
             throw new BusinessException(ErrorCode.REM_CONFLICT_003, null, List.of());
         }

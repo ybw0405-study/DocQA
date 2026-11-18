@@ -6,6 +6,7 @@ import com.docqa.agentgateway.domain.OutboxExecution;
 import com.docqa.agentgateway.dto.AuditEvent;
 import com.docqa.agentgateway.repository.AgentExecutionRepository;
 import com.docqa.common.metrics.BusinessMetrics;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -50,7 +51,10 @@ public class AuditOutboxRelay {
         Cursor cursor = null;
         try {
             cursor = readCursor();
+            // P0: relay 是定时任务、无 HTTP 行上下文，跨租户投递暂用默认租户；P1 改为按租户分别扫描 outbox
+            UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
             List<OutboxExecution> executions = repository.findOutboxBatch(
+                    tenantId,
                     cursor == null ? null : cursor.recordedAt(),
                     cursor == null ? null : cursor.id(),
                     properties.getRelayBatchSize());
@@ -67,7 +71,10 @@ public class AuditOutboxRelay {
 
     private void refreshBacklog(Cursor cursor) {
         try {
+            // P0: relay 无 HTTP 行上下文，积压指标暂按默认租户统计；P1 改为按租户分别统计
+            UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
             OutboxBacklog backlog = repository.outboxBacklog(
+                    tenantId,
                     cursor == null ? null : cursor.recordedAt(),
                     cursor == null ? null : cursor.id());
             Instant oldest = backlog.oldestRecordedAt();

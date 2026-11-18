@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.config.ReminderProperties;
 import com.docqa.reminder.domain.IdempotencyOperation;
 import com.docqa.reminder.domain.ReminderKind;
@@ -33,6 +34,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +46,7 @@ import org.springframework.dao.DuplicateKeyException;
 @ExtendWith(MockitoExtension.class)
 class ReminderServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final String IDEMPOTENCY_KEY = "idem-key-0001";
     private static final Instant NOW = Instant.parse("2026-09-01T00:00:00Z");
@@ -72,6 +75,12 @@ class ReminderServiceTest {
                 properties);
         lenient().when(idempotencyStore.find(any(), any(), any())).thenReturn(Optional.empty());
         lenient().when(idempotencyStore.tryStart(any(), any(), any(), any(), any())).thenReturn(true);
+        TenantContext.set(TENANT_ID);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test
@@ -82,7 +91,7 @@ class ReminderServiceTest {
                 deadline(NOW.plusSeconds(7200), 120));
 
         ArgumentCaptor<ReminderRow> captor = ArgumentCaptor.forClass(ReminderRow.class);
-        verify(reminderRepository).insert(captor.capture());
+        verify(reminderRepository).insert(eq(TENANT_ID), captor.capture());
         ReminderRow row = captor.getValue();
         assertThat(row.id()).isNotNull();
         assertThat(row.userId()).isEqualTo(USER_ID);
@@ -136,7 +145,7 @@ class ReminderServiceTest {
         CreateReminderResult result = service.create(USER_ID, IDEMPOTENCY_KEY, request);
 
         ArgumentCaptor<ReminderRow> captor = ArgumentCaptor.forClass(ReminderRow.class);
-        verify(reminderRepository).insert(captor.capture());
+        verify(reminderRepository).insert(eq(TENANT_ID), captor.capture());
         ReminderRow row = captor.getValue();
         assertThat(row.description()).isNull();
         assertThat(row.rrule()).isEqualTo("FREQ=WEEKLY;BYDAY=MO");
@@ -164,7 +173,7 @@ class ReminderServiceTest {
         service.create(USER_ID, IDEMPOTENCY_KEY, request);
 
         ArgumentCaptor<ReminderRow> captor = ArgumentCaptor.forClass(ReminderRow.class);
-        verify(reminderRepository).insert(captor.capture());
+        verify(reminderRepository).insert(eq(TENANT_ID), captor.capture());
         assertThat(captor.getValue().nextTriggerAt())
                 .isEqualTo(Instant.parse("2026-09-21T00:00:00Z"));
     }
@@ -178,7 +187,7 @@ class ReminderServiceTest {
                         deadline(NOW.minusSeconds(11 * 60), 0)),
                 "dueAt");
 
-        verify(reminderRepository, never()).insert(any());
+        verify(reminderRepository, never()).insert(any(), any());
         verify(idempotencyStore).clear(USER_ID, IdempotencyOperation.REMINDER_CREATE, IDEMPOTENCY_KEY);
     }
 
@@ -193,7 +202,7 @@ class ReminderServiceTest {
                 0);
 
         assertValidation(() -> service.create(USER_ID, IDEMPOTENCY_KEY, request), "timezone");
-        verify(reminderRepository, never()).insert(any());
+        verify(reminderRepository, never()).insert(any(), any());
     }
 
     @Test
@@ -214,7 +223,7 @@ class ReminderServiceTest {
         CustomReminderCreateRequest request = custom("FREQ=HOURLY", NOW.plusSeconds(3600), List.of());
 
         assertValidation(() -> service.create(USER_ID, IDEMPOTENCY_KEY, request), "rrule");
-        verify(reminderRepository, never()).insert(any());
+        verify(reminderRepository, never()).insert(any(), any());
     }
 
     @Test
@@ -287,7 +296,7 @@ class ReminderServiceTest {
         assertThat(replay.created()).isFalse();
         assertThat(replay.data().idempotentReplay()).isTrue();
         assertThat(replay.data().reminderId()).isEqualTo(first.data().reminderId());
-        verify(reminderRepository, times(1)).insert(any());
+        verify(reminderRepository, times(1)).insert(any(), any());
     }
 
     @Test
@@ -335,7 +344,7 @@ class ReminderServiceTest {
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.REM_CONFLICT_001);
 
-        verify(reminderRepository, never()).insert(any());
+        verify(reminderRepository, never()).insert(any(), any());
     }
 
     @Test
@@ -353,15 +362,15 @@ class ReminderServiceTest {
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.REM_CONFLICT_001);
 
-        verify(reminderRepository, never()).insert(any());
+        verify(reminderRepository, never()).insert(any(), any());
     }
 
     @Test
     void fallsBackToDatabaseUniqueKeyForReplay() {
         DeadlineReminderCreateRequest request = deadline(NOW.plusSeconds(7200), 120);
         ReminderRow existing = row(Instant.parse("2026-09-01T02:00:00Z"));
-        doThrow(new DuplicateKeyException("duplicate")).when(reminderRepository).insert(any());
-        when(reminderRepository.findByUserAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
+        doThrow(new DuplicateKeyException("duplicate")).when(reminderRepository).insert(any(), any());
+        when(reminderRepository.findByUserAndIdempotencyKey(TENANT_ID, USER_ID, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.of(existing));
 
         CreateReminderResult result = service.create(USER_ID, IDEMPOTENCY_KEY, request);

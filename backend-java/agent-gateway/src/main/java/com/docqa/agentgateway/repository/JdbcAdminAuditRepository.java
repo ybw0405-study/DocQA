@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -15,9 +16,9 @@ public class JdbcAdminAuditRepository implements AdminAuditRepository {
 
     static final String INSERT_SQL = """
             INSERT INTO audit_event (
-                id, trace_id, user_id, event_type, agent_name,
+                tenant_id, id, trace_id, user_id, event_type, agent_name,
                 source, severity, payload_redacted, occurred_at, ingested_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -29,9 +30,10 @@ public class JdbcAdminAuditRepository implements AdminAuditRepository {
     }
 
     @Override
-    public void insert(AdminAuditEntry entry) {
+    public void insert(UUID tenantId, AdminAuditEntry entry) {
         jdbcTemplate.update(
                 INSERT_SQL,
+                tenantId.toString(),
                 entry.id().toString(),
                 entry.traceId(),
                 entry.userId().toString(),

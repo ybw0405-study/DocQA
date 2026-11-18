@@ -7,6 +7,7 @@ import com.docqa.agentgateway.repository.AdminAuditEntry;
 import com.docqa.agentgateway.repository.AdminAuditRepository;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.time.Clock;
 import java.time.Instant;
@@ -62,7 +63,9 @@ public class AdminAiControlsService {
         controlsStore.writeKillSwitch(active, adminId, now);
         killSwitch.refresh(active);
         try {
-            auditRepository.insert(new AdminAuditEntry(
+            // P0: 管理面跨租户聚合暂用默认租户，P1 改为按管理员可见租户集过滤
+            UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
+            auditRepository.insert(tenantId, new AdminAuditEntry(
                     UUID.randomUUID(),
                     TraceIdContext.currentOrCreate(),
                     adminId,

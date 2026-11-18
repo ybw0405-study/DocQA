@@ -9,6 +9,7 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.time.Clock;
 import java.time.Instant;
@@ -53,7 +54,10 @@ public class AdminQuotaService {
                     List.of(FieldViolation.of("limit", "must be between 1 and 200")));
         }
         KeysetCursor cursor = parseCursor(cursorToken);
+        // P0: 管理面跨租户聚合暂用默认租户，P1 改为按管理员可见租户集过滤
+        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
         List<AiQuota> rows = quotaRepository.findPage(
+                tenantId,
                 cursor == null ? null : cursor.sortKey(),
                 cursor == null ? null : cursor.id(),
                 limit + 1);
@@ -66,18 +70,20 @@ public class AdminQuotaService {
     }
 
     public AiQuota update(UUID adminId, UUID targetUserId, Long dailyQuestionLimit, Long dailyTokenLimit) {
-        String username = quotaRepository.findUsername(targetUserId)
+        // P0: 管理面跨租户聚合暂用默认租户，P1 改为按管理员可见租户集过滤
+        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
+        String username = quotaRepository.findUsername(tenantId, targetUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USR_NOT_FOUND_001));
         Instant now = clock.instant();
         boolean cleared = dailyQuestionLimit == null && dailyTokenLimit == null;
         String traceId = TraceIdContext.currentOrCreate();
         transactionRunner.execute(() -> {
             if (cleared) {
-                quotaRepository.delete(targetUserId);
+                quotaRepository.delete(tenantId, targetUserId);
             } else {
-                quotaRepository.upsert(targetUserId, dailyQuestionLimit, dailyTokenLimit, adminId, now);
+                quotaRepository.upsert(tenantId, targetUserId, dailyQuestionLimit, dailyTokenLimit, adminId, now);
             }
-            auditRepository.insert(new AdminAuditEntry(
+            auditRepository.insert(tenantId, new AdminAuditEntry(
                     UUID.randomUUID(),
                     traceId,
                     adminId,

@@ -1,5 +1,6 @@
 package com.docqa.document.messaging;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.document.config.DocumentProperties;
 import com.docqa.document.domain.DocumentRow;
@@ -19,6 +20,8 @@ public class DocumentReconciliationJob {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DocumentReconciliationJob.class);
     private static final String REINDEX_TIMEOUT_MESSAGE = "重建索引超时，已保留原索引版本，可稍后再次发起重建。";
+    // P0: 存量事件归属默认租户，P1 随事件携带 tenant_id
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
 
     private final DocumentRepository documentRepository;
     private final DocumentEventPublisher documentEventPublisher;
@@ -43,6 +46,7 @@ public class DocumentReconciliationJob {
         Instant now = clock.instant();
         Instant threshold = now.minus(properties.getStaleThreshold());
         List<DocumentRow> documents = documentRepository.findStaleParsing(
+                TENANT_ID,
                 threshold,
                 properties.getReconcileBatchSize());
         for (DocumentRow document : documents) {
@@ -57,10 +61,12 @@ public class DocumentReconciliationJob {
         Instant now = clock.instant();
         Instant threshold = now.minus(properties.getStaleThreshold());
         List<DocumentRow> documents = documentRepository.findStaleReindex(
+                TENANT_ID,
                 threshold,
                 properties.getReconcileBatchSize());
         for (DocumentRow document : documents) {
             int updated = documentRepository.abortReindex(
+                    TENANT_ID,
                     document.id(),
                     document.pendingIndexVersion(),
                     "COM-INTERNAL-001",
@@ -80,6 +86,7 @@ public class DocumentReconciliationJob {
         Instant now = clock.instant();
         Instant deletedBefore = now.minus(properties.getStaleThreshold());
         List<DocumentRow> documents = documentRepository.findUnconfirmedDeletions(
+                TENANT_ID,
                 deletedBefore,
                 properties.getReconcileBatchSize());
         for (DocumentRow document : documents) {
@@ -93,7 +100,7 @@ public class DocumentReconciliationJob {
 
     private void reconcile(DocumentRow document, Instant now) {
         if (document.retryCount() >= document.maxRetry()) {
-            documentRepository.markDead(document.id(), "COM-INTERNAL-001", "解析超时，已达到最大重试次数。");
+            documentRepository.markDead(TENANT_ID, document.id(), "COM-INTERNAL-001", "解析超时，已达到最大重试次数。");
             return;
         }
         int nextRetry = document.retryCount() + 1;
@@ -117,14 +124,14 @@ public class DocumentReconciliationJob {
             return;
         }
 
-        int updated = documentRepository.incrementRetryAndMarkParsing(document.id(), now);
+        int updated = documentRepository.incrementRetryAndMarkParsing(TENANT_ID, document.id(), now);
         if (updated == 0) {
-            DocumentRow current = documentRepository.findById(document.id()).orElse(null);
+            DocumentRow current = documentRepository.findById(TENANT_ID, document.id()).orElse(null);
             if (current != null
                     && current.retryCount() >= current.maxRetry()
                     && (current.status() == DocumentStatus.PARSING
                             || current.status() == DocumentStatus.FAILED)) {
-                documentRepository.markDead(current.id(), "COM-INTERNAL-001", "解析超时，已达到最大重试次数。");
+                documentRepository.markDead(TENANT_ID, current.id(), "COM-INTERNAL-001", "解析超时，已达到最大重试次数。");
             }
             return;
         }

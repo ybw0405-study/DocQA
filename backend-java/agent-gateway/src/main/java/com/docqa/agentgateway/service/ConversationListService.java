@@ -8,6 +8,7 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -25,12 +26,14 @@ public class ConversationListService {
     }
 
     public ConversationListData list(UUID userId, String cursorToken, int limit) {
+        UUID tenantId = TenantContext.require();
         if (limit < MIN_PAGE_SIZE || limit > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.COM_VALIDATION_001, "limit out of range",
                     List.of(FieldViolation.of("limit", "must be between 1 and 100")));
         }
         KeysetCursor cursor = parseCursor(cursorToken);
         List<ConversationListRow> rows = conversationRepository.findUserPage(
+                tenantId,
                 userId,
                 cursor == null ? null : cursor.sortKey(),
                 cursor == null ? null : cursor.id(),

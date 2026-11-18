@@ -6,6 +6,7 @@ import com.docqa.agentgateway.repository.DocumentScopeRepository;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,8 @@ public class DocumentScopeService {
         if (documentIds == null || documentIds.isEmpty()) {
             return;
         }
-        List<DocumentRecord> records = documentScopeRepository.findByUserAndIds(userId, documentIds);
+        List<DocumentRecord> records = documentScopeRepository.findByUserAndIds(
+                TenantContext.require(), userId, documentIds);
         if (records.size() != documentIds.size()) {
             throw new BusinessException(ErrorCode.DOC_NOT_FOUND_001);
         }
@@ -46,7 +48,8 @@ public class DocumentScopeService {
                     null,
                     List.of(FieldViolation.of("documentIds", "must not contain duplicates")));
         }
-        List<DocumentRecord> records = documentScopeRepository.findByUserAndIds(userId, documentIds);
+        List<DocumentRecord> records = documentScopeRepository.findByUserAndIds(
+                TenantContext.require(), userId, documentIds);
         Map<UUID, DocumentRecord> byId = records.stream()
                 .collect(Collectors.toMap(DocumentRecord::id, Function.identity()));
         if (byId.size() != documentIds.size()) {

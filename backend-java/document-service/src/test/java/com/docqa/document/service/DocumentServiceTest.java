@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.docqa.common.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
@@ -51,6 +52,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,6 +63,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class DocumentServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final String MD5 = "d41d8cd98f00b204e9800998ecf8427e";
@@ -92,6 +95,7 @@ class DocumentServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.set(TENANT_ID);
         DocumentProperties documentProperties = new DocumentProperties();
         documentProperties.setSessionTtl(Duration.ofMinutes(45));
         documentProperties.setDefaultMaxRetry(3);
@@ -121,11 +125,16 @@ class DocumentServiceTest {
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(0)).get());
     }
 
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
     @Test
     void initCreatesDocumentAndPresignedParts() {
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.UPLOAD_INIT, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByUserAndMd5(USER_ID, MD5)).thenReturn(Optional.empty());
+        when(documentRepository.findByUserAndMd5(TENANT_ID, USER_ID, MD5)).thenReturn(Optional.empty());
         when(objectStorage.createMultipartUpload(anyString())).thenReturn("minio-upload-1");
         when(objectStorage.presignPart(anyString(), eq("minio-upload-1"), anyInt(), any()))
                 .thenReturn("https://minio.example/part");
@@ -147,7 +156,7 @@ class DocumentServiceTest {
         assertThat(data.expiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(45)));
 
         ArgumentCaptor<DocumentRow> documentCaptor = ArgumentCaptor.forClass(DocumentRow.class);
-        verify(documentRepository).insert(documentCaptor.capture());
+        verify(documentRepository).insert(eq(TENANT_ID), documentCaptor.capture());
         DocumentRow inserted = documentCaptor.getValue();
         assertThat(data.documentId()).isEqualTo(inserted.id());
         assertThat(inserted.objectKey())
@@ -167,7 +176,7 @@ class DocumentServiceTest {
         DocumentRow indexed = document(DocumentStatus.INDEXED);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.UPLOAD_INIT, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByUserAndMd5(USER_ID, MD5)).thenReturn(Optional.of(indexed));
+        when(documentRepository.findByUserAndMd5(TENANT_ID, USER_ID, MD5)).thenReturn(Optional.of(indexed));
 
         UploadInitResult result = documentService.init(
                 USER_ID,
@@ -186,7 +195,7 @@ class DocumentServiceTest {
     void initRejectsInstantUploadForASoftDeletedDocument() {
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.UPLOAD_INIT, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByUserAndMd5(USER_ID, MD5))
+        when(documentRepository.findByUserAndMd5(TENANT_ID, USER_ID, MD5))
                 .thenReturn(Optional.of(softDeleted(DocumentStatus.INDEXED)));
 
         assertThatThrownBy(() -> documentService.init(
@@ -197,14 +206,14 @@ class DocumentServiceTest {
                     assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.DOC_CONFLICT_001);
                     assertThat(ex.getMessage()).contains("请重新上传完整文件");
                 });
-        verify(documentRepository, never()).insert(any());
+        verify(documentRepository, never()).insert(eq(TENANT_ID), any());
     }
 
     @Test
     void initRejectsDocumentThatIsAlreadyParsing() {
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.UPLOAD_INIT, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByUserAndMd5(USER_ID, MD5))
+        when(documentRepository.findByUserAndMd5(TENANT_ID, USER_ID, MD5))
                 .thenReturn(Optional.of(document(DocumentStatus.PARSING)));
 
         assertThatThrownBy(() -> documentService.init(
@@ -221,9 +230,9 @@ class DocumentServiceTest {
         UploadSession session = session();
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.UPLOAD_COMPLETE, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(uploaded));
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(uploaded));
         when(uploadSessionStore.find(DOCUMENT_ID)).thenReturn(Optional.of(session));
-        when(documentRepository.markParsing(DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
+        when(documentRepository.markParsing(TENANT_ID, DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
         when(objectStorage.size(OBJECT_KEY)).thenReturn((long) PART_SIZE);
         when(objectStorage.md5(OBJECT_KEY)).thenReturn(MD5);
 
@@ -246,7 +255,7 @@ class DocumentServiceTest {
         DocumentRow uploaded = document(DocumentStatus.UPLOADED);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.UPLOAD_COMPLETE, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(uploaded));
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(uploaded));
         when(uploadSessionStore.find(DOCUMENT_ID)).thenReturn(Optional.of(session()));
         when(objectStorage.size(OBJECT_KEY)).thenReturn((long) PART_SIZE);
         when(objectStorage.md5(OBJECT_KEY)).thenReturn("ffffffffffffffffffffffffffffffff");
@@ -261,16 +270,16 @@ class DocumentServiceTest {
 
         verify(objectStorage).remove(OBJECT_KEY);
         verify(uploadSessionStore).delete(DOCUMENT_ID);
-        verify(documentRepository, never()).markParsing(any(), any(), any());
+        verify(documentRepository, never()).markParsing(eq(TENANT_ID), any(), any(), any());
         verify(documentEventPublisher, never()).publishParseRequested(any());
     }
 
     @Test
     void statusReportsChunkCountVectorConfirmationAndTags() {
         DocumentRow indexed = row(DocumentStatus.INDEXED, "v2", null, 3L);
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
-        when(chunkRepository.count(DOCUMENT_ID, "v2")).thenReturn(3L);
-        when(tagRepository.findNames(DOCUMENT_ID)).thenReturn(List.of("考研数学"));
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
+        when(chunkRepository.count(TENANT_ID, DOCUMENT_ID, "v2")).thenReturn(3L);
+        when(tagRepository.findNames(TENANT_ID, DOCUMENT_ID)).thenReturn(List.of("考研数学"));
 
         DocumentStatusData data = documentService.status(USER_ID, DOCUMENT_ID);
 
@@ -289,16 +298,16 @@ class DocumentServiceTest {
         DocumentRow renamed = withTitle(indexed, "高等数学·第三章笔记");
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_RENAME, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID))
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID))
                 .thenReturn(Optional.of(indexed), Optional.of(renamed));
-        when(documentRepository.updateTitle(DOCUMENT_ID, USER_ID, "高等数学·第三章笔记")).thenReturn(1);
+        when(documentRepository.updateTitle(TENANT_ID, DOCUMENT_ID, USER_ID, "高等数学·第三章笔记")).thenReturn(1);
 
         DocumentStatusData data = documentService.rename(
                 USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY, new DocumentRenameRequest("  高等数学·第三章笔记 "));
 
         assertThat(data.title()).isEqualTo("高等数学·第三章笔记");
         assertThat(data.fileName()).isEqualTo("notes.pdf");
-        verify(documentRepository).updateTitle(DOCUMENT_ID, USER_ID, "高等数学·第三章笔记");
+        verify(documentRepository).updateTitle(TENANT_ID, DOCUMENT_ID, USER_ID, "高等数学·第三章笔记");
     }
 
     @Test
@@ -320,14 +329,14 @@ class DocumentServiceTest {
     void renameOfAForeignOrSoftDeletedDocumentIsNotFound() {
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_RENAME, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.empty());
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentService.rename(
                         USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY, new DocumentRenameRequest("新标题")))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.DOC_NOT_FOUND_001);
-        verify(documentRepository, never()).updateTitle(any(), any(), any());
+        verify(documentRepository, never()).updateTitle(eq(TENANT_ID), any(), any(), any());
     }
 
     @Test
@@ -341,9 +350,9 @@ class DocumentServiceTest {
         resolved.put(tags.get(1).normalized(), secondId);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_TAG_UPDATE, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
-        when(tagRepository.resolveOrCreate(USER_ID, tags, NOW)).thenReturn(resolved);
-        when(tagRepository.findNames(DOCUMENT_ID)).thenReturn(List.of("考研 数学", "错题本"));
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
+        when(tagRepository.resolveOrCreate(TENANT_ID, USER_ID, tags, NOW)).thenReturn(resolved);
+        when(tagRepository.findNames(TENANT_ID, DOCUMENT_ID)).thenReturn(List.of("考研 数学", "错题本"));
 
         DocumentStatusData data = documentService.replaceTags(
                 USER_ID,
@@ -351,7 +360,7 @@ class DocumentServiceTest {
                 IDEMPOTENCY_KEY,
                 new DocumentTagsUpdateRequest(List.of(" 考研   数学 ", "错题本")));
 
-        verify(tagRepository).replaceLinks(DOCUMENT_ID, List.of(firstId, secondId), NOW);
+        verify(tagRepository).replaceLinks(TENANT_ID, DOCUMENT_ID, List.of(firstId, secondId), NOW);
         assertThat(data.tags()).containsExactly("考研 数学", "错题本");
     }
 
@@ -360,13 +369,13 @@ class DocumentServiceTest {
         DocumentRow indexed = document(DocumentStatus.INDEXED);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_TAG_UPDATE, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
-        when(tagRepository.resolveOrCreate(USER_ID, List.of(), NOW)).thenReturn(Map.of());
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
+        when(tagRepository.resolveOrCreate(TENANT_ID, USER_ID, List.of(), NOW)).thenReturn(Map.of());
 
         DocumentStatusData data = documentService.replaceTags(
                 USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY, new DocumentTagsUpdateRequest(List.of()));
 
-        verify(tagRepository).replaceLinks(DOCUMENT_ID, List.of(), NOW);
+        verify(tagRepository).replaceLinks(TENANT_ID, DOCUMENT_ID, List.of(), NOW);
         assertThat(data.tags()).isEmpty();
     }
 
@@ -413,13 +422,13 @@ class DocumentServiceTest {
         DocumentRow indexed = document(DocumentStatus.INDEXED);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_DELETE, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
-        when(documentRepository.softDelete(DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
+        when(documentRepository.softDelete(TENANT_ID, DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
 
         documentService.delete(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY);
 
-        verify(chunkRepository).deleteByDocument(DOCUMENT_ID);
-        verify(documentRepository).softDelete(DOCUMENT_ID, USER_ID, NOW);
+        verify(chunkRepository).deleteByDocument(TENANT_ID, DOCUMENT_ID);
+        verify(documentRepository).softDelete(TENANT_ID, DOCUMENT_ID, USER_ID, NOW);
         ArgumentCaptor<VectorChangeRequestedEvent> captor =
                 ArgumentCaptor.forClass(VectorChangeRequestedEvent.class);
         verify(documentEventPublisher).publishVectorChangeRequested(captor.capture());
@@ -436,14 +445,14 @@ class DocumentServiceTest {
         DocumentRow indexed = document(DocumentStatus.INDEXED);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_DELETE, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
-        when(documentRepository.softDelete(DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
+        when(documentRepository.softDelete(TENANT_ID, DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
         doThrow(new IllegalStateException("broker down"))
                 .when(documentEventPublisher).publishVectorChangeRequested(any());
 
         documentService.delete(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY);
 
-        verify(documentRepository).softDelete(DOCUMENT_ID, USER_ID, NOW);
+        verify(documentRepository).softDelete(TENANT_ID, DOCUMENT_ID, USER_ID, NOW);
         verify(idempotencyStore).save(
                 eq(USER_ID), eq(IdempotencyOperation.DOCUMENT_DELETE), eq(IDEMPOTENCY_KEY),
                 any(IdempotencyRecord.class));
@@ -453,14 +462,14 @@ class DocumentServiceTest {
     void deleteRejectsADocumentThatIsStillParsing() {
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_DELETE, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID))
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID))
                 .thenReturn(Optional.of(document(DocumentStatus.PARSING)));
 
         assertThatThrownBy(() -> documentService.delete(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.DOC_CONFLICT_001);
-        verify(documentRepository, never()).softDelete(any(), any(), any());
+        verify(documentRepository, never()).softDelete(eq(TENANT_ID), any(), any(), any());
         verify(documentEventPublisher, never()).publishVectorChangeRequested(any());
         verify(idempotencyStore, never()).save(any(), any(), any(), any());
     }
@@ -470,8 +479,8 @@ class DocumentServiceTest {
         DocumentRow indexed = document(DocumentStatus.INDEXED);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_DELETE, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
-        when(documentRepository.softDelete(DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
+        when(documentRepository.softDelete(TENANT_ID, DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
 
         documentService.delete(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY);
         ArgumentCaptor<IdempotencyRecord> recordCaptor = ArgumentCaptor.forClass(IdempotencyRecord.class);
@@ -492,8 +501,8 @@ class DocumentServiceTest {
         DocumentRow indexed = document(DocumentStatus.INDEXED);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_DELETE, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
-        when(documentRepository.softDelete(DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
+        when(documentRepository.softDelete(TENANT_ID, DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
 
         documentService.delete(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY);
         ArgumentCaptor<IdempotencyRecord> recordCaptor = ArgumentCaptor.forClass(IdempotencyRecord.class);
@@ -517,9 +526,9 @@ class DocumentServiceTest {
         DocumentRow parsing = withRetry(failed, DocumentStatus.PARSING, 0);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_RETRY, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID))
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID))
                 .thenReturn(Optional.of(failed), Optional.of(parsing));
-        when(documentRepository.resetRetryAndMarkParsing(DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
+        when(documentRepository.resetRetryAndMarkParsing(TENANT_ID, DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
 
         DocumentCommandResult result = documentService.retryParse(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY);
 
@@ -539,14 +548,14 @@ class DocumentServiceTest {
             reset(idempotencyStore, documentRepository, documentEventPublisher);
             when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_RETRY, IDEMPOTENCY_KEY))
                     .thenReturn(Optional.empty());
-            when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID))
+            when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID))
                     .thenReturn(Optional.of(document(status)));
 
             assertThatThrownBy(() -> documentService.retryParse(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode")
                     .isEqualTo(ErrorCode.DOC_CONFLICT_001);
-            verify(documentRepository, never()).resetRetryAndMarkParsing(any(), any(), any());
+            verify(documentRepository, never()).resetRetryAndMarkParsing(eq(TENANT_ID), any(), any(), any());
             verify(documentEventPublisher, never()).publishParseRequested(any());
         }
     }
@@ -556,13 +565,13 @@ class DocumentServiceTest {
         DocumentRow dead = document(DocumentStatus.DEAD);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_RETRY, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(dead));
-        when(documentRepository.resetRetryAndMarkParsing(DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(dead));
+        when(documentRepository.resetRetryAndMarkParsing(TENANT_ID, DOCUMENT_ID, USER_ID, NOW)).thenReturn(1);
 
         DocumentCommandResult result = documentService.retryParse(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY);
 
         assertThat(result.accepted()).isTrue();
-        verify(documentRepository).resetRetryAndMarkParsing(DOCUMENT_ID, USER_ID, NOW);
+        verify(documentRepository).resetRetryAndMarkParsing(TENANT_ID, DOCUMENT_ID, USER_ID, NOW);
     }
 
     @Test
@@ -571,9 +580,9 @@ class DocumentServiceTest {
         DocumentRow rebuilding = withPending(indexed, "v2");
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_REINDEX, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID))
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID))
                 .thenReturn(Optional.of(indexed), Optional.of(rebuilding));
-        when(documentRepository.beginReindex(DOCUMENT_ID, USER_ID, "v2", NOW)).thenReturn(1);
+        when(documentRepository.beginReindex(TENANT_ID, DOCUMENT_ID, USER_ID, "v2", NOW)).thenReturn(1);
 
         DocumentCommandResult result = documentService.reindex(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY);
 
@@ -591,7 +600,7 @@ class DocumentServiceTest {
     void reindexRefusesNonIndexedDocumentsAndConcurrentRebuilds() {
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_REINDEX, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID))
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID))
                 .thenReturn(Optional.of(document(DocumentStatus.FAILED)));
 
         assertThatThrownBy(() -> documentService.reindex(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY))
@@ -602,7 +611,7 @@ class DocumentServiceTest {
         reset(idempotencyStore, documentRepository);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_REINDEX, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID))
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID))
                 .thenReturn(Optional.of(withPending(document(DocumentStatus.INDEXED), "v2")));
 
         assertThatThrownBy(() -> documentService.reindex(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY))
@@ -610,7 +619,7 @@ class DocumentServiceTest {
                     assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.DOC_CONFLICT_001);
                     assertThat(ex.getMessage()).contains("已有重建任务在途");
                 });
-        verify(documentRepository, never()).beginReindex(any(), any(), any(), any());
+        verify(documentRepository, never()).beginReindex(eq(TENANT_ID), any(), any(), any(), any());
     }
 
     @Test
@@ -618,13 +627,13 @@ class DocumentServiceTest {
         DocumentRow indexed = row(DocumentStatus.INDEXED, "prod-2026-10", null, null);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_REINDEX, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
 
         assertThatThrownBy(() -> documentService.reindex(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.DOC_CONFLICT_001);
-        verify(documentRepository, never()).beginReindex(any(), any(), any(), any());
+        verify(documentRepository, never()).beginReindex(eq(TENANT_ID), any(), any(), any(), any());
         verify(documentEventPublisher, never()).publishParseRequested(any());
     }
 
@@ -633,8 +642,8 @@ class DocumentServiceTest {
         DocumentRow indexed = document(DocumentStatus.INDEXED);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.DOCUMENT_REINDEX, IDEMPOTENCY_KEY))
                 .thenReturn(Optional.empty());
-        when(documentRepository.findByIdAndUser(DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
-        when(documentRepository.beginReindex(DOCUMENT_ID, USER_ID, "v2", NOW)).thenReturn(1);
+        when(documentRepository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID)).thenReturn(Optional.of(indexed));
+        when(documentRepository.beginReindex(TENANT_ID, DOCUMENT_ID, USER_ID, "v2", NOW)).thenReturn(1);
 
         DocumentCommandResult first = documentService.reindex(USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY);
         ArgumentCaptor<IdempotencyRecord> recordCaptor = ArgumentCaptor.forClass(IdempotencyRecord.class);
@@ -682,9 +691,9 @@ class DocumentServiceTest {
     }
 
     private void verifyNoDocumentLookup() {
-        verify(documentRepository, never()).findByIdAndUser(any(), any());
-        verify(documentRepository, never()).updateTitle(any(), any(), any());
-        verify(documentRepository, never()).softDelete(any(), any(), any());
+        verify(documentRepository, never()).findByIdAndUser(eq(TENANT_ID), any(), any());
+        verify(documentRepository, never()).updateTitle(eq(TENANT_ID), any(), any(), any());
+        verify(documentRepository, never()).softDelete(eq(TENANT_ID), any(), any(), any());
     }
 
     private UploadSession session() {

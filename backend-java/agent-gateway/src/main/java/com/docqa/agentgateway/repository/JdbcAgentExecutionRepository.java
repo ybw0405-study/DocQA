@@ -32,14 +32,16 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
     }
 
     @Override
-    public void insert(AgentExecution execution) {
+    public void insert(UUID tenantId, AgentExecution execution) {
         jdbcTemplate.update("""
                         INSERT INTO agent_execution (
-                            id, trace_id, user_id, conversation_id, request_message_id, response_message_id,
-                            status, budget_status, token_budget, token_used, tool_calls_made, rounds_used,
-                            cache_hit, latency_ms, error_code, audit_outbox, started_at, finished_at, recorded_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            tenant_id, id, trace_id, user_id, conversation_id, request_message_id,
+                            response_message_id, status, budget_status, token_budget, token_used,
+                            tool_calls_made, rounds_used, cache_hit, latency_ms, error_code, audit_outbox,
+                            started_at, finished_at, recorded_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
+                tenantId.toString(),
                 execution.id().toString(),
                 execution.traceId(),
                 execution.userId().toString(),
@@ -62,25 +64,28 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
     }
 
     @Override
-    public List<OutboxExecution> findOutboxBatch(Instant afterRecordedAt, UUID afterId, int limit) {
+    public List<OutboxExecution> findOutboxBatch(UUID tenantId, Instant afterRecordedAt, UUID afterId, int limit) {
         if (afterRecordedAt == null || afterId == null) {
             return jdbcTemplate.query("""
                             SELECT id, recorded_at, audit_outbox
                             FROM agent_execution
+                            WHERE tenant_id = ?
                             ORDER BY recorded_at, id
                             LIMIT ?
                             """,
                     rowMapper(),
+                    tenantId.toString(),
                     limit);
         }
         return jdbcTemplate.query("""
                         SELECT id, recorded_at, audit_outbox
                         FROM agent_execution
-                        WHERE recorded_at > ? OR (recorded_at = ? AND id > ?)
+                        WHERE tenant_id = ? AND (recorded_at > ? OR (recorded_at = ? AND id > ?))
                         ORDER BY recorded_at, id
                         LIMIT ?
                         """,
                 rowMapper(),
+                tenantId.toString(),
                 Timestamp.from(afterRecordedAt),
                 Timestamp.from(afterRecordedAt),
                 afterId.toString(),
@@ -92,20 +97,23 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
     }
 
     @Override
-    public OutboxBacklog outboxBacklog(Instant afterRecordedAt, UUID afterId) {
+    public OutboxBacklog outboxBacklog(UUID tenantId, Instant afterRecordedAt, UUID afterId) {
         if (afterRecordedAt == null || afterId == null) {
             return jdbcTemplate.queryForObject("""
                             SELECT COUNT(*) AS pending, MIN(recorded_at) AS oldest_recorded_at
                             FROM agent_execution
+                            WHERE tenant_id = ?
                             """,
-                    backlogMapper());
+                    backlogMapper(),
+                    tenantId.toString());
         }
         return jdbcTemplate.queryForObject("""
                         SELECT COUNT(*) AS pending, MIN(recorded_at) AS oldest_recorded_at
                         FROM agent_execution
-                        WHERE recorded_at > ? OR (recorded_at = ? AND id > ?)
+                        WHERE tenant_id = ? AND (recorded_at > ? OR (recorded_at = ? AND id > ?))
                         """,
                 backlogMapper(),
+                tenantId.toString(),
                 Timestamp.from(afterRecordedAt),
                 Timestamp.from(afterRecordedAt),
                 afterId.toString());

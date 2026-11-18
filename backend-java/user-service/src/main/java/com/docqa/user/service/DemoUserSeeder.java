@@ -1,5 +1,6 @@
 package com.docqa.user.service;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.config.DemoUserProperties;
 import com.docqa.user.domain.NewUser;
 import com.docqa.user.domain.UserRole;
@@ -55,7 +56,7 @@ public class DemoUserSeeder implements ApplicationRunner {
         if (username.isEmpty()) {
             throw new IllegalStateException("Demo user username must not be blank");
         }
-        if (userRepository.existsByUsername(username)) {
+        if (userRepository.existsByUsername(TenantContext.DEFAULT_TENANT_ID, username)) {
             return;
         }
 
@@ -63,6 +64,7 @@ public class DemoUserSeeder implements ApplicationRunner {
                 ? EnumSet.of(UserRole.USER, UserRole.ADMIN)
                 : EnumSet.of(UserRole.USER);
         userRepository.insert(
+                TenantContext.DEFAULT_TENANT_ID,
                 new NewUser(properties.getUserId(), username, passwordHash, UserStatus.ACTIVE, clock.instant()),
                 roles);
         LOGGER.info("Seeded demo account with roles={}", roles);

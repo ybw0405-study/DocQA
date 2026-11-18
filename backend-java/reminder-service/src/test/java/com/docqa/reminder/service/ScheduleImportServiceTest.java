@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.domain.IdempotencyOperation;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.domain.ReminderStatus;
@@ -36,6 +37,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +49,7 @@ import org.springframework.dao.DuplicateKeyException;
  */
 class ScheduleImportServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID REMINDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final Instant NOW = Instant.parse("2026-09-01T00:00:00Z");
@@ -70,6 +73,12 @@ class ScheduleImportServiceTest {
     void setUp() {
         service = new ScheduleImportService(parser, evaluator, writer, idempotencyStore, rateLimiter,
                 objectMapper, Clock.fixed(NOW, ZoneId.of("UTC")));
+        TenantContext.set(TENANT_ID);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test
@@ -194,7 +203,7 @@ class ScheduleImportServiceTest {
         assertThat(result.data().idempotentReplay()).isFalse();
         assertThat(result.data().items()).singleElement()
                 .satisfies(item -> assertThat(item.reminderId()).isEqualTo(REMINDER_ID));
-        verify(writer).persist(anyList());
+        verify(writer).persist(eq(TENANT_ID), anyList());
     }
 
     @Test
@@ -281,7 +290,7 @@ class ScheduleImportServiceTest {
         givenIdempotencyAbsent();
         givenDecisions(decision(ScheduleImportAction.CREATE, 3, null));
         doThrow(new DuplicateKeyException("uk_reminder_user_source"))
-                .when(writer).persist(anyList());
+                .when(writer).persist(eq(TENANT_ID), anyList());
 
         assertThatThrownBy(() -> service.importSchedule(USER_ID, KEY, upload("text/calendar"), ZONE, 10))
                 .isInstanceOfSatisfying(BusinessException.class,
@@ -316,7 +325,7 @@ class ScheduleImportServiceTest {
 
     private void givenDecisions(ScheduleDecision... decisions) {
         when(parser.parse(any(), any())).thenReturn(List.of());
-        when(evaluator.evaluate(any(), anyString(), anyInt(), anyList())).thenReturn(List.of(decisions));
+        when(evaluator.evaluate(any(), any(), anyString(), anyInt(), anyList())).thenReturn(List.of(decisions));
     }
 
     private IcsUpload upload(String contentType) {

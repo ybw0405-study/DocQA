@@ -43,15 +43,16 @@ public class JdbcReminderRepository implements ReminderRepository {
     }
 
     @Override
-    public void insert(ReminderRow reminder) {
+    public void insert(UUID tenantId, ReminderRow reminder) {
         jdbcTemplate.update("""
                         INSERT INTO reminder (
-                            id, user_id, title, description, rrule, dtstart, timezone, lead_minutes,
+                            tenant_id, id, user_id, title, description, rrule, dtstart, timezone, lead_minutes,
                             exdates, exdate_dates,
                             status, source_type, source_uid, source_sequence, idempotency_key,
                             next_trigger_at, last_triggered_at, version, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
+                tenantId.toString(),
                 reminder.id().toString(),
                 reminder.userId().toString(),
                 reminder.title(),
@@ -75,10 +76,12 @@ public class JdbcReminderRepository implements ReminderRepository {
     }
 
     @Override
-    public Optional<ReminderRow> findByUserAndIdempotencyKey(UUID userId, String idempotencyKey) {
+    public Optional<ReminderRow> findByUserAndIdempotencyKey(UUID tenantId, UUID userId, String idempotencyKey) {
         return jdbcTemplate.query(
-                        "SELECT " + COLUMNS + " FROM reminder WHERE user_id = ? AND idempotency_key = ?",
+                        "SELECT " + COLUMNS + " FROM reminder WHERE tenant_id = ? AND user_id = ?"
+                                + " AND idempotency_key = ?",
                         rowMapper,
+                        tenantId.toString(),
                         userId.toString(),
                         idempotencyKey)
                 .stream()
@@ -86,10 +89,11 @@ public class JdbcReminderRepository implements ReminderRepository {
     }
 
     @Override
-    public Optional<ReminderRow> findOwned(UUID userId, UUID id) {
+    public Optional<ReminderRow> findOwned(UUID tenantId, UUID userId, UUID id) {
         return jdbcTemplate.query(
-                        "SELECT " + COLUMNS + " FROM reminder WHERE id = ? AND user_id = ?",
+                        "SELECT " + COLUMNS + " FROM reminder WHERE tenant_id = ? AND id = ? AND user_id = ?",
                         rowMapper,
+                        tenantId.toString(),
                         id.toString(),
                         userId.toString())
                 .stream()
@@ -97,70 +101,78 @@ public class JdbcReminderRepository implements ReminderRepository {
     }
 
     @Override
-    public int updateStatus(UUID id, UUID userId, long expectedVersion, ReminderStatus target,
+    public int updateStatus(UUID tenantId, UUID id, UUID userId, long expectedVersion, ReminderStatus target,
             Instant nextTriggerAt, Instant updatedAt) {
         return jdbcTemplate.update("""
                         UPDATE reminder
                         SET status = ?, next_trigger_at = ?, version = version + 1, updated_at = ?
-                        WHERE id = ? AND user_id = ? AND version = ?
+                        WHERE tenant_id = ? AND id = ? AND user_id = ? AND version = ?
                         """,
                 target.name(),
                 toTimestamp(nextTriggerAt),
                 Timestamp.from(updatedAt),
+                tenantId.toString(),
                 id.toString(),
                 userId.toString(),
                 expectedVersion);
     }
 
     @Override
-    public List<ReminderRow> findDue(Instant now, int limit) {
+    public List<ReminderRow> findDue(UUID tenantId, Instant now, int limit) {
         return jdbcTemplate.query("""
                         SELECT %s
                         FROM reminder
-                        WHERE status = 'ACTIVE' AND next_trigger_at IS NOT NULL AND next_trigger_at <= ?
+                        WHERE tenant_id = ? AND status = 'ACTIVE' AND next_trigger_at IS NOT NULL
+                          AND next_trigger_at <= ?
                         ORDER BY next_trigger_at
                         LIMIT ?
                         """.formatted(COLUMNS),
                 rowMapper,
+                tenantId.toString(),
                 Timestamp.from(now),
                 limit);
     }
 
     @Override
-    public int advance(UUID id, long expectedVersion, Instant nextTriggerAt, Instant lastTriggeredAt) {
+    public int advance(UUID tenantId, UUID id, long expectedVersion, Instant nextTriggerAt,
+            Instant lastTriggeredAt) {
         return jdbcTemplate.update("""
                         UPDATE reminder
                         SET next_trigger_at = ?,
                             last_triggered_at = COALESCE(?, last_triggered_at),
                             version = version + 1
-                        WHERE id = ? AND version = ? AND status = 'ACTIVE'
+                        WHERE tenant_id = ? AND id = ? AND version = ? AND status = 'ACTIVE'
                         """,
                 Timestamp.from(nextTriggerAt),
                 lastTriggeredAt == null ? null : Timestamp.from(lastTriggeredAt),
+                tenantId.toString(),
                 id.toString(),
                 expectedVersion);
     }
 
     @Override
-    public int complete(UUID id, long expectedVersion, Instant lastTriggeredAt) {
+    public int complete(UUID tenantId, UUID id, long expectedVersion, Instant lastTriggeredAt) {
         return jdbcTemplate.update("""
                         UPDATE reminder
                         SET status = 'COMPLETED',
                             next_trigger_at = NULL,
                             last_triggered_at = COALESCE(?, last_triggered_at),
                             version = version + 1
-                        WHERE id = ? AND version = ? AND status = 'ACTIVE'
+                        WHERE tenant_id = ? AND id = ? AND version = ? AND status = 'ACTIVE'
                         """,
                 lastTriggeredAt == null ? null : Timestamp.from(lastTriggeredAt),
+                tenantId.toString(),
                 id.toString(),
                 expectedVersion);
     }
 
     @Override
-    public List<ReminderRow> findUserPage(UUID userId, ReminderStatus status, Instant afterNextTriggerAt,
-            UUID afterId, boolean afterNullGroup, int limit) {
-        StringBuilder sql = new StringBuilder("SELECT ").append(COLUMNS).append(" FROM reminder WHERE user_id = ?");
+    public List<ReminderRow> findUserPage(UUID tenantId, UUID userId, ReminderStatus status,
+            Instant afterNextTriggerAt, UUID afterId, boolean afterNullGroup, int limit) {
+        StringBuilder sql = new StringBuilder("SELECT ").append(COLUMNS)
+                .append(" FROM reminder WHERE tenant_id = ? AND user_id = ?");
         List<Object> args = new ArrayList<>();
+        args.add(tenantId.toString());
         args.add(userId.toString());
         if (status != null) {
             sql.append(" AND status = ?");
@@ -183,31 +195,34 @@ public class JdbcReminderRepository implements ReminderRepository {
     }
 
     @Override
-    public List<ReminderRow> findByUserAndSourceUids(UUID userId, String sourceType, List<String> sourceUids) {
+    public List<ReminderRow> findByUserAndSourceUids(UUID tenantId, UUID userId, String sourceType,
+            List<String> sourceUids) {
         if (sourceUids.isEmpty()) {
             return List.of();
         }
         String placeholders = sourceUids.stream().map(uid -> "?").collect(Collectors.joining(", "));
         List<Object> args = new ArrayList<>();
+        args.add(tenantId.toString());
         args.add(userId.toString());
         args.add(sourceType);
         args.addAll(sourceUids);
         return jdbcTemplate.query(
                 "SELECT " + COLUMNS + " FROM reminder"
-                        + " WHERE user_id = ? AND source_type = ? AND source_uid IN (" + placeholders + ")",
+                        + " WHERE tenant_id = ? AND user_id = ? AND source_type = ?"
+                        + " AND source_uid IN (" + placeholders + ")",
                 rowMapper,
                 args.toArray());
     }
 
     @Override
-    public int updateFromImport(ReminderRow reminder) {
+    public int updateFromImport(UUID tenantId, ReminderRow reminder) {
         return jdbcTemplate.update("""
                         UPDATE reminder
                         SET title = ?, description = ?, rrule = ?, dtstart = ?, timezone = ?,
                             lead_minutes = ?,
                             exdates = ?, exdate_dates = ?, source_sequence = ?,
                             next_trigger_at = ?, version = version + 1, updated_at = ?
-                        WHERE id = ? AND user_id = ?
+                        WHERE tenant_id = ? AND id = ? AND user_id = ?
                         """,
                 reminder.title(),
                 reminder.description(),
@@ -220,6 +235,7 @@ public class JdbcReminderRepository implements ReminderRepository {
                 reminder.sourceSequence(),
                 toTimestamp(reminder.nextTriggerAt()),
                 Timestamp.from(reminder.updatedAt()),
+                tenantId.toString(),
                 reminder.id().toString(),
                 reminder.userId().toString());
     }

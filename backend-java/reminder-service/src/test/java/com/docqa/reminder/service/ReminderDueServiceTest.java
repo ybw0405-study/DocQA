@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.common.metrics.BusinessMetrics;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.config.ReminderProperties;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.domain.ReminderStatus;
@@ -38,6 +39,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class ReminderDueServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID REMINDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final Instant NOW = Instant.parse("2026-01-01T09:00:30Z");
@@ -74,11 +76,11 @@ class ReminderDueServiceTest {
 
     @Test
     void publishesDueEventAndAdvancesReminder() {
-        when(reminderRepository.findDue(NOW, properties.getScanBatchSize()))
+        when(reminderRepository.findDue(TENANT_ID, NOW, properties.getScanBatchSize()))
                 .thenReturn(List.of(row(REMINDER_ID, "FREQ=DAILY", OCCURRENCE, 5L)));
         when(firedOccurrenceStore.claim(REMINDER_ID, OCCURRENCE))
                 .thenReturn(FiredOccurrenceStore.Claim.CLAIMED);
-        when(reminderRepository.advance(REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(1);
+        when(reminderRepository.advance(TENANT_ID, REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(1);
 
         service.dispatchDue();
 
@@ -99,45 +101,45 @@ class ReminderDueServiceTest {
         assertThat(event.occurredAt()).isEqualTo(NOW);
 
         verify(firedOccurrenceStore).markFired(REMINDER_ID, OCCURRENCE);
-        verify(reminderRepository).advance(REMINDER_ID, 5L, NEXT, OCCURRENCE);
-        verify(reminderRepository, never()).complete(any(), anyLong(), any());
+        verify(reminderRepository).advance(TENANT_ID, REMINDER_ID, 5L, NEXT, OCCURRENCE);
+        verify(reminderRepository, never()).complete(any(), any(), anyLong(), any());
     }
 
     @Test
     void completesReminderWithoutFurtherOccurrences() {
-        when(reminderRepository.findDue(NOW, properties.getScanBatchSize()))
+        when(reminderRepository.findDue(TENANT_ID, NOW, properties.getScanBatchSize()))
                 .thenReturn(List.of(row(REMINDER_ID, "FREQ=DAILY;COUNT=1", OCCURRENCE, 5L)));
         when(firedOccurrenceStore.claim(REMINDER_ID, OCCURRENCE))
                 .thenReturn(FiredOccurrenceStore.Claim.CLAIMED);
-        when(reminderRepository.complete(REMINDER_ID, 5L, OCCURRENCE)).thenReturn(1);
+        when(reminderRepository.complete(TENANT_ID, REMINDER_ID, 5L, OCCURRENCE)).thenReturn(1);
 
         service.dispatchDue();
 
         ArgumentCaptor<ReminderDueEvent> captor = ArgumentCaptor.forClass(ReminderDueEvent.class);
         verify(reminderDuePublisher).publish(captor.capture());
         assertThat(captor.getValue().nextTriggerAt()).isNull();
-        verify(reminderRepository).complete(REMINDER_ID, 5L, OCCURRENCE);
-        verify(reminderRepository, never()).advance(any(), anyLong(), any(), any());
+        verify(reminderRepository).complete(TENANT_ID, REMINDER_ID, 5L, OCCURRENCE);
+        verify(reminderRepository, never()).advance(any(), any(), anyLong(), any(), any());
     }
 
     @Test
     void alreadyPublishedOccurrenceAdvancesWithoutPublishing() {
-        when(reminderRepository.findDue(NOW, properties.getScanBatchSize()))
+        when(reminderRepository.findDue(TENANT_ID, NOW, properties.getScanBatchSize()))
                 .thenReturn(List.of(row(REMINDER_ID, "FREQ=DAILY", OCCURRENCE, 5L)));
         when(firedOccurrenceStore.claim(REMINDER_ID, OCCURRENCE))
                 .thenReturn(FiredOccurrenceStore.Claim.FIRED);
-        when(reminderRepository.advance(REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(1);
+        when(reminderRepository.advance(TENANT_ID, REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(1);
 
         service.dispatchDue();
 
         verifyNoInteractions(reminderDuePublisher);
         verify(firedOccurrenceStore, never()).markFired(any(), any());
-        verify(reminderRepository).advance(REMINDER_ID, 5L, NEXT, OCCURRENCE);
+        verify(reminderRepository).advance(TENANT_ID, REMINDER_ID, 5L, NEXT, OCCURRENCE);
     }
 
     @Test
     void occurrenceBeingPublishedElsewhereIsSkipped() {
-        when(reminderRepository.findDue(NOW, properties.getScanBatchSize()))
+        when(reminderRepository.findDue(TENANT_ID, NOW, properties.getScanBatchSize()))
                 .thenReturn(List.of(row(REMINDER_ID, "FREQ=DAILY", OCCURRENCE, 5L)));
         when(firedOccurrenceStore.claim(REMINDER_ID, OCCURRENCE))
                 .thenReturn(FiredOccurrenceStore.Claim.IN_PROGRESS);
@@ -145,28 +147,28 @@ class ReminderDueServiceTest {
         service.dispatchDue();
 
         verifyNoInteractions(reminderDuePublisher);
-        verify(reminderRepository, never()).advance(any(), anyLong(), any(), any());
-        verify(reminderRepository, never()).complete(any(), anyLong(), any());
+        verify(reminderRepository, never()).advance(any(), any(), anyLong(), any(), any());
+        verify(reminderRepository, never()).complete(any(), any(), anyLong(), any());
     }
 
     @Test
     void skipsOccurrenceBeyondPastGraceWithoutPublishing() {
         Instant stale = Instant.parse("2025-12-30T09:00:00Z");
-        when(reminderRepository.findDue(NOW, properties.getScanBatchSize()))
+        when(reminderRepository.findDue(TENANT_ID, NOW, properties.getScanBatchSize()))
                 .thenReturn(List.of(row(REMINDER_ID, "FREQ=DAILY", stale, stale, 5L)));
-        when(reminderRepository.advance(REMINDER_ID, 5L, OCCURRENCE, null)).thenReturn(1);
+        when(reminderRepository.advance(TENANT_ID, REMINDER_ID, 5L, OCCURRENCE, null)).thenReturn(1);
 
         service.dispatchDue();
 
         verifyNoInteractions(reminderDuePublisher);
         verifyNoInteractions(firedOccurrenceStore);
-        verify(reminderRepository).advance(eq(REMINDER_ID), eq(5L), eq(OCCURRENCE), isNull());
-        verify(reminderRepository, never()).complete(any(), anyLong(), any());
+        verify(reminderRepository).advance(eq(TENANT_ID), eq(REMINDER_ID), eq(5L), eq(OCCURRENCE), isNull());
+        verify(reminderRepository, never()).complete(any(), any(), anyLong(), any());
     }
 
     @Test
     void publishFailureReleasesClaimAndLeavesStateUntouched() {
-        when(reminderRepository.findDue(NOW, properties.getScanBatchSize()))
+        when(reminderRepository.findDue(TENANT_ID, NOW, properties.getScanBatchSize()))
                 .thenReturn(List.of(row(REMINDER_ID, "FREQ=DAILY", OCCURRENCE, 5L)));
         when(firedOccurrenceStore.claim(REMINDER_ID, OCCURRENCE))
                 .thenReturn(FiredOccurrenceStore.Claim.CLAIMED);
@@ -176,20 +178,20 @@ class ReminderDueServiceTest {
 
         verify(firedOccurrenceStore).release(REMINDER_ID, OCCURRENCE);
         verify(firedOccurrenceStore, never()).markFired(any(), any());
-        verify(reminderRepository, never()).advance(any(), anyLong(), any(), any());
-        verify(reminderRepository, never()).complete(any(), anyLong(), any());
+        verify(reminderRepository, never()).advance(any(), any(), anyLong(), any(), any());
+        verify(reminderRepository, never()).complete(any(), any(), anyLong(), any());
     }
 
     @Test
     void continuesScanningAfterOneCorruptRow() {
         UUID corruptId = UUID.fromString("00000000-0000-0000-0000-000000000003");
-        when(reminderRepository.findDue(NOW, properties.getScanBatchSize()))
+        when(reminderRepository.findDue(TENANT_ID, NOW, properties.getScanBatchSize()))
                 .thenReturn(List.of(
                         row(corruptId, "FREQ=BOGUS", OCCURRENCE, 0L),
                         row(REMINDER_ID, "FREQ=DAILY", OCCURRENCE, 5L)));
         when(firedOccurrenceStore.claim(REMINDER_ID, OCCURRENCE))
                 .thenReturn(FiredOccurrenceStore.Claim.CLAIMED);
-        when(reminderRepository.advance(REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(1);
+        when(reminderRepository.advance(TENANT_ID, REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(1);
 
         service.dispatchDue();
 
@@ -201,36 +203,36 @@ class ReminderDueServiceTest {
 
     @Test
     void lostOptimisticLockDoesNotFailTheScan() {
-        when(reminderRepository.findDue(NOW, properties.getScanBatchSize()))
+        when(reminderRepository.findDue(TENANT_ID, NOW, properties.getScanBatchSize()))
                 .thenReturn(List.of(row(REMINDER_ID, "FREQ=DAILY", OCCURRENCE, 5L)));
         when(firedOccurrenceStore.claim(REMINDER_ID, OCCURRENCE))
                 .thenReturn(FiredOccurrenceStore.Claim.CLAIMED);
-        when(reminderRepository.advance(REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(0);
+        when(reminderRepository.advance(TENANT_ID, REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(0);
 
         service.dispatchDue();
 
         verify(reminderDuePublisher).publish(any());
-        verify(reminderRepository).advance(REMINDER_ID, 5L, NEXT, OCCURRENCE);
+        verify(reminderRepository).advance(TENANT_ID, REMINDER_ID, 5L, NEXT, OCCURRENCE);
     }
 
     @Test
     void usesConfiguredBatchSize() {
         properties.setScanBatchSize(7);
-        when(reminderRepository.findDue(NOW, 7)).thenReturn(List.of());
+        when(reminderRepository.findDue(TENANT_ID, NOW, 7)).thenReturn(List.of());
 
         service.dispatchDue();
 
-        verify(reminderRepository).findDue(NOW, 7);
+        verify(reminderRepository).findDue(TENANT_ID, NOW, 7);
     }
 
     @Test
     void keepsExistingTraceIdInPublishedEvent() {
         TraceIdContext.set("4bf92f3577b34da6a3ce929d0e0e4736");
-        when(reminderRepository.findDue(NOW, properties.getScanBatchSize()))
+        when(reminderRepository.findDue(TENANT_ID, NOW, properties.getScanBatchSize()))
                 .thenReturn(List.of(row(REMINDER_ID, "FREQ=DAILY", OCCURRENCE, 5L)));
         when(firedOccurrenceStore.claim(REMINDER_ID, OCCURRENCE))
                 .thenReturn(FiredOccurrenceStore.Claim.CLAIMED);
-        when(reminderRepository.advance(REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(1);
+        when(reminderRepository.advance(TENANT_ID, REMINDER_ID, 5L, NEXT, OCCURRENCE)).thenReturn(1);
 
         service.dispatchDue();
 

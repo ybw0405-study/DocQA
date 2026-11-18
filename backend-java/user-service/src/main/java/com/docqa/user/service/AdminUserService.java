@@ -4,6 +4,7 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.domain.AppUserRow;
 import com.docqa.user.domain.IdempotencyOperation;
 import com.docqa.user.domain.UserRole;
@@ -57,6 +58,7 @@ public class AdminUserService {
         KeysetCursor keyset = parseCursor(cursor);
 
         List<AppUserRow> rows = userRepository.findPage(
+                tenantId(),
                 status,
                 role,
                 keyset == null ? null : keyset.sortKey(),
@@ -66,7 +68,7 @@ public class AdminUserService {
         List<AppUserRow> page = hasMore ? List.copyOf(rows.subList(0, pageSize)) : rows;
 
         Map<UUID, Set<UserRole>> rolesByUser = roleRepository.findRolesByUserIds(
-                page.stream().map(AppUserRow::id).toList());
+                tenantId(), page.stream().map(AppUserRow::id).toList());
         List<UserSummaryData> items = page.stream()
                 .map(row -> toSummary(row, rolesByUser.getOrDefault(row.id(), Set.of())))
                 .toList();
@@ -80,7 +82,7 @@ public class AdminUserService {
     }
 
     public UserSummaryData get(UUID userId) {
-        return toSummary(requireUser(userId), roleRepository.findRoles(userId));
+        return toSummary(requireUser(userId), roleRepository.findRoles(tenantId(), userId));
     }
 
     public UserSummaryData replaceRoles(
@@ -98,7 +100,7 @@ public class AdminUserService {
                         () -> {
                             rejectSelfLockout(callerId, targetId, roles);
                             requireUser(targetId);
-                            roleRepository.replaceRoles(targetId, roles, clock.instant());
+                            roleRepository.replaceRoles(tenantId(), targetId, roles, clock.instant());
                             return get(targetId);
                         })
                 .response();
@@ -124,7 +126,7 @@ public class AdminUserService {
                             }
                             requireUser(targetId);
                             Instant now = clock.instant();
-                            userRepository.updateStatus(targetId, status, now);
+                            userRepository.updateStatus(tenantId(), targetId, status, now);
                             if (status == UserStatus.DISABLED) {
                                 // 停用必须即时生效：只改状态列等于给被盗账号留 15 分钟可用窗口。
                                 refreshTokenService.revokeAllForUser(targetId);
@@ -145,7 +147,7 @@ public class AdminUserService {
     }
 
     private AppUserRow requireUser(UUID userId) {
-        return userRepository.findById(userId)
+        return userRepository.findById(tenantId(), userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USR_NOT_FOUND_001));
     }
 
@@ -205,5 +207,10 @@ public class AdminUserService {
                 ErrorCode.USR_VALIDATION_001,
                 null,
                 List.of(FieldViolation.of(field, message)));
+    }
+
+    /** P0：管理面暂只看默认租户；P1 改为按管理员可见租户集过滤。 */
+    private UUID tenantId() {
+        return TenantContext.DEFAULT_TENANT_ID;
     }
 }

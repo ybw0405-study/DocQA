@@ -25,6 +25,7 @@ import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
 import com.docqa.common.error.ProblemDetailFactory;
 import com.docqa.common.metrics.BusinessMetrics;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.io.IOException;
 import java.time.Clock;
@@ -231,6 +232,7 @@ public class AskService {
      * 调用方必须在 finally 中按 lockHeld 释放；本方法内部抛出时自行释放。
      */
     private PreparedAsk prepare(UUID userId, UUID conversationId, String key, AskRequest request, boolean stream) {
+        UUID tenantId = TenantContext.require();
         String question = validateQuestion(request);
         List<UUID> documentIds = validateDocumentIds(request.documentIds());
         Instant startedAt = clock.instant();
@@ -243,7 +245,7 @@ public class AskService {
         Optional<IdempotencyRecord> existing = idempotencyStore.find(userId, conversationId, key);
         if (existing.isPresent()) {
             return new PreparedAsk(
-                    userId, conversationId, key, fingerprint, question, documentIds,
+                    userId, tenantId, conversationId, key, fingerprint, question, documentIds,
                     List.of(), List.of(), null, traceId, startedAt, false, stream,
                     Optional.of(replayOrConflict(existing.get(), fingerprint)), Optional.empty());
         }
@@ -255,20 +257,20 @@ public class AskService {
             existing = idempotencyStore.find(userId, conversationId, key);
             if (existing.isPresent()) {
                 return new PreparedAsk(
-                        userId, conversationId, key, fingerprint, question, documentIds,
+                        userId, tenantId, conversationId, key, fingerprint, question, documentIds,
                         List.of(), List.of(), null, traceId, startedAt, true, stream,
                         Optional.of(replayOrConflict(existing.get(), fingerprint)), Optional.empty());
             }
             List<AuthorizedDocument> documents = documentScopeService.resolve(userId, documentIds);
             conversationService.ensureOwned(conversationId, userId, documentIds);
             if (killSwitch.isActive()) {
-                handleKillSwitch(userId, conversationId, traceId, startedAt);
+                handleKillSwitch(tenantId, userId, conversationId, traceId, startedAt);
             }
             // 准入即计数：幂等重放已在上面返回；Kill Switch 拒绝的请求不消耗配额；缓存命中仍计 1 次问答（D-155）。
             quotaGuard.reserve(userId);
 
             PiiMaskingResult masked = piiMasker.mask(question);
-            List<QaCacheService.PythonHistoryMessageMask> history = loadHistory(conversationId);
+            List<QaCacheService.PythonHistoryMessageMask> history = loadHistory(tenantId, conversationId);
             Optional<CachedAnswer> usable = qaCacheService
                     .find(userId, documents, history, masked.masked())
                     .filter(AskService.this::isUsable);
@@ -276,7 +278,7 @@ public class AskService {
             // 未命中，若把这种记成 hit，缓存命中率会虚高而实际几乎没有缓存收益。
             metrics.qaCacheLookup(usable.isPresent());
             return new PreparedAsk(
-                    userId, conversationId, key, fingerprint, question, documentIds,
+                    userId, tenantId, conversationId, key, fingerprint, question, documentIds,
                     documents, history, masked, traceId, startedAt, true, stream,
                     Optional.empty(), usable);
         } catch (RuntimeException ex) {
@@ -361,14 +363,14 @@ public class AskService {
             throw new BusinessException(ex.getErrorCode(), ex.getMessage());
         } catch (BusinessException ex) {
             recordFailure(
-                    prepared.userId(), prepared.conversationId(), execution.userMessageId(),
+                    prepared.tenantId(), prepared.userId(), prepared.conversationId(), execution.userMessageId(),
                     prepared.traceId(), prepared.startedAt(),
                     ex.getErrorCode().code(), protocolEvents(prepared, ex));
             markIdempotencyFailed(prepared, ex.getErrorCode());
             throw ex;
         } catch (RuntimeException ex) {
             recordFailure(
-                    prepared.userId(), prepared.conversationId(), execution.userMessageId(),
+                    prepared.tenantId(), prepared.userId(), prepared.conversationId(), execution.userMessageId(),
                     prepared.traceId(), prepared.startedAt(),
                     ErrorCode.COM_INTERNAL_001.code(),
                     List.of(auditEventFactory.failed(
@@ -396,6 +398,7 @@ public class AskService {
         try {
             transactionRunner.execute(() -> {
                 messageRepository.insert(
+                        prepared.tenantId(),
                         userMessageId,
                         prepared.conversationId(),
                         "USER",
@@ -405,7 +408,7 @@ public class AskService {
                         prepared.traceId(),
                         toJson(Map.of("documentIds", prepared.documentIds())),
                         userMessageAt);
-                conversationRepository.touch(prepared.conversationId(), userMessageAt);
+                conversationRepository.touch(prepared.tenantId(), prepared.conversationId(), userMessageAt);
             });
         } catch (DuplicateKeyException ex) {
             markIdempotencyFailed(prepared, ErrorCode.AGT_CONFLICT_001);
@@ -468,7 +471,8 @@ public class AskService {
                         latencyMs(prepared.startedAt(), assistantMessageAt),
                         0, "OK", true));
         AgentExecution execution = new AgentExecution(
-                UUID.randomUUID(), prepared.traceId(), prepared.userId(), prepared.conversationId(),
+                UUID.randomUUID(), prepared.tenantId(), prepared.traceId(), prepared.userId(),
+                prepared.conversationId(),
                 userMessageId, assistantMessageId,
                 "SUCCESS", "OK", pythonProperties.getTokenBudget(), 0, 0, 0, true,
                 latencyMs(prepared.startedAt(), assistantMessageAt), null, events,
@@ -476,16 +480,17 @@ public class AskService {
         try {
             transactionRunner.execute(() -> {
                 messageRepository.insert(
-                        userMessageId, prepared.conversationId(), "USER", prepared.question(),
+                        prepared.tenantId(), userMessageId, prepared.conversationId(), "USER", prepared.question(),
                         estimateTokens(prepared.question()),
                         prepared.key(), prepared.traceId(),
                         toJson(Map.of("documentIds", prepared.documentIds())), userMessageAt);
                 messageRepository.insert(
-                        assistantMessageId, prepared.conversationId(), "ASSISTANT", cached.answer(), 0,
+                        prepared.tenantId(), assistantMessageId, prepared.conversationId(), "ASSISTANT",
+                        cached.answer(), 0,
                         null, prepared.traceId(), toJson(Map.of("citations", cached.citations())),
                         assistantMessageAt);
-                conversationRepository.touch(prepared.conversationId(), assistantMessageAt);
-                agentExecutionRepository.insert(execution);
+                conversationRepository.touch(prepared.tenantId(), prepared.conversationId(), assistantMessageAt);
+                agentExecutionRepository.insert(prepared.tenantId(), execution);
             });
         } catch (RuntimeException ex) {
             markIdempotencyFailed(prepared, ErrorCode.AGT_INTERNAL_001);
@@ -522,6 +527,7 @@ public class AskService {
                 cacheHit));
         AgentExecution execution = new AgentExecution(
                 UUID.randomUUID(),
+                prepared.tenantId(),
                 prepared.traceId(),
                 prepared.userId(),
                 prepared.conversationId(),
@@ -543,6 +549,7 @@ public class AskService {
         try {
             transactionRunner.execute(() -> {
                 messageRepository.insert(
+                        prepared.tenantId(),
                         assistantMessageId,
                         prepared.conversationId(),
                         "ASSISTANT",
@@ -552,8 +559,8 @@ public class AskService {
                         prepared.traceId(),
                         toJson(Map.of("citations", validated.citations())),
                         assistantAt);
-                conversationRepository.touch(prepared.conversationId(), assistantAt);
-                agentExecutionRepository.insert(execution);
+                conversationRepository.touch(prepared.tenantId(), prepared.conversationId(), assistantAt);
+                agentExecutionRepository.insert(prepared.tenantId(), execution);
             });
         } catch (RuntimeException ex) {
             throw new BusinessException(ErrorCode.AGT_INTERNAL_001, "Unable to persist agent execution", ex);
@@ -605,12 +612,13 @@ public class AskService {
                 prepared.traceId(), prepared.userId(), prepared.conversationId(),
                 latencyMs(prepared.startedAt()), ex.getErrorCode().code()));
         recordFailure(
-                prepared.userId(), prepared.conversationId(), userMessageId, prepared.traceId(),
-                prepared.startedAt(), ex.getErrorCode().code(), events);
+                prepared.tenantId(), prepared.userId(), prepared.conversationId(), userMessageId,
+                prepared.traceId(), prepared.startedAt(), ex.getErrorCode().code(), events);
         markIdempotencyFailed(prepared, ex.getErrorCode());
     }
 
     private void recordFailure(
+            UUID tenantId,
             UUID userId,
             UUID conversationId,
             UUID requestMessageId,
@@ -621,6 +629,7 @@ public class AskService {
         Instant finishedAt = clock.instant();
         AgentExecution execution = new AgentExecution(
                 UUID.randomUUID(),
+                tenantId,
                 traceId,
                 userId,
                 conversationId,
@@ -640,19 +649,20 @@ public class AskService {
                 finishedAt,
                 finishedAt);
         try {
-            transactionRunner.execute(() -> agentExecutionRepository.insert(execution));
+            transactionRunner.execute(() -> agentExecutionRepository.insert(tenantId, execution));
         } catch (RuntimeException ex) {
             LOGGER.error("Unable to persist failure execution: traceId={}, code={}", traceId, errorCode);
         }
     }
 
-    private void handleKillSwitch(UUID userId, UUID conversationId, String traceId, Instant startedAt) {
+    private void handleKillSwitch(UUID tenantId, UUID userId, UUID conversationId, String traceId,
+            Instant startedAt) {
         List<AuditEvent> events = List.of(
                 auditEventFactory.killSwitch(traceId, userId, conversationId),
                 auditEventFactory.failed(
                         traceId, userId, conversationId, latencyMs(startedAt), ErrorCode.AGT_UPSTREAM_003.code()));
         recordFailure(
-                userId, conversationId, null, traceId, startedAt,
+                tenantId, userId, conversationId, null, traceId, startedAt,
                 ErrorCode.AGT_UPSTREAM_003.code(), events);
         throw new BusinessException(ErrorCode.AGT_UPSTREAM_003);
     }
@@ -694,8 +704,9 @@ public class AskService {
                 pythonHistory);
     }
 
-    private List<QaCacheService.PythonHistoryMessageMask> loadHistory(UUID conversationId) {
-        List<StoredMessage> messages = messageRepository.findRecent(conversationId, agentProperties.getHistoryLimit());
+    private List<QaCacheService.PythonHistoryMessageMask> loadHistory(UUID tenantId, UUID conversationId) {
+        List<StoredMessage> messages = messageRepository.findRecent(
+                tenantId, conversationId, agentProperties.getHistoryLimit());
         List<QaCacheService.PythonHistoryMessageMask> newestFirst = new ArrayList<>();
         int remaining = agentProperties.getHistoryMaxChars();
         for (int index = messages.size() - 1; index >= 0; index--) {
@@ -978,7 +989,7 @@ public class AskService {
                 // 落库 / 校验失败：与非流式 executeFresh 的 BusinessException 分支逐字段一致，
                 // 但 meta 已发，只能以 error 帧表达
                 recordFailure(
-                        prepared.userId(), prepared.conversationId(), userMessageId,
+                        prepared.tenantId(), prepared.userId(), prepared.conversationId(), userMessageId,
                         prepared.traceId(), prepared.startedAt(),
                         ex.getErrorCode().code(), protocolEvents(prepared, ex));
                 markIdempotencyFailed(prepared, ex.getErrorCode());
@@ -986,7 +997,7 @@ public class AskService {
                 completeEmitter();
             } catch (RuntimeException ex) {
                 recordFailure(
-                        prepared.userId(), prepared.conversationId(), userMessageId,
+                        prepared.tenantId(), prepared.userId(), prepared.conversationId(), userMessageId,
                         prepared.traceId(), prepared.startedAt(),
                         ErrorCode.COM_INTERNAL_001.code(),
                         List.of(auditEventFactory.failed(

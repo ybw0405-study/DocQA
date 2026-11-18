@@ -9,10 +9,10 @@ import java.util.UUID;
 
 public interface RoleRepository {
 
-    Set<UserRole> findRoles(UUID userId);
+    Set<UserRole> findRoles(UUID tenantId, UUID userId);
 
     /** 列表页按整页 id 批量取角色，避免逐行 N+1 查询。 */
-    Map<UUID, Set<UserRole>> findRolesByUserIds(Collection<UUID> userIds);
+    Map<UUID, Set<UserRole>> findRolesByUserIds(UUID tenantId, Collection<UUID> userIds);
 
-    void replaceRoles(UUID userId, Set<UserRole> roles, Instant createdAt);
+    void replaceRoles(UUID tenantId, UUID userId, Set<UserRole> roles, Instant createdAt);
 }

@@ -24,7 +24,8 @@ public class JdbcUserRepository implements UserRepository {
 
     private static final String PUBLIC_COLUMNS = "id, username, status, last_login_at, created_at";
 
-    private static final String CREDENTIAL_SELECT = "SELECT id, username, password_hash, status FROM app_user WHERE ";
+    private static final String CREDENTIAL_SELECT =
+            "SELECT id, username, password_hash, status FROM app_user WHERE tenant_id = ? AND ";
 
     private static final RowMapper<UserCredentials> CREDENTIAL_MAPPER = (rs, rowNum) -> new UserCredentials(
             UUID.fromString(rs.getString("id")),
@@ -46,46 +47,49 @@ public class JdbcUserRepository implements UserRepository {
     }
 
     @Override
-    public Optional<UserCredentials> findCredentialsByUsername(String username) {
+    public Optional<UserCredentials> findCredentialsByUsername(UUID tenantId, String username) {
         return jdbcTemplate.query(
                         CREDENTIAL_SELECT + " username = ?",
                         CREDENTIAL_MAPPER,
-                        username)
+                        tenantId.toString(), username)
                 .stream()
                 .findFirst();
     }
 
     @Override
-    public Optional<UserCredentials> findCredentialsById(UUID id) {
+    public Optional<UserCredentials> findCredentialsById(UUID tenantId, UUID id) {
         return jdbcTemplate.query(
                         CREDENTIAL_SELECT + " id = ?",
                         CREDENTIAL_MAPPER,
-                        id.toString())
+                        tenantId.toString(), id.toString())
                 .stream()
                 .findFirst();
     }
 
     @Override
-    public Optional<AppUserRow> findById(UUID id) {
+    public Optional<AppUserRow> findById(UUID tenantId, UUID id) {
         return jdbcTemplate.query(
-                        "SELECT " + PUBLIC_COLUMNS + " FROM app_user WHERE id = ?",
+                        "SELECT " + PUBLIC_COLUMNS + " FROM app_user WHERE tenant_id = ? AND id = ?",
                         ROW_MAPPER,
-                        id.toString())
+                        tenantId.toString(), id.toString())
                 .stream()
                 .findFirst();
     }
 
     @Override
-    public List<AppUserRow> findPage(UserStatus status, UserRole role, Instant beforeCreatedAt, UUID beforeId,
-            int limit) {
-        StringBuilder sql = new StringBuilder("SELECT ").append(PUBLIC_COLUMNS).append(" FROM app_user u WHERE 1 = 1");
+    public List<AppUserRow> findPage(UUID tenantId, UserStatus status, UserRole role,
+            Instant beforeCreatedAt, UUID beforeId, int limit) {
+        StringBuilder sql = new StringBuilder("SELECT ").append(PUBLIC_COLUMNS)
+                .append(" FROM app_user u WHERE u.tenant_id = ?");
         List<Object> args = new ArrayList<>();
+        args.add(tenantId.toString());
         if (status != null) {
             sql.append(" AND u.status = ?");
             args.add(status.name());
         }
         if (role != null) {
-            sql.append(" AND EXISTS (SELECT 1 FROM app_user_role r WHERE r.user_id = u.id AND r.role = ?)");
+            sql.append(" AND EXISTS (SELECT 1 FROM app_user_role r"
+                    + " WHERE r.tenant_id = u.tenant_id AND r.user_id = u.id AND r.role = ?)");
             args.add(role.name());
         }
         if (beforeCreatedAt != null && beforeId != null) {
@@ -101,20 +105,23 @@ public class JdbcUserRepository implements UserRepository {
     }
 
     @Override
-    public boolean existsByUsername(String username) {
+    public boolean existsByUsername(UUID tenantId, String username) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM app_user WHERE username = ?", Integer.class, username);
+                "SELECT COUNT(*) FROM app_user WHERE tenant_id = ? AND username = ?",
+                Integer.class, tenantId.toString(), username);
         return count != null && count > 0;
     }
 
     @Override
     @Transactional
-    public void insert(NewUser user, Set<UserRole> roles) {
+    public void insert(UUID tenantId, NewUser user, Set<UserRole> roles) {
         Timestamp createdAt = Timestamp.from(user.createdAt());
         jdbcTemplate.update("""
-                        INSERT INTO app_user (id, username, password_hash, status, last_login_at, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, NULL, ?, ?)
+                        INSERT INTO app_user
+                          (tenant_id, id, username, password_hash, status, last_login_at, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
                         """,
+                tenantId.toString(),
                 user.id().toString(),
                 user.username(),
                 user.passwordHash(),
@@ -123,7 +130,8 @@ public class JdbcUserRepository implements UserRepository {
                 createdAt);
         for (UserRole role : roles) {
             jdbcTemplate.update(
-                    "INSERT INTO app_user_role (user_id, role, created_at) VALUES (?, ?, ?)",
+                    "INSERT INTO app_user_role (tenant_id, user_id, role, created_at) VALUES (?, ?, ?, ?)",
+                    tenantId.toString(),
                     user.id().toString(),
                     role.name(),
                     createdAt);
@@ -131,28 +139,31 @@ public class JdbcUserRepository implements UserRepository {
     }
 
     @Override
-    public int updateStatus(UUID id, UserStatus status, Instant updatedAt) {
+    public int updateStatus(UUID tenantId, UUID id, UserStatus status, Instant updatedAt) {
         return jdbcTemplate.update(
-                "UPDATE app_user SET status = ?, updated_at = ? WHERE id = ?",
+                "UPDATE app_user SET status = ?, updated_at = ? WHERE tenant_id = ? AND id = ?",
                 status.name(),
                 Timestamp.from(updatedAt),
+                tenantId.toString(),
                 id.toString());
     }
 
     @Override
-    public int updatePasswordHash(UUID id, String passwordHash, Instant updatedAt) {
+    public int updatePasswordHash(UUID tenantId, UUID id, String passwordHash, Instant updatedAt) {
         return jdbcTemplate.update(
-                "UPDATE app_user SET password_hash = ?, updated_at = ? WHERE id = ?",
+                "UPDATE app_user SET password_hash = ?, updated_at = ? WHERE tenant_id = ? AND id = ?",
                 passwordHash,
                 Timestamp.from(updatedAt),
+                tenantId.toString(),
                 id.toString());
     }
 
     @Override
-    public int touchLastLogin(UUID id, Instant lastLoginAt) {
+    public int touchLastLogin(UUID tenantId, UUID id, Instant lastLoginAt) {
         return jdbcTemplate.update(
-                "UPDATE app_user SET last_login_at = ? WHERE id = ?",
+                "UPDATE app_user SET last_login_at = ? WHERE tenant_id = ? AND id = ?",
                 Timestamp.from(lastLoginAt),
+                tenantId.toString(),
                 id.toString());
     }
 

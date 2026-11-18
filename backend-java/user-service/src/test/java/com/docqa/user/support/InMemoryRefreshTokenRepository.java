@@ -18,19 +18,19 @@ public class InMemoryRefreshTokenRepository implements RefreshTokenRepository {
     private final Map<UUID, RefreshTokenRow> rows = new LinkedHashMap<>();
 
     @Override
-    public void insert(RefreshTokenRow token) {
+    public void insert(UUID tenantId, RefreshTokenRow token) {
         rows.put(token.id(), token);
     }
 
     @Override
-    public Optional<RefreshTokenRow> findByHash(String tokenHash) {
+    public Optional<RefreshTokenRow> findByHash(UUID tenantId, String tokenHash) {
         return rows.values().stream()
                 .filter(row -> row.tokenHash().equals(tokenHash))
                 .findFirst();
     }
 
     @Override
-    public int consumeActive(UUID id, Instant now) {
+    public int consumeActive(UUID tenantId, UUID id, Instant now) {
         RefreshTokenRow row = rows.get(id);
         if (row == null || row.status() != RefreshTokenStatus.ACTIVE) {
             return 0;
@@ -40,12 +40,12 @@ public class InMemoryRefreshTokenRepository implements RefreshTokenRepository {
     }
 
     @Override
-    public int revokeFamily(UUID familyId, Instant now) {
+    public int revokeFamily(UUID tenantId, UUID familyId, Instant now) {
         return revokeActive(row -> row.familyId().equals(familyId));
     }
 
     @Override
-    public int revokeAllActiveForUser(UUID userId, Instant now) {
+    public int revokeAllActiveForUser(UUID tenantId, UUID userId, Instant now) {
         return revokeActive(row -> row.userId().equals(userId));
     }
 

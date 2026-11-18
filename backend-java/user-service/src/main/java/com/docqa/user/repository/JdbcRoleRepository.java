@@ -27,11 +27,11 @@ public class JdbcRoleRepository implements RoleRepository {
     }
 
     @Override
-    public Set<UserRole> findRoles(UUID userId) {
+    public Set<UserRole> findRoles(UUID tenantId, UUID userId) {
         List<UserRole> roles = jdbcTemplate.query(
-                "SELECT role FROM app_user_role WHERE user_id = ? ORDER BY role",
+                "SELECT role FROM app_user_role WHERE tenant_id = ? AND user_id = ? ORDER BY role",
                 (ResultSet rs, int rowNum) -> UserRole.from(rs.getString("role")),
-                userId.toString());
+                tenantId.toString(), userId.toString());
         if (roles.isEmpty()) {
             return Set.of();
         }
@@ -39,7 +39,7 @@ public class JdbcRoleRepository implements RoleRepository {
     }
 
     @Override
-    public Map<UUID, Set<UserRole>> findRolesByUserIds(Collection<UUID> userIds) {
+    public Map<UUID, Set<UserRole>> findRolesByUserIds(UUID tenantId, Collection<UUID> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return Map.of();
         }
@@ -47,29 +47,39 @@ public class JdbcRoleRepository implements RoleRepository {
         String placeholders = ids.stream().map(id -> "?").collect(Collectors.joining(", "));
         Map<UUID, Set<UserRole>> result = new HashMap<>();
         jdbcTemplate.query(
-                "SELECT user_id, role FROM app_user_role WHERE user_id IN (" + placeholders + ") ORDER BY user_id, role",
+                "SELECT user_id, role FROM app_user_role WHERE tenant_id = ? AND user_id IN ("
+                        + placeholders + ") ORDER BY user_id, role",
                 (ResultSet rs) -> {
                     UUID userId = UUID.fromString(rs.getString("user_id"));
                     result.computeIfAbsent(userId, key -> EnumSet.noneOf(UserRole.class))
                             .add(UserRole.from(rs.getString("role")));
                 },
-                ids.toArray());
+                buildArgs(tenantId, ids));
         return Map.copyOf(result);
     }
 
     @Override
     @Transactional
-    public void replaceRoles(UUID userId, Set<UserRole> roles, Instant createdAt) {
-        jdbcTemplate.update("DELETE FROM app_user_role WHERE user_id = ?", userId.toString());
+    public void replaceRoles(UUID tenantId, UUID userId, Set<UserRole> roles, Instant createdAt) {
+        jdbcTemplate.update(
+                "DELETE FROM app_user_role WHERE tenant_id = ? AND user_id = ?",
+                tenantId.toString(), userId.toString());
         // 整集替换必须是「删干净再插」的单个原子动作，否则中途失败会留下半套权限。
         Set<UserRole> ordered = new LinkedHashSet<>(roles);
         Timestamp created = Timestamp.from(createdAt);
         for (UserRole role : ordered) {
             jdbcTemplate.update(
-                    "INSERT INTO app_user_role (user_id, role, created_at) VALUES (?, ?, ?)",
-                    userId.toString(),
-                    role.name(),
-                    created);
+                    "INSERT INTO app_user_role (tenant_id, user_id, role, created_at) VALUES (?, ?, ?, ?)",
+                    tenantId.toString(), userId.toString(), role.name(), created);
         }
+    }
+
+    private static Object[] buildArgs(UUID tenantId, List<String> userIds) {
+        Object[] args = new Object[userIds.size() + 1];
+        args[0] = tenantId.toString();
+        for (int i = 0; i < userIds.size(); i++) {
+            args[i + 1] = userIds.get(i);
+        }
+        return args;
     }
 }

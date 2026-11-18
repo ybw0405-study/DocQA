@@ -15,6 +15,7 @@ import com.docqa.agentgateway.repository.AdminAuditEntry;
 import com.docqa.agentgateway.repository.AdminAuditRepository;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.time.Clock;
 import java.time.Instant;
@@ -98,7 +99,7 @@ class AdminAiControlsServiceTest {
         order.verify(controlsStore).writeKillSwitch(true, ADMIN_ID, NOW);
         order.verify(killSwitch).refresh(true);
         ArgumentCaptor<AdminAuditEntry> captor = ArgumentCaptor.forClass(AdminAuditEntry.class);
-        order.verify(auditRepository).insert(captor.capture());
+        order.verify(auditRepository).insert(org.mockito.ArgumentMatchers.eq(TenantContext.DEFAULT_TENANT_ID), captor.capture());
 
         AdminAuditEntry entry = captor.getValue();
         assertThat(entry.id()).isNotNull();
@@ -120,7 +121,7 @@ class AdminAiControlsServiceTest {
         verify(controlsStore).writeKillSwitch(false, ADMIN_ID, NOW);
         verify(killSwitch).refresh(false);
         ArgumentCaptor<AdminAuditEntry> captor = ArgumentCaptor.forClass(AdminAuditEntry.class);
-        verify(auditRepository).insert(captor.capture());
+        verify(auditRepository).insert(org.mockito.ArgumentMatchers.eq(TenantContext.DEFAULT_TENANT_ID), captor.capture());
         assertThat(captor.getValue().eventType())
                 .isEqualTo(AdminAiControlsService.EVENT_KILL_SWITCH_DISABLED);
         assertThat(captor.getValue().severity()).isEqualTo("INFO");
@@ -129,7 +130,7 @@ class AdminAiControlsServiceTest {
     @Test
     void auditFailureReportsAnInternalErrorAfterTheStateWasApplied() {
         doThrow(new IllegalStateException("audit database unavailable"))
-                .when(auditRepository).insert(any());
+                .when(auditRepository).insert(any(), any());
 
         BusinessException failure = catchThrowableOfType(
                 () -> service.updateKillSwitch(ADMIN_ID, true),
@@ -139,7 +140,7 @@ class AdminAiControlsServiceTest {
         assertThat(failure.getDetail()).contains("已变更");
         verify(controlsStore).writeKillSwitch(true, ADMIN_ID, NOW);
         verify(killSwitch).refresh(true);
-        verify(auditRepository).insert(any());
+        verify(auditRepository).insert(any(), any());
     }
 
     private void stubAppliedState(boolean active) {

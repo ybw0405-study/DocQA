@@ -18,16 +18,16 @@ public class JdbcAuditEventRepository implements AuditEventRepository {
 
     static final String INSERT_SQL = """
             INSERT INTO audit_event (
-                id, trace_id, user_id, event_type, agent_name,
+                tenant_id, id, trace_id, user_id, event_type, agent_name,
                 source, severity, payload_redacted, occurred_at, ingested_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     static final String SELECT_BY_TRACE_SQL = """
             SELECT id, trace_id, user_id, event_type, agent_name,
                    source, severity, payload_redacted, occurred_at, ingested_at
             FROM audit_event
-            WHERE trace_id = ?
+            WHERE tenant_id = ? AND trace_id = ?
             ORDER BY occurred_at ASC, id ASC
             LIMIT ?
             """;
@@ -44,9 +44,10 @@ public class JdbcAuditEventRepository implements AuditEventRepository {
     }
 
     @Override
-    public void insert(AuditEventRow event) {
+    public void insert(UUID tenantId, AuditEventRow event) {
         jdbcTemplate.update(
                 INSERT_SQL,
+                tenantId.toString(),
                 event.id().toString(),
                 event.traceId(),
                 event.userId().toString(),
@@ -60,10 +61,11 @@ public class JdbcAuditEventRepository implements AuditEventRepository {
     }
 
     @Override
-    public List<AuditEventRow> findByTraceId(String traceId, int limit) {
+    public List<AuditEventRow> findByTraceId(UUID tenantId, String traceId, int limit) {
         return jdbcTemplate.query(
                 SELECT_BY_TRACE_SQL,
                 (resultSet, rowNumber) -> mapRow(resultSet),
+                tenantId.toString(),
                 traceId,
                 limit);
     }

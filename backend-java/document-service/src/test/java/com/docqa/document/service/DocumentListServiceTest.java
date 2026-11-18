@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.docqa.common.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
@@ -34,6 +35,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +45,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class DocumentListServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID FIRST_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID SECOND_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -72,6 +75,7 @@ class DocumentListServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.set(TENANT_ID);
         DocumentProperties documentProperties = new DocumentProperties();
         documentProperties.setSessionTtl(Duration.ofMinutes(45));
         documentProperties.setDefaultMaxRetry(3);
@@ -94,12 +98,17 @@ class DocumentListServiceTest {
                 minioProperties);
     }
 
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
     @Test
     void returnsItemsWithBatchedChunkCountsAndTags() {
-        when(documentRepository.findUserPage(eq(USER_ID), isNull(), isNull(), isNull(), isNull(), isNull(), eq(3)))
+        when(documentRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), isNull(), isNull(), isNull(), eq(3)))
                 .thenReturn(List.of(row(FIRST_ID, DocumentStatus.INDEXED), row(SECOND_ID, DocumentStatus.UPLOADED)));
-        when(chunkRepository.countByDocuments(any())).thenReturn(Map.of(FIRST_ID, 42L));
-        when(tagRepository.findNamesByDocuments(any())).thenReturn(Map.of(FIRST_ID, List.of("考研数学")));
+        when(chunkRepository.countByDocuments(eq(TENANT_ID), any())).thenReturn(Map.of(FIRST_ID, 42L));
+        when(tagRepository.findNamesByDocuments(eq(TENANT_ID), any())).thenReturn(Map.of(FIRST_ID, List.of("考研数学")));
 
         DocumentListData data = documentService.list(USER_ID, null, null, null, null, 2);
 
@@ -115,19 +124,19 @@ class DocumentListServiceTest {
         assertThat(data.items().get(1).errorCode()).isEqualTo("DOC-PARSE-001");
         assertThat(data.items().get(1).tags()).isEmpty();
         assertThat(data.items().get(1).chunkCount()).isZero();
-        verify(chunkRepository).countByDocuments(List.of(FIRST_ID, SECOND_ID));
-        verify(tagRepository).findNamesByDocuments(List.of(FIRST_ID, SECOND_ID));
+        verify(chunkRepository).countByDocuments(TENANT_ID, List.of(FIRST_ID, SECOND_ID));
+        verify(tagRepository).findNamesByDocuments(TENANT_ID, List.of(FIRST_ID, SECOND_ID));
     }
 
     @Test
     void exposesNextCursorFromTheLastReturnedRowNotTheLookaheadRow() {
-        when(documentRepository.findUserPage(eq(USER_ID), isNull(), isNull(), isNull(), isNull(), isNull(), eq(3)))
+        when(documentRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), isNull(), isNull(), isNull(), eq(3)))
                 .thenReturn(List.of(
                         row(FIRST_ID, DocumentStatus.INDEXED),
                         row(SECOND_ID, DocumentStatus.PARSING),
                         row(LOOKAHEAD_ID, DocumentStatus.FAILED)));
-        when(chunkRepository.countByDocuments(any())).thenReturn(Map.of());
-        when(tagRepository.findNamesByDocuments(any())).thenReturn(Map.of());
+        when(chunkRepository.countByDocuments(eq(TENANT_ID), any())).thenReturn(Map.of());
+        when(tagRepository.findNamesByDocuments(eq(TENANT_ID), any())).thenReturn(Map.of());
 
         DocumentListData data = documentService.list(USER_ID, null, null, null, null, 2);
 
@@ -135,14 +144,14 @@ class DocumentListServiceTest {
         KeysetCursor cursor = KeysetCursor.decode(data.nextCursor()).orElseThrow();
         assertThat(cursor.id()).isEqualTo(SECOND_ID);
         assertThat(cursor.sortKey()).isEqualTo(CREATED_AT);
-        verify(chunkRepository).countByDocuments(List.of(FIRST_ID, SECOND_ID));
-        verify(tagRepository).findNamesByDocuments(List.of(FIRST_ID, SECOND_ID));
+        verify(chunkRepository).countByDocuments(TENANT_ID, List.of(FIRST_ID, SECOND_ID));
+        verify(tagRepository).findNamesByDocuments(TENANT_ID, List.of(FIRST_ID, SECOND_ID));
     }
 
     @Test
     void passesStatusSearchTagAndCursorDownToTheRepository() {
         String token = KeysetCursor.of(CREATED_AT.minusSeconds(60), USER_ID).encode();
-        when(documentRepository.findUserPage(eq(USER_ID), eq(DocumentStatus.FAILED), eq("高数"), eq("考研数学"),
+        when(documentRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), eq(DocumentStatus.FAILED), eq("高数"), eq("考研数学"),
                 eq(CREATED_AT.minusSeconds(60)), eq(USER_ID), eq(21)))
                 .thenReturn(List.of());
 
@@ -154,25 +163,25 @@ class DocumentListServiceTest {
 
     @Test
     void blankSearchAndTagFiltersBehaveAsAbsent() {
-        when(documentRepository.findUserPage(eq(USER_ID), isNull(), isNull(), isNull(), isNull(), isNull(), eq(21)))
+        when(documentRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), isNull(), isNull(), isNull(), eq(21)))
                 .thenReturn(List.of());
 
         documentService.list(USER_ID, null, "   ", "  ", null, 20);
 
-        verify(documentRepository).findUserPage(
+        verify(documentRepository).findUserPage(eq(TENANT_ID), 
                 eq(USER_ID), isNull(), isNull(), isNull(), isNull(), isNull(), eq(21));
     }
 
     @Test
     void tagFilterIsNormalizedBeforeItReachesTheRepository() {
         String normalized = TagNormalizer.of("  考研   数学 ").normalized();
-        when(documentRepository.findUserPage(eq(USER_ID), isNull(), isNull(), eq(normalized),
+        when(documentRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), eq(normalized),
                 isNull(), isNull(), eq(21)))
                 .thenReturn(List.of());
 
         documentService.list(USER_ID, null, null, "  考研   数学 ", null, 20);
 
-        verify(documentRepository).findUserPage(
+        verify(documentRepository).findUserPage(eq(TENANT_ID), 
                 eq(USER_ID), isNull(), isNull(), eq(normalized), isNull(), isNull(), eq(21));
     }
 

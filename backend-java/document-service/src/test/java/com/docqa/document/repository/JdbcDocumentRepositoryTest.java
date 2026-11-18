@@ -10,6 +10,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
 import com.docqa.document.domain.VectorConsistency;
@@ -26,6 +27,7 @@ import org.springframework.jdbc.core.RowMapper;
 
 class JdbcDocumentRepositoryTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID CURSOR_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -37,12 +39,12 @@ class JdbcDocumentRepositoryTest {
 
     @Test
     void firstPageBindsOnlyTheUserAndTheLimitAndAlwaysExcludesDeleted() {
-        repository.findUserPage(USER_ID, null, null, null, null, null, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, null, null, null, null, null, 21);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq(USER_ID.toString()), eq(21));
+        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq(TENANT_ID.toString()), eq(USER_ID.toString()), eq(21));
         String sql = sqlCaptor.getValue();
-        assertThat(sql).contains("FROM document d WHERE d.user_id = ?");
+        assertThat(sql).contains("FROM document d WHERE d.tenant_id = ? AND d.user_id = ?");
         assertThat(sql).contains("AND d.deleted_at IS NULL");
         assertThat(sql).contains("ORDER BY d.created_at DESC, d.id DESC LIMIT ?");
         assertThat(sql).doesNotContain("d.status = ?");
@@ -52,12 +54,13 @@ class JdbcDocumentRepositoryTest {
 
     @Test
     void statusFilterAndKeysetCursorAreBothBoundAsPlaceholders() {
-        repository.findUserPage(USER_ID, DocumentStatus.FAILED, null, null, CURSOR_AT, CURSOR_ID, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, DocumentStatus.FAILED, null, null, CURSOR_AT, CURSOR_ID, 21);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(
                 sqlCaptor.capture(),
                 any(RowMapper.class),
+                eq(TENANT_ID.toString()),
                 eq(USER_ID.toString()),
                 eq("FAILED"),
                 eq(Timestamp.from(CURSOR_AT)),
@@ -73,12 +76,13 @@ class JdbcDocumentRepositoryTest {
 
     @Test
     void keywordFilterBindsOneEscapedPatternTwice() {
-        repository.findUserPage(USER_ID, null, "100%_搞定\\期末", null, null, null, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, null, "100%_搞定\\期末", null, null, null, 21);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(
                 sqlCaptor.capture(),
                 any(RowMapper.class),
+                eq(TENANT_ID.toString()),
                 eq(USER_ID.toString()),
                 eq("%100\\%\\_搞定\\\\期末%"),
                 eq("%100\\%\\_搞定\\\\期末%"),
@@ -88,37 +92,41 @@ class JdbcDocumentRepositoryTest {
 
     @Test
     void tagFilterResolvesByNameInsideTheOwningUserOnly() {
-        repository.findUserPage(USER_ID, null, null, "考研数学", null, null, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, null, null, "考研数学", null, null, 21);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(
                 sqlCaptor.capture(),
                 any(RowMapper.class),
+                eq(TENANT_ID.toString()),
                 eq(USER_ID.toString()),
+                eq(TENANT_ID.toString()),
+                eq(TENANT_ID.toString()),
                 eq(USER_ID.toString()),
                 eq("考研数学"),
                 eq(21));
         assertThat(sqlCaptor.getValue())
                 .contains("AND EXISTS (SELECT 1 FROM document_tag_link l JOIN document_tag t ON t.id = l.tag_id")
-                .contains("WHERE l.document_id = d.id AND t.user_id = ? AND t.normalized_name = ?");
+                .contains("WHERE l.document_id = d.id AND l.tenant_id = ? AND t.tenant_id = ? AND t.user_id = ? AND t.normalized_name = ?");
     }
 
     @Test
     void halfCursorIsIgnoredInsteadOfLeakingTheWholeTable() {
-        repository.findUserPage(USER_ID, null, null, null, CURSOR_AT, null, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, null, null, null, CURSOR_AT, null, 21);
 
-        verify(jdbcTemplate).query(anyString(), any(RowMapper.class), eq(USER_ID.toString()), eq(21));
+        verify(jdbcTemplate).query(anyString(), any(RowMapper.class), eq(TENANT_ID.toString()), eq(USER_ID.toString()), eq(21));
     }
 
     @Test
     void markIndexedWritesVectorColumnsOnlyWhenTheEventCarriesThem() {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        repository.markIndexed(DOCUMENT_ID, "v2", 42L, NOW);
+        repository.markIndexed(TENANT_ID, DOCUMENT_ID, "v2", 42L, NOW);
         verify(jdbcTemplate).update(
                 sqlCaptor.capture(),
                 eq(Timestamp.from(NOW)),
                 eq(42L),
                 eq(Timestamp.from(NOW)),
+                eq(TENANT_ID.toString()),
                 eq(DOCUMENT_ID.toString()),
                 eq("v2"));
         assertThat(sqlCaptor.getValue())
@@ -126,10 +134,11 @@ class JdbcDocumentRepositoryTest {
                 .contains("AND status = 'PARSING' AND index_version = ? AND deleted_at IS NULL");
 
         ArgumentCaptor<String> withoutRows = ArgumentCaptor.forClass(String.class);
-        repository.markIndexed(DOCUMENT_ID, "v2", null, NOW);
+        repository.markIndexed(TENANT_ID, DOCUMENT_ID, "v2", null, NOW);
         verify(jdbcTemplate).update(
                 withoutRows.capture(),
                 eq(Timestamp.from(NOW)),
+                eq(TENANT_ID.toString()),
                 eq(DOCUMENT_ID.toString()),
                 eq("v2"));
         assertThat(withoutRows.getValue()).doesNotContain("vector_rows");
@@ -138,19 +147,20 @@ class JdbcDocumentRepositoryTest {
     @Test
     void promotePendingIndexVersionGuardsOnThePendingColumnNotOnStatus() {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        repository.promotePendingIndexVersion(DOCUMENT_ID, "v3", 7L, NOW);
+        repository.promotePendingIndexVersion(TENANT_ID, DOCUMENT_ID, "v3", 7L, NOW);
 
         verify(jdbcTemplate).update(
                 sqlCaptor.capture(),
                 eq(Timestamp.from(NOW)),
                 eq(7L),
                 eq(Timestamp.from(NOW)),
+                eq(TENANT_ID.toString()),
                 eq(DOCUMENT_ID.toString()),
                 eq("v3"));
         String sql = sqlCaptor.getValue();
         assertThat(sql).contains("index_version = pending_index_version");
         assertThat(sql).contains("pending_index_version = NULL");
-        assertThat(sql).contains("WHERE id = ?");
+        assertThat(sql).contains("WHERE tenant_id = ? AND id = ?");
         assertThat(sql).contains("AND pending_index_version = ?");
         assertThat(sql).contains("AND deleted_at IS NULL");
         assertThat(sql).doesNotContain("status = 'PARSING'");
@@ -159,12 +169,13 @@ class JdbcDocumentRepositoryTest {
     @Test
     void abortReindexKeepsIndexedStatusAndClearsOnlyThePendingVersion() {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        repository.abortReindex(DOCUMENT_ID, "v3", "DOC-PARSE-001", "重建索引失败，已保留原索引版本，可稍后再次发起重建。");
+        repository.abortReindex(TENANT_ID, DOCUMENT_ID, "v3", "DOC-PARSE-001", "重建索引失败，已保留原索引版本，可稍后再次发起重建。");
 
         verify(jdbcTemplate).update(
                 sqlCaptor.capture(),
                 eq("DOC-PARSE-001"),
                 eq("重建索引失败，已保留原索引版本，可稍后再次发起重建。"),
+                eq(TENANT_ID.toString()),
                 eq(DOCUMENT_ID.toString()),
                 eq("v3"));
         String sql = sqlCaptor.getValue();
@@ -177,12 +188,13 @@ class JdbcDocumentRepositoryTest {
     @Test
     void beginReindexKeepsTheDocumentIndexed() {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        repository.beginReindex(DOCUMENT_ID, USER_ID, "v2", NOW);
+        repository.beginReindex(TENANT_ID, DOCUMENT_ID, USER_ID, "v2", NOW);
 
         verify(jdbcTemplate).update(
                 sqlCaptor.capture(),
                 eq("v2"),
                 eq(Timestamp.from(NOW)),
+                eq(TENANT_ID.toString()),
                 eq(DOCUMENT_ID.toString()),
                 eq(USER_ID.toString()));
         String sql = sqlCaptor.getValue();
@@ -194,21 +206,21 @@ class JdbcDocumentRepositoryTest {
     @Test
     void vectorConfirmationIsOnlyWritableForDeletedDocuments() {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        repository.recordVectorConfirmation(DOCUMENT_ID, 0L, NOW);
+        repository.recordVectorConfirmation(TENANT_ID, DOCUMENT_ID, 0L, NOW);
 
         verify(jdbcTemplate).update(
-                sqlCaptor.capture(), eq(0L), eq(Timestamp.from(NOW)), eq(DOCUMENT_ID.toString()));
-        assertThat(sqlCaptor.getValue()).contains("WHERE id = ? AND deleted_at IS NOT NULL");
+                sqlCaptor.capture(), eq(0L), eq(Timestamp.from(NOW)), eq(TENANT_ID.toString()), eq(DOCUMENT_ID.toString()));
+        assertThat(sqlCaptor.getValue()).contains("WHERE tenant_id = ? AND id = ? AND deleted_at IS NOT NULL");
     }
 
     @Test
     void softDeleteAndManualRetryCarryTheirOwnStateGuards() {
-        repository.softDelete(DOCUMENT_ID, USER_ID, NOW);
-        repository.resetRetryAndMarkParsing(DOCUMENT_ID, USER_ID, NOW);
+        repository.softDelete(TENANT_ID, DOCUMENT_ID, USER_ID, NOW);
+        repository.resetRetryAndMarkParsing(TENANT_ID, DOCUMENT_ID, USER_ID, NOW);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate, times(2)).update(
-                sqlCaptor.capture(), eq(Timestamp.from(NOW)), eq(DOCUMENT_ID.toString()), eq(USER_ID.toString()));
+                sqlCaptor.capture(), eq(Timestamp.from(NOW)), eq(TENANT_ID.toString()), eq(DOCUMENT_ID.toString()), eq(USER_ID.toString()));
         List<String> statements = sqlCaptor.getAllValues();
         String deleteSql = statements.stream().filter(sql -> sql.contains("deleted_at = ?"))
                 .findFirst().orElseThrow();
@@ -226,25 +238,25 @@ class JdbcDocumentRepositoryTest {
     @Test
     void ownedReadsFilterDeletedRowsButMd5LookupDoesNot() {
         ArgumentCaptor<String> owned = ArgumentCaptor.forClass(String.class);
-        repository.findByIdAndUser(DOCUMENT_ID, USER_ID);
+        repository.findByIdAndUser(TENANT_ID, DOCUMENT_ID, USER_ID);
         verify(jdbcTemplate).query(
-                owned.capture(), any(RowMapper.class), eq(DOCUMENT_ID.toString()), eq(USER_ID.toString()));
+                owned.capture(), any(RowMapper.class), eq(TENANT_ID.toString()), eq(DOCUMENT_ID.toString()), eq(USER_ID.toString()));
         assertThat(owned.getValue()).contains("AND deleted_at IS NULL");
 
         ArgumentCaptor<String> byMd5 = ArgumentCaptor.forClass(String.class);
-        repository.findByUserAndMd5(USER_ID, "0123456789abcdef0123456789abcdef");
+        repository.findByUserAndMd5(TENANT_ID, USER_ID, "0123456789abcdef0123456789abcdef");
         verify(jdbcTemplate).query(
-                byMd5.capture(), any(RowMapper.class), eq(USER_ID.toString()), eq("0123456789abcdef0123456789abcdef"));
+                byMd5.capture(), any(RowMapper.class), eq(TENANT_ID.toString()), eq(USER_ID.toString()), eq("0123456789abcdef0123456789abcdef"));
         assertThat(byMd5.getValue()).doesNotContain("deleted_at IS NULL");
     }
 
     @Test
     void deletionSweepSelectsTheCrashWindowOnly() {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        repository.findUnconfirmedDeletions(CURSOR_AT, 50);
+        repository.findUnconfirmedDeletions(TENANT_ID, CURSOR_AT, 50);
 
         verify(jdbcTemplate).query(
-                sqlCaptor.capture(), any(RowMapper.class), eq(Timestamp.from(CURSOR_AT)), eq(50));
+                sqlCaptor.capture(), any(RowMapper.class), eq(TENANT_ID.toString()), eq(Timestamp.from(CURSOR_AT)), eq(50));
         assertThat(sqlCaptor.getValue())
                 .contains("deleted_at IS NOT NULL")
                 .contains("AND deleted_at < ?")
@@ -254,12 +266,12 @@ class JdbcDocumentRepositoryTest {
     @Test
     void staleReindexScanIsIndependentFromTheParsingScan() {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        repository.findStaleReindex(CURSOR_AT, 50);
+        repository.findStaleReindex(TENANT_ID, CURSOR_AT, 50);
 
         verify(jdbcTemplate).query(
-                sqlCaptor.capture(), any(RowMapper.class), eq(Timestamp.from(CURSOR_AT)), eq(50));
+                sqlCaptor.capture(), any(RowMapper.class), eq(TENANT_ID.toString()), eq(Timestamp.from(CURSOR_AT)), eq(50));
         String sql = sqlCaptor.getValue();
-        assertThat(sql).contains("WHERE pending_index_version IS NOT NULL");
+        assertThat(sql).contains("WHERE tenant_id = ? AND pending_index_version IS NOT NULL");
         assertThat(sql).doesNotContain("status = 'PARSING'");
     }
 
@@ -289,11 +301,12 @@ class JdbcDocumentRepositoryTest {
                 CURSOR_AT,
                 CURSOR_AT.plusSeconds(60));
 
-        repository.insert(document);
+        repository.insert(TENANT_ID, document);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).update(
                 sqlCaptor.capture(),
+                eq(TENANT_ID.toString()),
                 eq(DOCUMENT_ID.toString()),
                 eq(USER_ID.toString()),
                 eq("calculus-notes.pdf"),
@@ -323,10 +336,10 @@ class JdbcDocumentRepositoryTest {
 
     @Test
     void mapsEveryListedColumnIncludingTheCursorSortKey() throws Exception {
-        repository.findUserPage(USER_ID, null, null, null, null, null, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, null, null, null, null, null, 21);
 
         ArgumentCaptor<RowMapper<DocumentRow>> mapperCaptor = mapperCaptor();
-        verify(jdbcTemplate).query(anyString(), mapperCaptor.capture(), eq(USER_ID.toString()), eq(21));
+        verify(jdbcTemplate).query(anyString(), mapperCaptor.capture(), eq(TENANT_ID.toString()), eq(USER_ID.toString()), eq(21));
         DocumentRow row = mapperCaptor.getValue().mapRow(resultSet(false), 0);
 
         assertThat(row.id()).isEqualTo(DOCUMENT_ID);
@@ -347,10 +360,10 @@ class JdbcDocumentRepositoryTest {
 
     @Test
     void nullVectorRowsStayNullInsteadOfBecomingZero() throws Exception {
-        repository.findUserPage(USER_ID, null, null, null, null, null, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, null, null, null, null, null, 21);
 
         ArgumentCaptor<RowMapper<DocumentRow>> mapperCaptor = mapperCaptor();
-        verify(jdbcTemplate).query(anyString(), mapperCaptor.capture(), eq(USER_ID.toString()), eq(21));
+        verify(jdbcTemplate).query(anyString(), mapperCaptor.capture(), eq(TENANT_ID.toString()), eq(USER_ID.toString()), eq(21));
         DocumentRow row = mapperCaptor.getValue().mapRow(resultSet(true), 0);
 
         assertThat(row.vectorRows()).isNull();

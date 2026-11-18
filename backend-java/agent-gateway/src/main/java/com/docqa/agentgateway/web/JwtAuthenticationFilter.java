@@ -6,6 +6,7 @@ import com.docqa.agentgateway.service.JwtAuthenticator;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
 import com.docqa.common.error.ProblemDetailFactory;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.web.PublicPaths;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -62,7 +63,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
             request.setAttribute(USER_ID_ATTRIBUTE, user.userId());
-            filterChain.doFilter(request, response);
+            request.setAttribute(TenantContext.REQUEST_ATTRIBUTE, user.tenantId());
+            TenantContext.set(user.tenantId());
+            try {
+                filterChain.doFilter(request, response);
+            } finally {
+                TenantContext.clear();
+            }
         } catch (BusinessException ex) {
             writeProblem(request, response, ErrorCode.USR_AUTH_001);
         }

@@ -2,6 +2,7 @@ package com.docqa.agentgateway.service;
 
 import com.docqa.agentgateway.config.JwtProperties;
 import com.docqa.common.error.BusinessException;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.error.ErrorCode;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -70,8 +71,20 @@ public class JwtAuthenticator {
             if (revocationStore.isRevoked(tokenId, userId, issuedAt.toInstant())) {
                 throw new BusinessException(ErrorCode.USR_AUTH_001);
             }
-            return new AuthenticatedUser(userId, parseRoles(claims));
+            return new AuthenticatedUser(userId, parseTenantId(claims), parseRoles(claims));
         } catch (JwtException | IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.USR_AUTH_001);
+        }
+    }
+
+    private UUID parseTenantId(Claims claims) {
+        Object raw = claims.get(TenantContext.CLAIM_NAME);
+        if (!(raw instanceof String value) || value.isBlank()) {
+            throw new BusinessException(ErrorCode.USR_AUTH_001);
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ex) {
             throw new BusinessException(ErrorCode.USR_AUTH_001);
         }
     }

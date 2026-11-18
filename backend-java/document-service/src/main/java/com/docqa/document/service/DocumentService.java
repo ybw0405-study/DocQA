@@ -6,6 +6,7 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.document.config.DocumentProperties;
 import com.docqa.document.config.MinioProperties;
@@ -184,7 +185,7 @@ public class DocumentService {
                 DocumentStatusData.class, () -> {
                     DocumentRow document = requireOwnedDocument(documentId, userId);
                     if (transactionRunner.execute(
-                            () -> documentRepository.updateTitle(document.id(), userId, title)) == 0) {
+                            () -> documentRepository.updateTitle(TenantContext.require(), document.id(), userId, title)) == 0) {
                         throw lostDocument(documentId, userId);
                     }
                     return view(userId, document.id());
@@ -207,8 +208,8 @@ public class DocumentService {
                     DocumentRow document = requireOwnedDocument(documentId, userId);
                     Instant now = clock.instant();
                     transactionRunner.execute(() -> {
-                        Map<String, UUID> ids = tagRepository.resolveOrCreate(userId, tags, now);
-                        tagRepository.replaceLinks(document.id(),
+                        Map<String, UUID> ids = tagRepository.resolveOrCreate(TenantContext.require(), userId, tags, now);
+                        tagRepository.replaceLinks(TenantContext.require(), document.id(),
                                 tags.stream().map(tag -> ids.get(tag.normalized())).toList(), now);
                         return Boolean.TRUE;
                     });
@@ -228,8 +229,8 @@ public class DocumentService {
             }
             Instant now = clock.instant();
             transactionRunner.execute(() -> {
-                chunkRepository.deleteByDocument(document.id());
-                if (documentRepository.softDelete(document.id(), userId, now) == 0) {
+                chunkRepository.deleteByDocument(TenantContext.require(), document.id());
+                if (documentRepository.softDelete(TenantContext.require(), document.id(), userId, now) == 0) {
                     throw lostDocument(documentId, userId);
                 }
                 return Boolean.TRUE;
@@ -253,7 +254,7 @@ public class DocumentService {
                                 "只有解析失败的文档可以重试，请先查询文档状态。");
                     }
                     Instant now = clock.instant();
-                    if (documentRepository.resetRetryAndMarkParsing(document.id(), userId, now) == 0) {
+                    if (documentRepository.resetRetryAndMarkParsing(TenantContext.require(), document.id(), userId, now) == 0) {
                         throw lostDocument(documentId, userId);
                     }
                     publishRequestedQuietly(document, document.indexVersion(), 0, now);
@@ -281,7 +282,7 @@ public class DocumentService {
                     }
                     String pendingVersion = nextIndexVersion(document.indexVersion());
                     Instant now = clock.instant();
-                    if (documentRepository.beginReindex(document.id(), userId, pendingVersion, now) == 0) {
+                    if (documentRepository.beginReindex(TenantContext.require(), document.id(), userId, pendingVersion, now) == 0) {
                         throw lostDocument(documentId, userId);
                     }
                     publishRequestedQuietly(document, pendingVersion, 0, now);
@@ -301,6 +302,7 @@ public class DocumentService {
         String tagName = parseTagFilter(tagParam);
         KeysetCursor cursor = parseCursor(cursorToken);
         List<DocumentRow> rows = documentRepository.findUserPage(
+                TenantContext.require(),
                 userId,
                 status,
                 keyword,
@@ -311,8 +313,8 @@ public class DocumentService {
         boolean hasMore = rows.size() > limit;
         List<DocumentRow> page = hasMore ? rows.subList(0, limit) : rows;
         List<UUID> pageIds = page.stream().map(DocumentRow::id).toList();
-        Map<UUID, Long> chunkCounts = chunkRepository.countByDocuments(pageIds);
-        Map<UUID, List<String>> tagNames = tagRepository.findNamesByDocuments(pageIds);
+        Map<UUID, Long> chunkCounts = chunkRepository.countByDocuments(TenantContext.require(), pageIds);
+        Map<UUID, List<String>> tagNames = tagRepository.findNamesByDocuments(TenantContext.require(), pageIds);
         List<DocumentListItemData> items = page.stream()
                 .map(row -> new DocumentListItemData(
                         row.id(),
@@ -339,12 +341,12 @@ public class DocumentService {
 
     private DocumentStatusData view(UUID userId, UUID documentId) {
         DocumentRow document = requireOwnedDocument(documentId, userId);
-        long chunkCount = chunkRepository.count(document.id(), document.indexVersion());
+        long chunkCount = chunkRepository.count(TenantContext.require(), document.id(), document.indexVersion());
         return new DocumentStatusData(
                 document.id(),
                 document.fileName(),
                 document.title(),
-                tagRepository.findNames(document.id()),
+                tagRepository.findNames(TenantContext.require(), document.id()),
                 document.status().name(),
                 document.retryCount(),
                 document.maxRetry(),
@@ -362,12 +364,12 @@ public class DocumentService {
     }
 
     private DocumentRow requireOwnedDocument(UUID documentId, UUID userId) {
-        return documentRepository.findByIdAndUser(documentId, userId)
+        return documentRepository.findByIdAndUser(TenantContext.require(), documentId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DOC_NOT_FOUND_001));
     }
 
     private BusinessException lostDocument(UUID documentId, UUID userId) {
-        DocumentRow current = documentRepository.findByIdAndUser(documentId, userId).orElse(null);
+        DocumentRow current = documentRepository.findByIdAndUser(TenantContext.require(), documentId, userId).orElse(null);
         if (current == null) {
             return new BusinessException(ErrorCode.DOC_NOT_FOUND_001);
         }
@@ -513,7 +515,7 @@ public class DocumentService {
     }
 
     private UploadInitResult initByMd5(UUID userId, UploadInitRequest request) {
-        Optional<DocumentRow> existing = documentRepository.findByUserAndMd5(userId, request.md5());
+        Optional<DocumentRow> existing = documentRepository.findByUserAndMd5(TenantContext.require(), userId, request.md5());
         if (existing.isPresent()) {
             return handleExistingDocument(existing.get(), userId, request);
         }
@@ -591,11 +593,11 @@ public class DocumentService {
 
         try {
             transactionRunner.execute(() -> {
-                documentRepository.insert(document);
+                documentRepository.insert(TenantContext.require(), document);
                 return Boolean.TRUE;
             });
         } catch (DuplicateKeyException ex) {
-            return documentRepository.findByUserAndMd5(userId, request.md5())
+            return documentRepository.findByUserAndMd5(TenantContext.require(), userId, request.md5())
                     .map(existing -> handleExistingDocument(existing, userId, request))
                     .orElseThrow(() -> ex);
         }
@@ -614,7 +616,7 @@ public class DocumentService {
                     false);
             return new UploadInitResult(data, true);
         } catch (RuntimeException ex) {
-            documentRepository.deleteByIdAndUser(document.id(), userId);
+            documentRepository.deleteByIdAndUser(TenantContext.require(), document.id(), userId);
             throw ex;
         }
     }
@@ -665,7 +667,7 @@ public class DocumentService {
             String idempotencyKey,
             String fingerprint,
             CompleteUploadRequest request) {
-        DocumentRow document = documentRepository.findByIdAndUser(uploadId, userId)
+        DocumentRow document = documentRepository.findByIdAndUser(TenantContext.require(), uploadId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DOC_NOT_FOUND_001));
         if (document.status() != DocumentStatus.UPLOADED) {
             CompleteUploadData data = currentCompleteData(document);
@@ -717,9 +719,9 @@ public class DocumentService {
 
         Instant now = clock.instant();
         int updated = transactionRunner.execute(
-                () -> documentRepository.markParsing(document.id(), userId, now));
+                () -> documentRepository.markParsing(TenantContext.require(), document.id(), userId, now));
         if (updated == 0) {
-            DocumentRow current = documentRepository.findByIdAndUser(uploadId, userId)
+            DocumentRow current = documentRepository.findByIdAndUser(TenantContext.require(), uploadId, userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.DOC_NOT_FOUND_001));
             CompleteUploadData data = currentCompleteData(current);
             saveIdempotency(

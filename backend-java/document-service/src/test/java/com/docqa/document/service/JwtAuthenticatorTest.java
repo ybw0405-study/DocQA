@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.document.config.JwtProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -50,6 +51,41 @@ class JwtAuthenticatorTest {
         String token = token(UUID.randomUUID().toString(), USER_ID.toString(), ISSUER, AUDIENCE, NOW.plusSeconds(60));
 
         assertThat(authenticator.authenticate("Bearer " + token)).isEqualTo(USER_ID);
+        assertThat(authenticator.authenticateIdentity("Bearer " + token).tenantId())
+                .isEqualTo(TenantContext.DEFAULT_TENANT_ID);
+    }
+
+    @Test
+    void rejectsTokenWithoutTenantClaim() {
+        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String token = Jwts.builder()
+                .subject(USER_ID.toString())
+                .issuer(ISSUER)
+                .audience().add(AUDIENCE).and()
+                .issuedAt(Date.from(NOW.minusSeconds(5)))
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .id(UUID.randomUUID().toString())
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+
+        assertUnauthorized("Bearer " + token);
+    }
+
+    @Test
+    void rejectsNonUuidTenantClaim() {
+        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String token = Jwts.builder()
+                .subject(USER_ID.toString())
+                .issuer(ISSUER)
+                .audience().add(AUDIENCE).and()
+                .issuedAt(Date.from(NOW.minusSeconds(5)))
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .id(UUID.randomUUID().toString())
+                .claim(TenantContext.CLAIM_NAME, "not-a-uuid")
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+
+        assertUnauthorized("Bearer " + token);
     }
 
     @Test
@@ -133,7 +169,8 @@ class JwtAuthenticatorTest {
                 .issuer(issuer)
                 .audience().add(audience).and()
                 .issuedAt(Date.from(NOW.minusSeconds(5)))
-                .expiration(Date.from(expiration));
+                .expiration(Date.from(expiration))
+                .claim(TenantContext.CLAIM_NAME, TenantContext.DEFAULT_TENANT_ID.toString());
         if (jti != null) {
             builder.id(jti);
         }

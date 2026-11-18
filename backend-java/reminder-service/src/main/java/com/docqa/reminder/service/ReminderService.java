@@ -6,6 +6,7 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.config.ReminderProperties;
 import com.docqa.reminder.domain.IdempotencyOperation;
 import com.docqa.reminder.domain.ReminderKind;
@@ -82,6 +83,7 @@ public class ReminderService {
             UUID userId,
             String idempotencyKey,
             ReminderCreateRequest request) {
+        UUID tenantId = TenantContext.require();
         String key = IdempotencyKeys.requireValid(idempotencyKey);
         rateLimiter.check(userId);
         String fingerprint = fingerprint(request);
@@ -102,13 +104,13 @@ public class ReminderService {
         boolean finished = false;
         try {
             ReminderRow row = toRow(userId, key, prepare(request));
-            reminderRepository.insert(row);
+            reminderRepository.insert(tenantId, row);
             ReminderCreateData data = toData(row, false);
             completeIdempotency(userId, key, fingerprint, data);
             finished = true;
             return new CreateReminderResult(data, true);
         } catch (DuplicateKeyException ex) {
-            ReminderRow existingRow = reminderRepository.findByUserAndIdempotencyKey(userId, key)
+            ReminderRow existingRow = reminderRepository.findByUserAndIdempotencyKey(tenantId, userId, key)
                     .orElseThrow(() -> new BusinessException(
                             ErrorCode.COM_INTERNAL_001,
                             "Unable to create reminder",
@@ -244,6 +246,7 @@ public class ReminderService {
     }
 
     public ReminderListData list(UUID userId, String statusParam, String cursorToken, int limit) {
+        UUID tenantId = TenantContext.require();
         if (limit < MIN_PAGE_SIZE || limit > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.COM_VALIDATION_001, "limit out of range",
                     List.of(FieldViolation.of("limit", "must be between 1 and 100")));
@@ -251,6 +254,7 @@ public class ReminderService {
         ReminderStatus status = parseStatusFilter(statusParam);
         KeysetCursor cursor = parseCursor(cursorToken);
         List<ReminderRow> rows = reminderRepository.findUserPage(
+                tenantId,
                 userId,
                 status,
                 cursor == null ? null : cursor.sortKey(),

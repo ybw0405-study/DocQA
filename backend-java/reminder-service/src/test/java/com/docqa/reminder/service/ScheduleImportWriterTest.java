@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.domain.ReminderStatus;
 import com.docqa.reminder.domain.ScheduleImportAction;
@@ -32,6 +33,7 @@ import org.springframework.dao.DuplicateKeyException;
  */
 class ScheduleImportWriterTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID REMINDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final Instant MONDAY = Instant.parse("2026-09-07T00:00:00Z");
@@ -43,27 +45,27 @@ class ScheduleImportWriterTest {
     void createDecisionInsertsThePendingRow() {
         ReminderRow row = row(1);
 
-        writer.persist(List.of(decision(ScheduleImportAction.CREATE, row)));
+        writer.persist(TENANT_ID, List.of(decision(ScheduleImportAction.CREATE, row)));
 
-        verify(reminderRepository).insert(row);
-        verify(reminderRepository, never()).updateFromImport(any());
+        verify(reminderRepository).insert(TENANT_ID, row);
+        verify(reminderRepository, never()).updateFromImport(any(), any());
     }
 
     @Test
     void updateDecisionWritesThroughTheImportUpdateNotAnInsert() {
         ReminderRow row = row(5);
 
-        writer.persist(List.of(decision(ScheduleImportAction.UPDATE, row)));
+        writer.persist(TENANT_ID, List.of(decision(ScheduleImportAction.UPDATE, row)));
 
-        verify(reminderRepository).updateFromImport(row);
-        verify(reminderRepository, never()).insert(any());
+        verify(reminderRepository).updateFromImport(TENANT_ID, row);
+        verify(reminderRepository, never()).insert(any(), any());
     }
 
     @Test
     void unchangedAndStaleDecisionsEmitNoSqlAtAll() {
         // UNCHANGED / STALE 的 row 恒为 null：给它们补一次 insert 就会把「文件比库里更旧」写成覆盖，
         // 这是判定的意义所在，因此断言的是完全没有任何交互，而不是只断言 updateFromImport 没被调。
-        writer.persist(List.of(
+        writer.persist(TENANT_ID, List.of(
                 decision(ScheduleImportAction.UNCHANGED, null),
                 decision(ScheduleImportAction.STALE, null)));
 
@@ -75,20 +77,20 @@ class ScheduleImportWriterTest {
         ReminderRow first = row(1);
         ReminderRow second = row(2);
 
-        writer.persist(List.of(
+        writer.persist(TENANT_ID, List.of(
                 decision(ScheduleImportAction.CREATE, first),
                 decision(ScheduleImportAction.UNCHANGED, null),
                 decision(ScheduleImportAction.UPDATE, second)));
 
         InOrder inOrder = Mockito.inOrder(reminderRepository);
-        inOrder.verify(reminderRepository).insert(first);
-        inOrder.verify(reminderRepository).updateFromImport(second);
+        inOrder.verify(reminderRepository).insert(TENANT_ID, first);
+        inOrder.verify(reminderRepository).updateFromImport(TENANT_ID, second);
         inOrder.verifyNoMoreInteractions();
     }
 
     @Test
     void emptyBatchIsANoOp() {
-        writer.persist(List.of());
+        writer.persist(TENANT_ID, List.of());
 
         verifyNoInteractions(reminderRepository);
     }
@@ -97,15 +99,15 @@ class ScheduleImportWriterTest {
     void sqlFailurePropagatesSoTheTransactionCanRollBack() {
         ReminderRow failing = row(1);
         DuplicateKeyException duplicate = new DuplicateKeyException("Duplicate entry for key 'uk_reminder_user_source'");
-        Mockito.doThrow(duplicate).when(reminderRepository).insert(failing);
+        Mockito.doThrow(duplicate).when(reminderRepository).insert(TENANT_ID, failing);
 
-        assertThatThrownBy(() -> writer.persist(List.of(
+        assertThatThrownBy(() -> writer.persist(TENANT_ID, List.of(
                 decision(ScheduleImportAction.CREATE, failing),
                 decision(ScheduleImportAction.UPDATE, row(2)))))
                 .isSameAs(duplicate);
 
         // 第一行抛错后循环立即结束：第二行不能再被写。整批回滚由代理完成，这里只保证不再追加 SQL。
-        verify(reminderRepository, never()).updateFromImport(any());
+        verify(reminderRepository, never()).updateFromImport(any(), any());
     }
 
     private static ScheduleDecision decision(ScheduleImportAction action, ReminderRow row) {

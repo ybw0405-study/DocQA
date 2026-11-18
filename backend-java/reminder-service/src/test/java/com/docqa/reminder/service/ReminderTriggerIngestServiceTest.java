@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.config.RocketMqProperties;
 import com.docqa.reminder.domain.ReminderTriggerRow;
 import com.docqa.reminder.messaging.MqIdempotencyMarker;
@@ -38,6 +40,7 @@ import org.springframework.dao.DuplicateKeyException;
 @ExtendWith(MockitoExtension.class)
 class ReminderTriggerIngestServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("0192f3a4-7b2c-7d10-9e8f-1234567890ab");
     private static final UUID REMINDER_ID = UUID.fromString("0192f3a4-7b2c-7d10-9e8f-1234567890ac");
     private static final UUID EVENT_ID = UUID.fromString("0192f3a4-7b2c-7d10-9e8f-1234567890ad");
@@ -90,8 +93,8 @@ class ReminderTriggerIngestServiceTest {
 
     @Test
     void duplicateUniqueKeyHitIsAcknowledgedWithoutRewritingTheFirstDelivery() {
-        doThrow(new DuplicateKeyException("uk_reminder_trigger_planned"))
-                .when(reminderTriggerRepository).insert(any());
+        doThrow(new DuplicateKeyException("uk_reminder_trigger_tenant_planned"))
+                .when(reminderTriggerRepository).insert(any(), any());
 
         ReminderTriggerIngestService service = service(NOW);
         assertThatCode(() -> service.ingest(new Draft().event(), MESSAGE_ID)).doesNotThrowAnyException();
@@ -124,7 +127,7 @@ class ReminderTriggerIngestServiceTest {
         ingest(new Draft(), NOW, null);
 
         verifyNoInteractions(idempotencyMarker);
-        verify(reminderTriggerRepository).insert(any());
+        verify(reminderTriggerRepository).insert(any(), any());
     }
 
     @Test
@@ -219,7 +222,7 @@ class ReminderTriggerIngestServiceTest {
     private ReminderTriggerRow ingest(Draft draft, Instant instant, String messageId) {
         service(instant).ingest(draft.event(), messageId);
         ArgumentCaptor<ReminderTriggerRow> captor = ArgumentCaptor.forClass(ReminderTriggerRow.class);
-        verify(reminderTriggerRepository).insert(captor.capture());
+        verify(reminderTriggerRepository).insert(eq(TENANT_ID), captor.capture());
         return captor.getValue();
     }
 

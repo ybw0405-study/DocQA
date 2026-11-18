@@ -16,6 +16,7 @@ import com.docqa.audit.domain.AuditEventRow;
 import com.docqa.audit.dto.AuditEventMessage;
 import com.docqa.audit.idempotency.MqIdempotencyStore;
 import com.docqa.audit.repository.AuditEventRepository;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -33,6 +34,7 @@ import org.springframework.dao.DuplicateKeyException;
 @ExtendWith(MockitoExtension.class)
 class AuditEventServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID EVENT_ID = UUID.fromString("0192f3a4-a1b2-7c33-9d01-1234567890ab");
     private static final UUID USER_ID = UUID.fromString("0192f3a4-7b2c-7d10-9e8f-1234567890ab");
     private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
@@ -61,7 +63,7 @@ class AuditEventServiceTest {
         AuditEventService.IngestOutcome outcome = service.ingest(message(), null);
 
         ArgumentCaptor<AuditEventRow> captor = ArgumentCaptor.forClass(AuditEventRow.class);
-        verify(repository).insert(captor.capture());
+        verify(repository).insert(eq(TENANT_ID), captor.capture());
         AuditEventRow row = captor.getValue();
         assertThat(row.id()).isEqualTo(EVENT_ID);
         assertThat(row.traceId()).isEqualTo(TRACE_ID);
@@ -82,13 +84,13 @@ class AuditEventServiceTest {
         AuditEventService.IngestOutcome outcome = service.ingest(message(), null);
 
         assertThat(outcome).isEqualTo(AuditEventService.IngestOutcome.DUPLICATE);
-        verify(repository, never()).insert(any());
+        verify(repository, never()).insert(any(), any());
     }
 
     @Test
     void treatsADatabaseDuplicateAsSuccessAndRefreshesTheRedisMarker() {
         when(idempotencyStore.isProcessed(EVENT_ID)).thenReturn(false);
-        doThrow(new DuplicateKeyException("duplicate")).when(repository).insert(any());
+        doThrow(new DuplicateKeyException("duplicate")).when(repository).insert(any(), any());
 
         AuditEventService.IngestOutcome outcome = service.ingest(message(), null);
 
@@ -111,7 +113,7 @@ class AuditEventServiceTest {
     @Test
     void propagatesStorageFailuresSoTheConsumerCanRetry() {
         when(idempotencyStore.isProcessed(EVENT_ID)).thenReturn(false);
-        doThrow(new IllegalStateException("database down")).when(repository).insert(any());
+        doThrow(new IllegalStateException("database down")).when(repository).insert(any(), any());
 
         assertThatThrownBy(() -> service.ingest(message(), null))
                 .isInstanceOf(IllegalStateException.class)
@@ -120,21 +122,21 @@ class AuditEventServiceTest {
 
     @Test
     void queriesByNormalizedTraceIdWithTheDefaultLimit() {
-        when(repository.findByTraceId(TRACE_ID, properties.getQueryDefaultLimit())).thenReturn(List.of());
+        when(repository.findByTraceId(TENANT_ID, TRACE_ID, properties.getQueryDefaultLimit())).thenReturn(List.of());
 
         List<AuditEventRow> result = service.findByTraceId(TRACE_ID.toUpperCase(), null);
 
         assertThat(result).isEmpty();
-        verify(repository).findByTraceId(TRACE_ID, properties.getQueryDefaultLimit());
+        verify(repository).findByTraceId(TENANT_ID, TRACE_ID, properties.getQueryDefaultLimit());
     }
 
     @Test
     void queriesByTraceIdWithAnExplicitLimit() {
-        when(repository.findByTraceId(eq(TRACE_ID), eq(25))).thenReturn(List.of());
+        when(repository.findByTraceId(eq(TENANT_ID), eq(TRACE_ID), eq(25))).thenReturn(List.of());
 
         service.findByTraceId(TRACE_ID, 25);
 
-        verify(repository).findByTraceId(TRACE_ID, 25);
+        verify(repository).findByTraceId(TENANT_ID, TRACE_ID, 25);
     }
 
     @Test
@@ -147,7 +149,7 @@ class AuditEventServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> service.findByTraceId(TRACE_ID, properties.getQueryMaxLimit() + 1))
                 .isInstanceOf(IllegalArgumentException.class);
-        verify(repository, never()).findByTraceId(any(), anyInt());
+        verify(repository, never()).findByTraceId(any(), any(), anyInt());
     }
 
     private AuditEventMessage message() {

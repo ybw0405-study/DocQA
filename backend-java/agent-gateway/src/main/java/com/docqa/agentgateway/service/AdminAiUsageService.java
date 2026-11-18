@@ -9,9 +9,11 @@ import com.docqa.agentgateway.repository.AiUsageRepository;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
@@ -50,10 +52,13 @@ public class AdminAiUsageService {
                     List.of(FieldViolation.of("topUsers", "must be between 1 and 50")));
         }
         AdminQueryWindow window = AdminQueryWindow.resolve(from, to, clock, true);
-        UsageTotals totals = usageRepository.totals(window.from(), window.to());
-        List<UsageDayPoint> byDay = usageRepository.byDay(window.from(), window.to());
-        List<UsageStatusCount> byStatus = sortStatuses(usageRepository.byStatus(window.from(), window.to()));
-        List<UsageTopUser> top = usageRepository.topUsers(window.from(), window.to(), topUsers);
+        // P0: 管理面跨租户聚合暂用默认租户，P1 改为按管理员可见租户集过滤
+        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
+        UsageTotals totals = usageRepository.totals(tenantId, window.from(), window.to());
+        List<UsageDayPoint> byDay = usageRepository.byDay(tenantId, window.from(), window.to());
+        List<UsageStatusCount> byStatus =
+                sortStatuses(usageRepository.byStatus(tenantId, window.from(), window.to()));
+        List<UsageTopUser> top = usageRepository.topUsers(tenantId, window.from(), window.to(), topUsers);
         return new UsageSummary(window.from(), window.to(), BUCKET_DAY, totals, byDay, byStatus, top);
     }
 

@@ -32,31 +32,36 @@ public class JdbcConversationRepository implements ConversationRepository {
     }
 
     @Override
-    public boolean existsById(UUID id) {
+    public boolean existsById(UUID tenantId, UUID id) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM conversation WHERE id = ?",
+                "SELECT COUNT(*) FROM conversation WHERE tenant_id = ? AND id = ?",
                 Integer.class,
+                tenantId.toString(),
                 id.toString());
         return count != null && count > 0;
     }
 
     @Override
-    public boolean existsByIdAndUser(UUID id, UUID userId) {
+    public boolean existsByIdAndUser(UUID tenantId, UUID id, UUID userId) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM conversation WHERE id = ? AND user_id = ?",
+                "SELECT COUNT(*) FROM conversation WHERE tenant_id = ? AND id = ? AND user_id = ?",
                 Integer.class,
+                tenantId.toString(),
                 id.toString(),
                 userId.toString());
         return count != null && count > 0;
     }
 
     @Override
-    public boolean createOwned(UUID id, UUID userId, String title, List<UUID> documentScopeIds, Instant now) {
+    public boolean createOwned(UUID tenantId, UUID id, UUID userId, String title, List<UUID> documentScopeIds,
+            Instant now) {
         try {
             jdbcTemplate.update(
                     "INSERT INTO conversation "
-                            + "(id, user_id, title, document_scope_ids, last_message_at, created_at, updated_at) "
-                            + "VALUES (?, ?, ?, ?, NULL, ?, ?)",
+                            + "(tenant_id, id, user_id, title, document_scope_ids, last_message_at, created_at, "
+                            + "updated_at) "
+                            + "VALUES (?, ?, ?, ?, ?, NULL, ?, ?)",
+                    tenantId.toString(),
                     id.toString(),
                     userId.toString(),
                     title,
@@ -70,22 +75,24 @@ public class JdbcConversationRepository implements ConversationRepository {
     }
 
     @Override
-    public void touch(UUID id, Instant now) {
+    public void touch(UUID tenantId, UUID id, Instant now) {
         jdbcTemplate.update(
-                "UPDATE conversation SET last_message_at = ? WHERE id = ?",
+                "UPDATE conversation SET last_message_at = ? WHERE tenant_id = ? AND id = ?",
                 Timestamp.from(now),
+                tenantId.toString(),
                 id.toString());
     }
 
     @Override
-    public List<ConversationListRow> findUserPage(UUID userId, Instant beforeLastMessageAt, UUID beforeId,
-            boolean beforeNullGroup, int limit) {
+    public List<ConversationListRow> findUserPage(UUID tenantId, UUID userId, Instant beforeLastMessageAt,
+            UUID beforeId, boolean beforeNullGroup, int limit) {
         StringBuilder sql = new StringBuilder("""
                         SELECT id, title, document_scope_ids, last_message_at, created_at
                         FROM conversation
-                        WHERE user_id = ?
+                        WHERE tenant_id = ? AND user_id = ?
                         """);
         List<Object> args = new ArrayList<>();
+        args.add(tenantId.toString());
         args.add(userId.toString());
         if (beforeNullGroup) {
             sql.append(" AND (last_message_at IS NULL AND id < ?)");

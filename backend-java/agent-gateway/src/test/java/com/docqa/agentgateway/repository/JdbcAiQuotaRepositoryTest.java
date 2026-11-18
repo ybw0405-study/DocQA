@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.docqa.agentgateway.dto.AiQuota;
+import com.docqa.common.tenant.TenantContext;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -21,6 +22,7 @@ import org.springframework.jdbc.core.RowMapper;
 
 class JdbcAiQuotaRepositoryTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
     private static final UUID CURSOR_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
     private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
@@ -32,34 +34,38 @@ class JdbcAiQuotaRepositoryTest {
     @Test
     void resolvesUsernameFromTheIdentityTable() {
         when(jdbcTemplate.query(
-                eq(JdbcAiQuotaRepository.FIND_USERNAME_SQL), any(RowMapper.class), eq(USER_ID.toString())))
+                eq(JdbcAiQuotaRepository.FIND_USERNAME_SQL), any(RowMapper.class),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString())))
                 .thenReturn(List.of("zhang.wei"));
 
-        assertThat(repository.findUsername(USER_ID)).contains("zhang.wei");
+        assertThat(repository.findUsername(TENANT_ID, USER_ID)).contains("zhang.wei");
         verify(jdbcTemplate).query(
-                eq(JdbcAiQuotaRepository.FIND_USERNAME_SQL), any(RowMapper.class), eq(USER_ID.toString()));
+                eq(JdbcAiQuotaRepository.FIND_USERNAME_SQL), any(RowMapper.class),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString()));
     }
 
     @Test
     void reportsAbsentUsersAsEmpty() {
         when(jdbcTemplate.query(
-                eq(JdbcAiQuotaRepository.FIND_USERNAME_SQL), any(RowMapper.class), eq(USER_ID.toString())))
+                eq(JdbcAiQuotaRepository.FIND_USERNAME_SQL), any(RowMapper.class),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString())))
                 .thenReturn(List.of());
 
-        assertThat(repository.findUsername(USER_ID)).isEmpty();
+        assertThat(repository.findUsername(TENANT_ID, USER_ID)).isEmpty();
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void readsOneQuotaByPrimaryKeyWithTheUsernameJoin() {
-        repository.findByUserId(USER_ID);
+        repository.findByUserId(TENANT_ID, USER_ID);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq(USER_ID.toString()));
+        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString()));
         String sql = sqlCaptor.getValue();
         assertThat(sql).contains("FROM ai_quota q");
-        assertThat(sql).contains("JOIN app_user u ON u.id = q.user_id");
-        assertThat(sql).contains("WHERE q.user_id = ?");
+        assertThat(sql).contains("JOIN app_user u ON u.id = q.user_id AND u.tenant_id = q.tenant_id");
+        assertThat(sql).contains("WHERE q.tenant_id = ? AND q.user_id = ?");
         assertThat(sql).doesNotContain("*");
         assertThat(sql).doesNotContain(USER_ID.toString());
     }
@@ -67,10 +73,10 @@ class JdbcAiQuotaRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void firstPageOrdersByUpdatedAtThenUserId() {
-        repository.findPage(null, null, 51);
+        repository.findPage(TENANT_ID, null, null, 51);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq(51));
+        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq(TENANT_ID.toString()), eq(51));
         String sql = sqlCaptor.getValue();
         assertThat(sql).contains("ORDER BY q.updated_at DESC, q.user_id DESC LIMIT ?");
         assertThat(sql).doesNotContain("q.updated_at < ?");
@@ -80,40 +86,43 @@ class JdbcAiQuotaRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void cursorKeepsUpdatedAtThenUserIdOrderStrictly() {
-        repository.findPage(UPDATED_AT, CURSOR_ID, 51);
+        repository.findPage(TENANT_ID, UPDATED_AT, CURSOR_ID, 51);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(
                 sqlCaptor.capture(),
                 any(RowMapper.class),
+                eq(TENANT_ID.toString()),
                 eq(Timestamp.from(UPDATED_AT)),
                 eq(Timestamp.from(UPDATED_AT)),
                 eq(CURSOR_ID.toString()),
                 eq(51));
         String sql = sqlCaptor.getValue();
-        assertThat(sql).contains("WHERE (q.updated_at < ? OR (q.updated_at = ? AND q.user_id < ?))");
+        assertThat(sql).contains("WHERE q.tenant_id = ? AND (q.updated_at < ? OR (q.updated_at = ? AND q.user_id < ?))");
         assertThat(sql).doesNotContain(CURSOR_ID.toString());
         assertThat(sql).doesNotContain(UPDATED_AT.toString());
     }
 
     @Test
     void halfCursorFallsBackToTheFirstPage() {
-        repository.findPage(null, CURSOR_ID, 51);
+        repository.findPage(TENANT_ID, null, CURSOR_ID, 51);
 
-        verify(jdbcTemplate).query(any(String.class), any(RowMapper.class), eq(51));
+        verify(jdbcTemplate).query(any(String.class), any(RowMapper.class), eq(TENANT_ID.toString()), eq(51));
     }
 
     @Test
     void upsertReplacesBothLimitsAndProvenance() {
-        repository.upsert(USER_ID, 30L, 60_000L, ADMIN_ID, UPDATED_AT);
+        repository.upsert(TENANT_ID, USER_ID, 30L, 60_000L, ADMIN_ID, UPDATED_AT);
 
         ArgumentCaptor<Object[]> captor = ArgumentCaptor.forClass(Object[].class);
         verify(jdbcTemplate).update(eq(JdbcAiQuotaRepository.UPSERT_SQL), captor.capture());
         Object[] args = captor.getValue();
         assertThat(args).containsExactly(
-                USER_ID.toString(), 30L, 60_000L, Timestamp.from(UPDATED_AT), ADMIN_ID.toString());
+                TENANT_ID.toString(), USER_ID.toString(), 30L, 60_000L, Timestamp.from(UPDATED_AT),
+                ADMIN_ID.toString());
         String sql = JdbcAiQuotaRepository.UPSERT_SQL;
         assertThat(sql).startsWith("INSERT INTO ai_quota");
+        assertThat(sql).contains("(tenant_id, user_id, daily_question_limit, daily_token_limit, updated_at, updated_by)");
         assertThat(sql).contains("ON DUPLICATE KEY UPDATE");
         assertThat(sql).contains("daily_question_limit = VALUES(daily_question_limit)");
         assertThat(sql).contains("daily_token_limit = VALUES(daily_token_limit)");
@@ -123,18 +132,19 @@ class JdbcAiQuotaRepositoryTest {
 
     @Test
     void clearingAQuotaDeletesTheRow() {
-        repository.delete(USER_ID);
+        repository.delete(TENANT_ID, USER_ID);
 
-        verify(jdbcTemplate).update(JdbcAiQuotaRepository.DELETE_SQL, USER_ID.toString());
-        assertThat(JdbcAiQuotaRepository.DELETE_SQL).isEqualTo("DELETE FROM ai_quota WHERE user_id = ?");
+        verify(jdbcTemplate).update(JdbcAiQuotaRepository.DELETE_SQL, TENANT_ID.toString(), USER_ID.toString());
+        assertThat(JdbcAiQuotaRepository.DELETE_SQL).isEqualTo("DELETE FROM ai_quota WHERE tenant_id = ? AND user_id = ?");
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void mapsNullableLimitsAndProvenance() throws Exception {
         ArgumentCaptor<RowMapper<AiQuota>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.findByUserId(USER_ID);
-        verify(jdbcTemplate).query(any(String.class), mapperCaptor.capture(), eq(USER_ID.toString()));
+        repository.findByUserId(TENANT_ID, USER_ID);
+        verify(jdbcTemplate).query(any(String.class), mapperCaptor.capture(),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString()));
 
         AiQuota row = mapperCaptor.getValue().mapRow(resultSet(null, null), 0);
 
@@ -150,8 +160,9 @@ class JdbcAiQuotaRepositoryTest {
     @SuppressWarnings("unchecked")
     void mapsUnsignedLimitsAsLong() throws Exception {
         ArgumentCaptor<RowMapper<AiQuota>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.findByUserId(USER_ID);
-        verify(jdbcTemplate).query(any(String.class), mapperCaptor.capture(), eq(USER_ID.toString()));
+        repository.findByUserId(TENANT_ID, USER_ID);
+        verify(jdbcTemplate).query(any(String.class), mapperCaptor.capture(),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString()));
 
         ResultSet rs = resultSet(4_294_967_295L, 60_000L);
         AiQuota row = mapperCaptor.getValue().mapRow(rs, 0);

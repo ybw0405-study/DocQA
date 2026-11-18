@@ -50,19 +50,19 @@ class AdminAuditQueryServiceTest {
 
     @Test
     void usesTheDefaultTwentyFourHourWindowWhenNoFilterIsGiven() {
-        when(auditRepository.findPage(any(), isNull(), isNull(), anyInt())).thenReturn(List.of());
+        when(auditRepository.findPage(any(), any(), isNull(), isNull(), anyInt())).thenReturn(List.of());
 
         service.list(null, null, null, null, null, 100, null);
 
         AuditQueryFilter filter = capturedFilter();
         assertThat(filter.from()).isEqualTo(NOW.minus(Duration.ofHours(24)));
         assertThat(filter.to()).isEqualTo(NOW);
-        verify(auditRepository).findPage(any(), isNull(), isNull(), org.mockito.ArgumentMatchers.eq(101));
+        verify(auditRepository).findPage(any(), any(), isNull(), isNull(), org.mockito.ArgumentMatchers.eq(101));
     }
 
     @Test
     void leavesTheWindowOpenWhenAFilterIsGiven() {
-        when(auditRepository.findPage(any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
 
         service.list(TRACE_ID, null, null, null, null, 100, null);
 
@@ -74,7 +74,7 @@ class AdminAuditQueryServiceTest {
 
     @Test
     void appliesAnExplicitWindowToFilteredQueries() {
-        when(auditRepository.findPage(any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
 
         service.list(
                 null,
@@ -94,12 +94,13 @@ class AdminAuditQueryServiceTest {
 
     @Test
     void forwardsTheCursorAsTheKeysetPosition() {
-        when(auditRepository.findPage(any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
         String cursor = KeysetCursor.of(NOW.minusSeconds(30), USER_ID).encode();
 
         service.list(TRACE_ID, null, null, null, null, 100, cursor);
 
         verify(auditRepository).findPage(
+                any(),
                 any(AuditQueryFilter.class),
                 org.mockito.ArgumentMatchers.eq(NOW.minusSeconds(30)),
                 org.mockito.ArgumentMatchers.eq(USER_ID),
@@ -108,7 +109,7 @@ class AdminAuditQueryServiceTest {
 
     @Test
     void buildsTheNextCursorFromTheLastVisibleRow() {
-        when(auditRepository.findPage(any(), any(), any(), anyInt()))
+        when(auditRepository.findPage(any(), any(), any(), any(), anyInt()))
                 .thenReturn(items(101));
 
         AuditEventListData page = service.list(TRACE_ID, null, null, null, null, 100, null);
@@ -123,7 +124,7 @@ class AdminAuditQueryServiceTest {
 
     @Test
     void omitsTheCursorWhenThePageIsExact() {
-        when(auditRepository.findPage(any(), any(), any(), anyInt()))
+        when(auditRepository.findPage(any(), any(), any(), any(), anyInt()))
                 .thenReturn(items(100));
 
         AuditEventListData page = service.list(TRACE_ID, null, null, null, null, 100, null);
@@ -181,7 +182,7 @@ class AdminAuditQueryServiceTest {
 
     @Test
     void treatsBlankFiltersAsAbsent() {
-        when(auditRepository.findPage(any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
 
         service.list("", "  ", "", " ", null, 100, " ");
 
@@ -194,7 +195,7 @@ class AdminAuditQueryServiceTest {
 
     private AuditQueryFilter capturedFilter() {
         ArgumentCaptor<AuditQueryFilter> captor = ArgumentCaptor.forClass(AuditQueryFilter.class);
-        verify(auditRepository).findPage(captor.capture(), any(), any(), anyInt());
+        verify(auditRepository).findPage(any(), captor.capture(), any(), any(), anyInt());
         return captor.getValue();
     }
 

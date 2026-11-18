@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.domain.ReminderTriggerRow;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -23,6 +24,7 @@ import org.springframework.jdbc.core.RowMapper;
  */
 class JdbcReminderTriggerRepositoryTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID REMINDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID NOTIFICATION_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
@@ -37,17 +39,18 @@ class JdbcReminderTriggerRepositoryTest {
 
     @Test
     void insertWritesEveryColumnExplicitlyAndLeavesReadAtToAnNullBinding() {
-        repository.insert(row());
+        repository.insert(TENANT_ID, row());
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).update(sql.capture(),
-                eq(NOTIFICATION_ID.toString()), eq(USER_ID.toString()), eq(REMINDER_ID.toString()),
+                eq(TENANT_ID.toString()), eq(NOTIFICATION_ID.toString()),
+                eq(USER_ID.toString()), eq(REMINDER_ID.toString()),
                 eq("线性代数"), eq("第三章"), eq("COURSE"),
                 eq(Timestamp.from(PLANNED)), eq(Timestamp.from(NEXT)), eq(TRACE_ID),
                 eq(Timestamp.from(DELIVERED)), isNull(),
                 eq(Timestamp.from(DELIVERED)), eq(Timestamp.from(DELIVERED)));
         String statement = sql.getValue();
-        assertThat(placeholders(statement)).isEqualTo(13);
+        assertThat(placeholders(statement)).isEqualTo(14);
         assertThat(statement).contains("INSERT INTO reminder_trigger");
         // read_at 必须显式写 NULL：靠列默认值会让「未读」与「这一列没被赋值」在语句上分不开。
         assertThat(statement).contains("read_at");
@@ -55,12 +58,13 @@ class JdbcReminderTriggerRepositoryTest {
 
     @Test
     void firstPageBindsOnlyTheOwnerAndOrdersByTheBusinessTriggerTimeDescending() {
-        repository.findUserPage(USER_ID, false, null, null, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, false, null, null, 21);
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).query(sql.capture(), any(RowMapper.class), eq(USER_ID.toString()), eq(21));
+        verify(jdbcTemplate).query(sql.capture(), any(RowMapper.class),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString()), eq(21));
         String statement = sql.getValue();
-        assertThat(statement).contains("FROM reminder_trigger WHERE user_id = ?");
+        assertThat(statement).contains("FROM reminder_trigger WHERE tenant_id = ? AND user_id = ?");
         // D-64：排序键是业务时刻而不是落库时刻，投递堆积时用户看到的仍是事件顺序。
         assertThat(statement).contains("ORDER BY planned_trigger_at DESC, id DESC LIMIT ?");
         assertThat(statement).doesNotContain("read_at IS NULL");
@@ -70,29 +74,30 @@ class JdbcReminderTriggerRepositoryTest {
 
     @Test
     void unreadOnlyAddsOnlyANullPredicateAndKeepsTheSameSortKey() {
-        repository.findUserPage(USER_ID, true, null, null, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, true, null, null, 21);
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).query(sql.capture(), any(RowMapper.class), eq(USER_ID.toString()), eq(21));
+        verify(jdbcTemplate).query(sql.capture(), any(RowMapper.class),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString()), eq(21));
         assertThat(sql.getValue()).contains("AND read_at IS NULL");
         assertThat(sql.getValue()).contains("ORDER BY planned_trigger_at DESC, id DESC LIMIT ?");
     }
 
     @Test
     void resumingComparesTheSecondColumnOnlyOnTiesAndBindsTheAnchorTwice() {
-        repository.findUserPage(USER_ID, false, PLANNED, CURSOR_ID, 21);
+        repository.findUserPage(TENANT_ID, USER_ID, false, PLANNED, CURSOR_ID, 21);
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(sql.capture(), any(RowMapper.class),
-                eq(USER_ID.toString()),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString()),
                 eq(Timestamp.from(PLANNED)),
                 eq(Timestamp.from(PLANNED)),
                 eq(CURSOR_ID.toString()),
                 eq(21));
         String statement = sql.getValue();
         assertThat(statement).contains("AND (planned_trigger_at < ? OR (planned_trigger_at = ? AND id < ?))");
-        // 五个绑定位：user_id、锚点时刻（严格小于与同刻比较各一次）、锚点 id、LIMIT。
-        assertThat(placeholders(statement)).isEqualTo(5);
+        // 六个绑定位：tenant_id、user_id、锚点时刻（严格小于与同刻比较各一次）、锚点 id、LIMIT。
+        assertThat(placeholders(statement)).isEqualTo(6);
         // 游标里的时刻与 id 都来自上一次响应，属于外部输入：只能进占位符。
         assertThat(statement).doesNotContain(PLANNED.toString());
         assertThat(statement).doesNotContain(CURSOR_ID.toString());
@@ -100,14 +105,17 @@ class JdbcReminderTriggerRepositoryTest {
 
     @Test
     void markAllUnreadAsReadOnlyEverFlipsNullReadAtInsideTheOwner() {
-        repository.markAllUnreadAsRead(USER_ID, DELIVERED);
+        repository.markAllUnreadAsRead(TENANT_ID, USER_ID, DELIVERED);
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).update(sql.capture(), eq(Timestamp.from(DELIVERED)), eq(USER_ID.toString()));
+        verify(jdbcTemplate).update(sql.capture(), eq(Timestamp.from(DELIVERED)),
+                eq(TENANT_ID.toString()), eq(USER_ID.toString()));
         String statement = sql.getValue();
         assertThat(statement).isEqualTo(
-                "UPDATE reminder_trigger SET read_at = ? WHERE user_id = ? AND read_at IS NULL");
-        // 两个谓词缺一不可：user_id 是越权边界，read_at IS NULL 是「真正由空变有」的行数来源。
+                "UPDATE reminder_trigger SET read_at = ? WHERE tenant_id = ? AND user_id = ?"
+                        + " AND read_at IS NULL");
+        // 三个谓词缺一不可：tenant_id 与 user_id 是越权边界，read_at IS NULL 是「真正由空变有」的行数来源。
+        assertThat(statement).contains("tenant_id = ?");
         assertThat(statement).contains("user_id = ?");
         assertThat(statement).contains("read_at IS NULL");
         assertThat(statement).doesNotContain("updated_at");
@@ -119,17 +127,19 @@ class JdbcReminderTriggerRepositoryTest {
     void markReadBindsOnePlaceholderPerIdAndNeverInlinesThem() {
         List<UUID> ids = List.of(NOTIFICATION_ID, CURSOR_ID);
 
-        repository.markRead(USER_ID, ids, DELIVERED);
+        repository.markRead(TENANT_ID, USER_ID, ids, DELIVERED);
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).update(sql.capture(),
                 eq(Timestamp.from(DELIVERED)),
+                eq(TENANT_ID.toString()),
                 eq(USER_ID.toString()),
                 eq(NOTIFICATION_ID.toString()),
                 eq(CURSOR_ID.toString()));
         String statement = sql.getValue();
-        assertThat(statement).contains("SET read_at = ? WHERE user_id = ? AND read_at IS NULL AND id IN (?, ?)");
-        assertThat(placeholders(statement)).isEqualTo(4);
+        assertThat(statement).contains(
+                "SET read_at = ? WHERE tenant_id = ? AND user_id = ? AND read_at IS NULL AND id IN (?, ?)");
+        assertThat(placeholders(statement)).isEqualTo(5);
         assertThat(statement).doesNotContain(NOTIFICATION_ID.toString());
     }
 

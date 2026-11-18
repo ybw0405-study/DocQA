@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.docqa.common.tenant.TenantContext;
 import java.lang.reflect.Method;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -29,22 +30,23 @@ class JdbcAdminAuditRepositoryTest {
 
     @Test
     void insertsEveryColumnWithAParameterizedStatement() {
-        repository.insert(entry());
+        repository.insert(TenantContext.DEFAULT_TENANT_ID, entry());
 
         ArgumentCaptor<Object[]> captor = ArgumentCaptor.forClass(Object[].class);
         verify(jdbcTemplate).update(eq(JdbcAdminAuditRepository.INSERT_SQL), captor.capture());
         Object[] args = captor.getValue();
-        assertThat(args).hasSize(10);
-        assertThat(args[0]).isEqualTo(EVENT_ID.toString());
-        assertThat(args[1]).isEqualTo(TRACE_ID);
-        assertThat(args[2]).isEqualTo(ADMIN_ID.toString());
-        assertThat(args[3]).isEqualTo("ADMIN_AI_KILL_SWITCH_ENABLED");
-        assertThat(args[4]).isEqualTo(JdbcAdminAuditRepository.AGENT_NAME);
-        assertThat(args[5]).isEqualTo(JdbcAdminAuditRepository.SOURCE);
-        assertThat(args[6]).isEqualTo("WARN");
-        assertThat(args[7]).isEqualTo("{\"killSwitchActive\":true}");
-        assertThat(args[8]).isEqualTo(Timestamp.from(OCCURRED_AT));
+        assertThat(args).hasSize(11);
+        assertThat(args[0]).isEqualTo(TenantContext.DEFAULT_TENANT_ID.toString());
+        assertThat(args[1]).isEqualTo(EVENT_ID.toString());
+        assertThat(args[2]).isEqualTo(TRACE_ID);
+        assertThat(args[3]).isEqualTo(ADMIN_ID.toString());
+        assertThat(args[4]).isEqualTo("ADMIN_AI_KILL_SWITCH_ENABLED");
+        assertThat(args[5]).isEqualTo(JdbcAdminAuditRepository.AGENT_NAME);
+        assertThat(args[6]).isEqualTo(JdbcAdminAuditRepository.SOURCE);
+        assertThat(args[7]).isEqualTo("WARN");
+        assertThat(args[8]).isEqualTo("{\"killSwitchActive\":true}");
         assertThat(args[9]).isEqualTo(Timestamp.from(OCCURRED_AT));
+        assertThat(args[10]).isEqualTo(Timestamp.from(OCCURRED_AT));
     }
 
     @Test
@@ -61,7 +63,7 @@ class JdbcAdminAuditRepositoryTest {
         String sql = JdbcAdminAuditRepository.INSERT_SQL;
         assertThat(sql).startsWith("INSERT INTO audit_event");
         assertThat(sql).contains(
-                "id", "trace_id", "user_id", "event_type", "agent_name",
+                "tenant_id", "id", "trace_id", "user_id", "event_type", "agent_name",
                 "source", "severity", "payload_redacted", "occurred_at", "ingested_at");
         assertThat(sql.toLowerCase()).doesNotContain("update", "delete");
     }

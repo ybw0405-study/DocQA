@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
+import com.docqa.document.service.AuthenticatedUser;
 import com.docqa.document.service.JwtAuthenticator;
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +27,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 class JwtAuthenticationFilterTest {
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID TENANT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
     private final JwtAuthenticator jwtAuthenticator = mock(JwtAuthenticator.class);
     private final ObjectMapper objectMapper = new ObjectMapper()
@@ -38,7 +41,8 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void validTokenSetsUserIdAttribute() throws Exception {
-        when(jwtAuthenticator.authenticate("Bearer token")).thenReturn(USER_ID);
+        when(jwtAuthenticator.authenticateIdentity("Bearer token"))
+                .thenReturn(new AuthenticatedUser(USER_ID, TENANT_ID));
         MockHttpServletRequest request = documentRequest();
         request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer token");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -47,13 +51,14 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, chain);
 
         assertThat(request.getAttribute(JwtAuthenticationFilter.USER_ID_ATTRIBUTE)).isEqualTo(USER_ID);
+        assertThat(request.getAttribute(TenantContext.REQUEST_ATTRIBUTE)).isEqualTo(TENANT_ID);
         assertThat(chain.getRequest()).isNotNull();
         assertThat(response.getStatus()).isEqualTo(200);
     }
 
     @Test
     void missingTokenReturnsProblemWithoutCallingChain() throws Exception {
-        when(jwtAuthenticator.authenticate(null))
+        when(jwtAuthenticator.authenticateIdentity(null))
                 .thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
         MockHttpServletRequest request = documentRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -94,12 +99,12 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void authenticatorIsInvokedForDocumentPaths() throws Exception {
-        when(jwtAuthenticator.authenticate(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
+        when(jwtAuthenticator.authenticateIdentity(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
         MockHttpServletRequest request = documentRequest();
 
         filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
 
-        verify(jwtAuthenticator).authenticate(null);
+        verify(jwtAuthenticator).authenticateIdentity(null);
         assertThat(List.of(request.getRequestURI())).contains("/api/v1/documents/upload/init");
     }
 
@@ -109,14 +114,14 @@ class JwtAuthenticationFilterTest {
      */
     @Test
     void pathsOutsideTheDocumentsPrefixAreFiltered() throws Exception {
-        when(jwtAuthenticator.authenticate(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
+        when(jwtAuthenticator.authenticateIdentity(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
         MockHttpServletRequest request = apiRequest("GET", "/api/v1/reminders");
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
         filter.doFilter(request, response, chain);
 
-        verify(jwtAuthenticator).authenticate(null);
+        verify(jwtAuthenticator).authenticateIdentity(null);
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(chain.getRequest()).isNull();
     }
@@ -143,13 +148,13 @@ class JwtAuthenticationFilterTest {
      */
     @Test
     void unmappedApiPathsAreStillAuthenticatedBeforeReachingMvc() throws Exception {
-        when(jwtAuthenticator.authenticate(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
+        when(jwtAuthenticator.authenticateIdentity(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
         MockHttpServletRequest request = apiRequest("GET", "/api/v1/not-mapped");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, new MockFilterChain());
 
-        verify(jwtAuthenticator).authenticate(null);
+        verify(jwtAuthenticator).authenticateIdentity(null);
         assertThat(response.getStatus()).isEqualTo(401);
     }
 

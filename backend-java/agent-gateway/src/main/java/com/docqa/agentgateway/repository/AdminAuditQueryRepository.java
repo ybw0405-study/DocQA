@@ -9,6 +9,7 @@ import java.util.UUID;
 public interface AdminAuditQueryRepository {
 
     List<AuditEventItem> findPage(
+            UUID tenantId,
             AuditQueryFilter filter,
             Instant beforeOccurredAt,
             UUID beforeEventId,

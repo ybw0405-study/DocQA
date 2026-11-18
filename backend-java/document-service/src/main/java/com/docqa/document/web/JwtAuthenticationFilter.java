@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
 import com.docqa.common.error.ProblemDetailFactory;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.web.PublicPaths;
+import com.docqa.document.service.AuthenticatedUser;
 import com.docqa.document.service.JwtAuthenticator;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -12,7 +14,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -64,9 +65,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         try {
-            UUID userId = jwtAuthenticator.authenticate(request.getHeader(HttpHeaders.AUTHORIZATION));
-            request.setAttribute(USER_ID_ATTRIBUTE, userId);
-            filterChain.doFilter(request, response);
+            AuthenticatedUser user = jwtAuthenticator.authenticateIdentity(
+                    request.getHeader(HttpHeaders.AUTHORIZATION));
+            request.setAttribute(USER_ID_ATTRIBUTE, user.userId());
+            request.setAttribute(TenantContext.REQUEST_ATTRIBUTE, user.tenantId());
+            TenantContext.set(user.tenantId());
+            try {
+                filterChain.doFilter(request, response);
+            } finally {
+                TenantContext.clear();
+            }
         } catch (BusinessException ex) {
             writeUnauthorized(request, response);
         }

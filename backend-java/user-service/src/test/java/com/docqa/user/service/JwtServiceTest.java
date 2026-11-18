@@ -3,6 +3,7 @@ package com.docqa.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.config.JwtProperties;
 import com.docqa.user.domain.UserRole;
 import io.jsonwebtoken.Jwts;
@@ -45,6 +46,7 @@ class JwtServiceTest {
 
         assertThat(token.split("\\.")).hasSize(3);
         assertThat(identity.userId()).isEqualTo(userId);
+        assertThat(identity.tenantId()).isEqualTo(TenantContext.DEFAULT_TENANT_ID);
         assertThat(identity.roles()).containsExactlyInAnyOrder(UserRole.USER, UserRole.ADMIN);
         assertThat(identity.issuedAt()).isEqualTo(NOW);
         assertThat(identity.expiresAt()).isEqualTo(NOW.plus(Duration.ofHours(2)));
@@ -166,6 +168,49 @@ class JwtServiceTest {
     }
 
     @Test
+    void issuesTokenWithExplicitTenantId() {
+        UUID tenantId = UUID.randomUUID();
+        String token = jwtService.issue(UUID.randomUUID(), tenantId, Set.of(UserRole.USER));
+
+        assertThat(jwtService.verify(token).tenantId()).isEqualTo(tenantId);
+    }
+
+    @Test
+    void rejectsMissingTenantClaim() {
+        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String token = Jwts.builder()
+                .subject(UUID.randomUUID().toString())
+                .issuer(ISSUER)
+                .audience().add(AUDIENCE).and()
+                .issuedAt(Date.from(NOW))
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .claim("roles", List.of("USER"))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+
+        assertThatThrownBy(() -> jwtService.verify(token))
+                .isInstanceOf(InvalidJwtException.class);
+    }
+
+    @Test
+    void rejectsNonUuidTenantClaim() {
+        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String token = Jwts.builder()
+                .subject(UUID.randomUUID().toString())
+                .issuer(ISSUER)
+                .audience().add(AUDIENCE).and()
+                .issuedAt(Date.from(NOW))
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .claim("roles", List.of("USER"))
+                .claim(TenantContext.CLAIM_NAME, "not-a-uuid")
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+
+        assertThatThrownBy(() -> jwtService.verify(token))
+                .isInstanceOf(InvalidJwtException.class);
+    }
+
+    @Test
     void refusesToIssueTokenWithoutRoles() {
         assertThatThrownBy(() -> jwtService.issue(UUID.randomUUID(), Set.of()))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -207,6 +252,7 @@ class JwtServiceTest {
                 .issuedAt(Date.from(NOW))
                 .expiration(Date.from(NOW.plusSeconds(60)))
                 .claim("roles", roles)
+                .claim(TenantContext.CLAIM_NAME, TenantContext.DEFAULT_TENANT_ID.toString())
                 .signWith(key, algorithm)
                 .compact();
     }
@@ -214,7 +260,7 @@ class JwtServiceTest {
     private String claimsJson(UUID userId, Instant issuedAt, Instant expiresAt) {
         return "{\"sub\":\"" + userId + "\",\"iss\":\"" + ISSUER + "\",\"aud\":\"" + AUDIENCE
                 + "\",\"iat\":" + issuedAt.getEpochSecond() + ",\"exp\":" + expiresAt.getEpochSecond()
-                + ",\"roles\":[\"USER\"]}";
+                + ",\"roles\":[\"USER\"],\"tenant_id\":\"" + TenantContext.DEFAULT_TENANT_ID + "\"}";
     }
 
     private String base64Url(String value) {
