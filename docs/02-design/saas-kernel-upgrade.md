@@ -319,6 +319,43 @@ DELETE FROM flyway_schema_history WHERE version = '10' AND success = 0;
    （`testcontainers/jdbc/database-commons/mysql` 四条缺一不可，只钉第一条时传递依赖
    仍会落回 1.19.8）。
 
+### 5.8 授权落地与运行时环境事故排障（2026-11-18 晚）
+
+**租户授权落地**：`ops/sql/apply-least-privilege.ps1` 幂等执行后，`ss_app@localhost`
+获得 `tenant` 表 SELECT/INSERT/UPDATE（无 DELETE，软删走 `status='DELETED'`）。
+`apply-least-privilege.ps1` 的 `$businessTables` 对账清单补入 `tenant`
+（verify 脚本从 `information_schema` 动态读表，无需改）。
+`document-service` 启动日志证实端到端打通：
+`DefaultTenantInitializer: Seeded default tenant slug=default` +
+`AuditAppendOnlyGuard: verdict=OK`。
+
+**排障记录（三连撞车，都是"两个项目共享一个内核"的病）**：
+
+1. **RocketMQ 9876 端口撞车**。恢复 agentflow 时 `docker start` 拉起的
+   `agentflow-rmq-namesrv`（Docker Desktop）与 WSL 发行版里 host 网络模式的
+   `docqa-rmq-namesrv` 争 9876——WSL2 NAT 模式下 Docker Desktop VM 与发行版
+   共享端口面，后者报 `BindException: Address already in use` 无限崩溃
+   （`Restarting (255)`），`docqa-infra.service` 卡 `activating`。孤儿 socket
+   （`ss -tlnpe` 无进程属主、cgroup 空）是共享端口面的指纹。处置：停
+   agentflow RMQ 两容器后 9876 立即释放，docqa namesrv/broker 自愈。
+   **两个项目的 RMQ 不能同时跑**，除非给 agentflow 换端口。
+2. **Redis 6379 同病**。WSL 里 `*:6379` 的监听者其实是 Docker Desktop 的
+   `agentflow-redis`（停掉即消失）；DOCQA 设计上中间件栈没有 Redis，
+   `DOCQA_REDIS_HOST=192.168.40.128` 是已失联的历史 VM 地址。解法不是蹭
+   agentflow 的 Redis（无密码 + 数据混用，双重不可接受），而是给 docqa-infra
+   加**专属 Redis**：`local-stack.compose.yaml` 新增 `docqa-redis`
+   （host 网络、**16379 避让**、`--requirepass` 从 `/opt/docqa-infra/.env` 注入）。
+   Windows 侧同步：`DOCQA_REDIS_PORT=16379`、`DOCQA_REDIS_HOST=<当前 WSL IP>`、
+   `DOCQA_AI_REDIS_URL=redis://:<密码>@<WSL IP>:16379/0`。
+3. **Machine 作用域残留变量**。`DOCQA_REDIS_PASSWORD`/`DOCQA_DB_PASSWORD` 在
+   Machine 作用域有一份旧值，User 清掉后 Machine 仍随新进程注入（清 Machine
+   需管理员，本次未清）；`run-local.ps1` 导入顺序 Machine→User，User 有值时覆盖
+   Machine，因此 User 侧写对即可生效。
+4. **沙箱回收 Java 子进程**。工具调用内经 `Start-Process` 拉起的 jar 会在
+   调用结束后被回收（此前已知），成功启动的 document-service 也一样。
+   稳定做法：后台任务里 `source` 环境变量导出文件后直接 `java -jar` 前台跑，
+   由后台任务本身锚定进程树。
+
 ---
 
 ## 6. 待确认事项

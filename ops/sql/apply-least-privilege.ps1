@@ -127,7 +127,7 @@ Write-Note "库 $Schema 与迁移账本都在位；管理员账号 $AdminUser"
 $businessTables = @(
     'agent_execution', 'ai_quota', 'app_user', 'app_user_role', 'chunk', 'conversation',
     'document', 'document_tag', 'document_tag_link', 'message', 'refresh_token',
-    'reminder', 'reminder_trigger'
+    'reminder', 'reminder_trigger', 'tenant'
 )
 $liveTables = @(Invoke-Query "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$Schema' AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME;" '读取表清单' |
     Where-Object { $_ -ne 'flyway_schema_history' })
