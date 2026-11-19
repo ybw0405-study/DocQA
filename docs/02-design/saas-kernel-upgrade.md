@@ -181,12 +181,12 @@ CREATE TABLE tenant (
 
 ### 5.2 P0 明确的临时口径（P1 必须替换）
 
-> 第 1～4 条已由 §5.9 / §5.10 / §5.11 替换；第 5～6 条仍待办。
+> 第 1～4 条已由 §5.9 / §5.10 / §5.11 / §5.12 替换；第 5～6 条仍待办。
 
 1. **只有一个租户生效**。V10 把全部存量数据回填到默认租户，登录/注册尚无租户解析入口，因此所有请求都拿到默认租户 ID。租户隔离的**结构与约束已就位，但隔离效果要到 P1 接入多租户解析后才可观测**。
 2. **登录/注册用 `DEFAULT_TENANT_ID`**：`AuthService`、`RefreshTokenService`、`DemoUserSeeder` 内有 `tenantId()` 帮助方法，P1 改为按邮箱域名路由解析。
 3. **管理面聚合只看默认租户**：`AdminQuotaService` / `AdminAiUsageService` / `AdminAiControlsService` / `AdminAuditQueryService` / `AdminUserService` 传默认租户，P1 改为按管理员可见租户集过滤。
-4. **MQ / 定时任务**：`AuditOutboxRelay`、`AuditEventService`、`ReminderDueService`、`ReminderTriggerIngestService`、`ParseResultHandler` 等传默认租户，P1 随消息体携带 `tenant_id` 或遍历所有 ACTIVE 租户。（已由 §5.11 收口除 `ParseResultHandler` 外的四点）
+4. **MQ / 定时任务**：`AuditOutboxRelay`、`AuditEventService`、`ReminderDueService`、`ReminderTriggerIngestService`、`ParseResultHandler` 等传默认租户，P1 随消息体携带 `tenant_id` 或遍历所有 ACTIVE 租户。（已由 §5.11 / §5.12 全部收口）
 5. **Java↔Python 协议未加 tenant 字段**：Python `AgentAskRequest` 是 `extra="forbid"`，双向必须同批发布，因此放在 P1 与 OPA 一起做。P0 的租户过滤在 Java 侧生效后再把 `documentScopes` 传给 Python。
 6. **pgvector / MinIO / Redis 键未动**：V10 只覆盖 MySQL 业务库。这三者加租户维度是 P1 范围（见 §1.1）。
 
@@ -437,8 +437,35 @@ reminder-service / document-service 的生产配置是 `true`，**本批改动�
 已在测试内注释说明。`AuditEventService.findByTraceId` 目前无 HTTP 入口（审计服务是纯消费者），
 暂保留默认租户，待管理面暴露查询时一并收口。
 
-**尚未完成**：`ParseResultHandler`（Python 解析回写）仍属第 5 条 Java↔Python 协议范围；
-§5.2 第 5 条协议、第 6 条 pgvector/MinIO/Redis、域名路由、OPA ABAC 仍未开始。
+**尚未完成**：`ParseResultHandler`（Python 解析回写）由 §5.12 以「按 documentId 反查」收口，
+不走消息体携带；§5.2 第 5 条协议、第 6 条 pgvector/MinIO/Redis、域名路由、OPA ABAC 仍未开始。
+
+验证：`mvn -o test` → 全绿；`mvn -o checkstyle:check` → 0 违规。
+
+### 5.12 文档解析链路的租户归属（2026-11-19，§5.2 第 4 条收口）
+
+`ParseResultHandler` / `VectorChangeResultHandler` / `DocumentReconciliationJob` 原来都是
+`private static final TENANT_ID = DEFAULT_TENANT_ID`。这批改为**以持久化的 document 行为事实来源**：
+
+| 路径 | 原口径 | 新口径 |
+|---|---|---|
+| `parse.completed` / `parse.failed` 消费 | `findById(DEFAULT, documentId)`，只认默认租户 | `findTenantDocumentById(documentId)` 一次查询返回 `TenantDocument(tenantId, row)`，后续 chunk 写入、markIndexed / markFailed / abortReindex / markDead、重试发布全部用该 tenantId |
+| `vector-change-completed` 消费 | 同上 | 同上，`recordVectorConfirmation` 用行上的 tenantId |
+| `findStaleParsing` / `findStaleReindex` / `findUnconfirmedDeletions` | 只扫默认租户 | 跨租户扫描，返回 `TenantDocument`；对账写侧 `abortReindex` / `incrementRetryAndMarkParsing` / `markDead` 按行上 tenantId 执行 |
+
+**为什么不改消息体**：Java→Python 的 `ParseRequestedEvent` / `VectorChangeRequestedEvent` 被
+Python 侧 Pydantic 模型以 `extra="forbid"` 校验，加字段必须双端同批发布；而 documentId 是全局唯一
+UUID，按它反查归属租户既不会串账，也天然覆盖存量在途消息。这样 Java↔Python 消息契约一个字节
+都不用改，§5.11 的「同批发布」约束不扩散到 Python 侧。
+
+**边界**：`findTenantDocumentById` 与三个 `findStale*` 是有意的跨租户读，查询不带 tenant_id 谓词，
+但 SELECT 带出行的 tenant_id；所有写侧仍逐行带 tenant_id 谓词。这些读只服务于内部可信的 MQ/定时
+任务，documentId 不是用户可控的跨租户入参；若行不存在则消息被丢弃并标记已处理。租户边界由
+documentId 的全局唯一性与写侧谓词共同保证。`TenantIsolationContractTest`
+已在注释中记录这四个方法的有意跨租户性质，文件级判定因写侧仍含 tenant_id 而无需新增豁免。
+
+**尚未完成**：Python 侧的 pgvector 写入仍按 documentId 而非 tenant_id 分片（§5.2 第 6 条）；
+Java→Python 的 `AgentAskRequest.documentScopes` 仍未带租户上下文（第 5 条）；域名路由、OPA ABAC 未开始。
 
 验证：`mvn -o test` → 全绿；`mvn -o checkstyle:check` → 0 违规。
 

@@ -2,6 +2,7 @@ package com.docqa.document.repository;
 
 import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
+import com.docqa.document.domain.TenantDocument;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +11,14 @@ import java.util.UUID;
 public interface DocumentRepository {
 
     Optional<DocumentRow> findById(UUID tenantId, UUID id);
+
+    /**
+     * 系统级反查：按全局唯一的 documentId 读取行及其归属租户。
+     *
+     * <p>MQ 消费与定时任务没有 HTTP 租户上下文，用它取得事实租户；所有后续写操作必须带上
+     * 返回的 tenantId，不能回落默认租户。
+     */
+    Optional<TenantDocument> findTenantDocumentById(UUID id);
 
     Optional<DocumentRow> findByIdAndUser(UUID tenantId, UUID id, UUID userId);
 
@@ -43,11 +52,12 @@ public interface DocumentRepository {
 
     int abortReindex(UUID tenantId, UUID id, String pendingIndexVersion, String errorCode, String errorMessage);
 
-    List<DocumentRow> findStaleParsing(UUID tenantId, Instant threshold, int limit);
+    /** 系统级跨租户扫描：对账任务按全局时间阈值捞出所有租户的待处理行。 */
+    List<TenantDocument> findStaleParsing(Instant threshold, int limit);
 
-    List<DocumentRow> findStaleReindex(UUID tenantId, Instant threshold, int limit);
+    List<TenantDocument> findStaleReindex(Instant threshold, int limit);
 
-    List<DocumentRow> findUnconfirmedDeletions(UUID tenantId, Instant deletedBefore, int limit);
+    List<TenantDocument> findUnconfirmedDeletions(Instant deletedBefore, int limit);
 
     List<DocumentRow> findUserPage(UUID tenantId, UUID userId, DocumentStatus status, String keyword, String normalizedTagName,
             Instant beforeCreatedAt, UUID beforeId, int limit);

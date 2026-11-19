@@ -11,13 +11,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.docqa.common.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.metrics.BusinessMetrics;
 import com.docqa.document.config.DocumentProperties;
 import com.docqa.document.domain.ChunkEntry;
 import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
+import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.ChunkRepository;
 import com.docqa.document.repository.DocumentRepository;
 import com.docqa.document.transaction.TransactionRunner;
@@ -43,7 +43,7 @@ import org.springframework.data.redis.core.ValueOperations;
 @ExtendWith(MockitoExtension.class)
 class ParseResultHandlerTest {
 
-    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
+    private static final UUID TENANT_ID = UUID.fromString("0192f3a4-a1b2-7c33-9d01-1234567890ab");
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final String OBJECT_KEY = "documents/" + USER_ID + "/" + DOCUMENT_ID + "/source";
@@ -91,8 +91,7 @@ class ParseResultHandlerTest {
 
     @Test
     void completedEventWritesChunksAndMarksIndexed() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(DocumentStatus.PARSING, 0)));
+        givenDocument(document(DocumentStatus.PARSING, 0));
         when(documentRepository.markIndexed(TENANT_ID, DOCUMENT_ID, "v1", null, NOW)).thenReturn(1);
 
         handler.handleCompleted(MESSAGE_ID, bytes(completed("v1", null, chunk(0))));
@@ -108,9 +107,24 @@ class ParseResultHandlerTest {
     }
 
     @Test
+    void completedEventWritesInTheTenantThatOwnsTheDocument() throws Exception {
+        UUID owningTenant = UUID.fromString("0192f3a4-a1b2-7c33-9d01-1234567890ac");
+        DocumentRow row = document(DocumentStatus.PARSING, 0);
+        when(documentRepository.findTenantDocumentById(DOCUMENT_ID))
+                .thenReturn(Optional.of(new TenantDocument(owningTenant, row)));
+        when(documentRepository.findById(owningTenant, DOCUMENT_ID)).thenReturn(Optional.of(row));
+        when(documentRepository.markIndexed(owningTenant, DOCUMENT_ID, "v1", null, NOW)).thenReturn(1);
+
+        handler.handleCompleted(MESSAGE_ID, bytes(completed("v1", null, chunk(0))));
+
+        verify(chunkRepository).upsertAll(eq(owningTenant), any());
+        verify(documentRepository).markIndexed(owningTenant, DOCUMENT_ID, "v1", null, NOW);
+        verify(documentRepository, never()).markIndexed(eq(TENANT_ID), any(), anyString(), any(), any());
+    }
+
+    @Test
     void completedEventStoresTheVectorRowCountReportedByPython() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(DocumentStatus.PARSING, 0)));
+        givenDocument(document(DocumentStatus.PARSING, 0));
         when(documentRepository.markIndexed(TENANT_ID, DOCUMENT_ID, "v1", 7L, NOW)).thenReturn(1);
 
         handler.handleCompleted(MESSAGE_ID, bytes(completed("v1", 7L, chunk(0))));
@@ -121,7 +135,7 @@ class ParseResultHandlerTest {
     @Test
     void completedEventPromotesAPendingVersionAndQueuesTheOldVersionForDeletion() throws Exception {
         DocumentRow rebuilding = row(DocumentStatus.INDEXED, 0, "v1", "v2", null);
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID)).thenReturn(Optional.of(rebuilding));
+        givenDocument(rebuilding);
         when(documentRepository.promotePendingIndexVersion(TENANT_ID, DOCUMENT_ID, "v2", null, NOW)).thenReturn(1);
 
         handler.handleCompleted(MESSAGE_ID, bytes(completed("v2", null, chunk(0))));
@@ -142,8 +156,7 @@ class ParseResultHandlerTest {
 
     @Test
     void completedEventForASoftDeletedDocumentIsDroppedWithoutAnyWrite() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(row(DocumentStatus.INDEXED, 0, "v1", null, NOW)));
+        givenDocument(row(DocumentStatus.INDEXED, 0, "v1", null, NOW));
 
         handler.handleCompleted(MESSAGE_ID, bytes(completed("v1", null, chunk(0))));
 
@@ -155,8 +168,7 @@ class ParseResultHandlerTest {
 
     @Test
     void staleCompletedEventForAnAlreadySupersededVersionIsIgnored() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(row(DocumentStatus.INDEXED, 0, "v2", null, null)));
+        givenDocument(row(DocumentStatus.INDEXED, 0, "v2", null, null));
 
         handler.handleCompleted(MESSAGE_ID, bytes(completed("v1", null, chunk(0))));
 
@@ -167,8 +179,7 @@ class ParseResultHandlerTest {
 
     @Test
     void invalidChunksFailANormalParseAndKeepTheDocumentUnindexed() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(DocumentStatus.PARSING, 0)));
+        givenDocument(document(DocumentStatus.PARSING, 0));
         when(documentRepository.markFailed(TENANT_ID, DOCUMENT_ID, "DOC-VALIDATION-004", "解析结果不完整，请重新上传。"))
                 .thenReturn(1);
 
@@ -180,8 +191,7 @@ class ParseResultHandlerTest {
 
     @Test
     void invalidChunksDuringARebuildOnlyAbortThePendingVersion() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(row(DocumentStatus.INDEXED, 0, "v1", "v2", null)));
+        givenDocument(row(DocumentStatus.INDEXED, 0, "v1", "v2", null));
 
         handler.handleCompleted(MESSAGE_ID, bytes(completed("v2", null, (ParsedChunk[]) null)));
 
@@ -192,8 +202,7 @@ class ParseResultHandlerTest {
 
     @Test
     void failedEventDuringARebuildKeepsTheOldIndexVersionAndDoesNotRetry() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(row(DocumentStatus.INDEXED, 0, "v1", "v2", null)));
+        givenDocument(row(DocumentStatus.INDEXED, 0, "v1", "v2", null));
 
         handler.handleFailed(MESSAGE_ID, bytes(failed("v2", "DOC-PARSE-001", "embedding timeout", true)));
 
@@ -205,9 +214,10 @@ class ParseResultHandlerTest {
 
     @Test
     void retryableFailureRepublishesWithDelay() throws Exception {
+        givenDocument(document(DocumentStatus.PARSING, 0));
+        // applyIndexed / retry 判定读到的最新行
         when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(DocumentStatus.PARSING, 0)),
-                        Optional.of(document(DocumentStatus.PARSING, 1)));
+                .thenReturn(Optional.of(document(DocumentStatus.PARSING, 1)));
         when(documentRepository.incrementRetryAndMarkParsing(TENANT_ID, DOCUMENT_ID, NOW)).thenReturn(1);
 
         handler.handleFailed(MESSAGE_ID, bytes(failed("v1", "DOC-VALIDATION-003", "encrypted", true)));
@@ -218,8 +228,7 @@ class ParseResultHandlerTest {
 
     @Test
     void exhaustedRetryMarksDocumentDead() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(DocumentStatus.PARSING, 3)));
+        givenDocument(document(DocumentStatus.PARSING, 3));
         when(documentRepository.incrementRetryAndMarkParsing(TENANT_ID, DOCUMENT_ID, NOW)).thenReturn(0);
 
         handler.handleFailed(MESSAGE_ID, bytes(failed("v1", "COM-INTERNAL-001", "parser failed", true)));
@@ -230,8 +239,7 @@ class ParseResultHandlerTest {
 
     @Test
     void permanentFailureMarksFailedWithoutRetry() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(DocumentStatus.PARSING, 0)));
+        givenDocument(document(DocumentStatus.PARSING, 0));
         when(documentRepository.markFailed(TENANT_ID, DOCUMENT_ID, "DOC-VALIDATION-003", "encrypted")).thenReturn(1);
 
         handler.handleFailed(MESSAGE_ID, bytes(failed("v1", "DOC-VALIDATION-003", "encrypted", false)));
@@ -242,8 +250,7 @@ class ParseResultHandlerTest {
 
     @Test
     void unrecognisedErrorCodeFallsBackToTheInternalCode() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(DocumentStatus.PARSING, 0)));
+        givenDocument(document(DocumentStatus.PARSING, 0));
         when(documentRepository.markFailed(TENANT_ID, DOCUMENT_ID, "COM-INTERNAL-001", "解析失败，请稍后重试。")).thenReturn(1);
 
         handler.handleFailed(MESSAGE_ID, bytes(failed("v1", "lowercase code", null, false)));
@@ -277,6 +284,14 @@ class ParseResultHandlerTest {
 
         verifyNoInteractions(documentRepository, chunkRepository);
         verifyProcessedMarker("parse.completed");
+    }
+
+
+    private void givenDocument(DocumentRow document) {
+        when(documentRepository.findTenantDocumentById(DOCUMENT_ID))
+                .thenReturn(Optional.of(new TenantDocument(TENANT_ID, document)));
+        // 只有走到 applyIndexed / 重试判定才会再读一次，其他路径不应因未使用而报严格桩错误
+        lenient().when(documentRepository.findById(TENANT_ID, DOCUMENT_ID)).thenReturn(Optional.of(document));
     }
 
     private void verifyProcessedMarker(String topic) {

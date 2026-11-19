@@ -11,10 +11,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.document.config.DocumentProperties;
 import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
+import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.DocumentRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -32,7 +32,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class DocumentReconciliationJobTest {
 
-    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
+    private static final UUID TENANT_ID = UUID.fromString("0192f3a4-a1b2-7c33-9d01-1234567890ab");
+    private static final UUID OTHER_TENANT_ID = UUID.fromString("0192f3a4-a1b2-7c33-9d01-1234567890ac");
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
@@ -57,8 +58,8 @@ class DocumentReconciliationJobTest {
 
     @Test
     void publishFailureDoesNotConsumeRetryCount() {
-        when(documentRepository.findStaleParsing(eq(TENANT_ID), any(Instant.class), eq(50)))
-                .thenReturn(List.of(document(0)));
+        when(documentRepository.findStaleParsing(any(Instant.class), eq(50)))
+                .thenReturn(List.of(tenantDocument(document(0))));
         doThrow(new IllegalStateException("mq down"))
                 .when(documentEventPublisher)
                 .publishParseRequested(any(ParseRequestedEvent.class));
@@ -69,9 +70,9 @@ class DocumentReconciliationJobTest {
     }
 
     @Test
-    void successfulRepublishIncrementsRetryCount() {
-        when(documentRepository.findStaleParsing(eq(TENANT_ID), any(Instant.class), eq(50)))
-                .thenReturn(List.of(document(0)));
+    void successfulRepublishIncrementsRetryCountInTheRowsTenant() {
+        when(documentRepository.findStaleParsing(any(Instant.class), eq(50)))
+                .thenReturn(List.of(tenantDocument(document(0))));
         when(documentRepository.incrementRetryAndMarkParsing(TENANT_ID, DOCUMENT_ID, NOW)).thenReturn(1);
 
         job.reconcileStaleParsing();
@@ -83,9 +84,24 @@ class DocumentReconciliationJobTest {
     }
 
     @Test
+    void staleParsingScansEveryTenantAndWritesInEachOwnTenant() {
+        when(documentRepository.findStaleParsing(any(Instant.class), eq(50)))
+                .thenReturn(List.of(
+                        tenantDocument(TENANT_ID, document(0)),
+                        tenantDocument(OTHER_TENANT_ID, document(0))));
+        when(documentRepository.incrementRetryAndMarkParsing(any(), eq(DOCUMENT_ID), eq(NOW))).thenReturn(1);
+
+        job.reconcileStaleParsing();
+
+        verify(documentRepository).incrementRetryAndMarkParsing(TENANT_ID, DOCUMENT_ID, NOW);
+        verify(documentRepository).incrementRetryAndMarkParsing(OTHER_TENANT_ID, DOCUMENT_ID, NOW);
+        verify(documentEventPublisher, times(2)).publishParseRequested(any(ParseRequestedEvent.class));
+    }
+
+    @Test
     void exhaustedDocumentIsMarkedDeadWithoutPublishing() {
-        when(documentRepository.findStaleParsing(eq(TENANT_ID), any(Instant.class), eq(50)))
-                .thenReturn(List.of(document(3)));
+        when(documentRepository.findStaleParsing(any(Instant.class), eq(50)))
+                .thenReturn(List.of(tenantDocument(document(3))));
 
         job.reconcileStaleParsing();
 
@@ -99,17 +115,17 @@ class DocumentReconciliationJobTest {
 
         job.reconcileStaleParsing();
 
-        verify(documentRepository).findStaleParsing(TENANT_ID, NOW.minus(Duration.ofMinutes(10)), 50);
+        verify(documentRepository).findStaleParsing(NOW.minus(Duration.ofMinutes(10)), 50);
     }
 
     @Test
-    void timedOutRebuildAbortsOnlyThePendingVersionAndKeepsTheDocumentIndexed() {
-        when(documentRepository.findStaleReindex(eq(TENANT_ID), any(Instant.class), eq(50)))
-                .thenReturn(List.of(rebuilding()));
+    void timedOutRebuildAbortsOnlyThePendingVersionInTheRowsTenant() {
+        when(documentRepository.findStaleReindex(any(Instant.class), eq(50)))
+                .thenReturn(List.of(tenantDocument(rebuilding())));
 
         job.abortStaleReindex();
 
-        verify(documentRepository).abortReindex(TENANT_ID, 
+        verify(documentRepository).abortReindex(TENANT_ID,
                 DOCUMENT_ID,
                 "v2",
                 "COM-INTERNAL-001",
@@ -120,9 +136,21 @@ class DocumentReconciliationJobTest {
     }
 
     @Test
+    void rebuildTimeoutAlsoAbortsInOtherTenants() {
+        when(documentRepository.findStaleReindex(any(Instant.class), eq(50)))
+                .thenReturn(List.of(
+                        tenantDocument(TENANT_ID, rebuilding()),
+                        tenantDocument(OTHER_TENANT_ID, rebuilding())));
+
+        job.abortStaleReindex();
+
+        verify(documentRepository).abortReindex(eq(OTHER_TENANT_ID), eq(DOCUMENT_ID), eq("v2"), any(), any());
+    }
+
+    @Test
     void deletionSweepRepublishesVectorRemovalsWithoutTouchingMysqlRows() {
-        when(documentRepository.findUnconfirmedDeletions(eq(TENANT_ID), any(Instant.class), eq(50)))
-                .thenReturn(List.of(deleted()));
+        when(documentRepository.findUnconfirmedDeletions(any(Instant.class), eq(50)))
+                .thenReturn(List.of(tenantDocument(deleted())));
 
         job.republishUnconfirmedDeletions();
 
@@ -138,9 +166,21 @@ class DocumentReconciliationJobTest {
     }
 
     @Test
+    void deletionSweepRepublishesForEveryTenant() {
+        when(documentRepository.findUnconfirmedDeletions(any(Instant.class), eq(50)))
+                .thenReturn(List.of(
+                        tenantDocument(TENANT_ID, deleted()),
+                        tenantDocument(OTHER_TENANT_ID, deleted())));
+
+        job.republishUnconfirmedDeletions();
+
+        verify(documentEventPublisher, times(2)).publishVectorChangeRequested(any());
+    }
+
+    @Test
     void aFailingDeletionRepublishIsLoggedAndLeftForTheNextSweep() {
-        when(documentRepository.findUnconfirmedDeletions(eq(TENANT_ID), any(Instant.class), eq(50)))
-                .thenReturn(List.of(deleted(), deleted()));
+        when(documentRepository.findUnconfirmedDeletions(any(Instant.class), eq(50)))
+                .thenReturn(List.of(tenantDocument(deleted()), tenantDocument(deleted())));
         doThrow(new IllegalStateException("mq down"))
                 .when(documentEventPublisher)
                 .publishVectorChangeRequested(any());
@@ -148,6 +188,14 @@ class DocumentReconciliationJobTest {
         job.republishUnconfirmedDeletions();
 
         verify(documentEventPublisher, times(2)).publishVectorChangeRequested(any());
+    }
+
+    private static TenantDocument tenantDocument(DocumentRow document) {
+        return tenantDocument(TENANT_ID, document);
+    }
+
+    private static TenantDocument tenantDocument(UUID tenantId, DocumentRow document) {
+        return new TenantDocument(tenantId, document);
     }
 
     private static DocumentRow document(int retryCount) {

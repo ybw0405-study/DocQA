@@ -36,8 +36,12 @@ class TenantIsolationContractTest {
      *   按单一游标投递；每行自带 tenant_id，由 relay stamp 到消息再下发。
      * - JdbcReminderRepository.findDue：定时到期扫描，返回 DueReminder(tenantId, row)，
      *   由投放侧用行上的 tenantId 做消息 stamp 与后续 CAS 写入。
-     * 两者的写侧（insert / advance / complete）仍逐行带 tenant_id 谓词，租户边界在写侧保证。
-     * 本测试是文件级判定，这两个文件仍因写侧而含 tenant_id，故无需新增豁免。
+     * - JdbcDocumentRepository.findTenantDocumentById / findStaleParsing / findStaleReindex /
+     *   findUnconfirmedDeletions：MQ 消费按全局唯一 documentId 反查归属租户，定时对账跨租户扫描；
+     *   查询一并返回行上的 tenant_id，Java↔Python 消息体因此无需携带租户字段。
+     * 三者的写侧（insert / mark* / abortReindex / recordVectorConfirmation 等）仍逐行带
+     * tenant_id 谓词，租户边界在写侧保证。本测试是文件级判定，这些文件仍因写侧而含
+     * tenant_id，故无需新增豁免。
      */
 
     /**

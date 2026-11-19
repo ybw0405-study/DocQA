@@ -10,11 +10,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.docqa.common.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.document.config.DocumentProperties;
 import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
+import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.DocumentRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -34,7 +34,8 @@ import org.springframework.data.redis.core.ValueOperations;
 @ExtendWith(MockitoExtension.class)
 class VectorChangeResultHandlerTest {
 
-    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
+    private static final UUID TENANT_ID = UUID.fromString("0192f3a4-a1b2-7c33-9d01-1234567890ab");
+    private static final UUID OTHER_TENANT_ID = UUID.fromString("0192f3a4-a1b2-7c33-9d01-1234567890ac");
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
@@ -66,20 +67,17 @@ class VectorChangeResultHandlerTest {
 
     @Test
     void aConfirmedDocumentDeletionRecordsTheRowCountReportedByPython() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(true)));
+        givenDocument(document(true));
 
         handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "COMPLETED", 0L, null));
 
         verify(documentRepository).recordVectorConfirmation(TENANT_ID, DOCUMENT_ID, 0L, NOW);
-        verify(valueOperations).set(
-                anyString(), anyString(), eq(Duration.ofDays(7)));
+        verify(valueOperations).set(anyString(), anyString(), eq(Duration.ofDays(7)));
     }
 
     @Test
     void aNonZeroRemainingCountIsStoredSoConsistencyReadsAsDiverged() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(true)));
+        givenDocument(document(true));
 
         handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "COMPLETED", 7L, null));
 
@@ -87,9 +85,18 @@ class VectorChangeResultHandlerTest {
     }
 
     @Test
+    void confirmationWritesInTheTenantThatOwnsTheDocument() throws Exception {
+        givenDocument(OTHER_TENANT_ID, document(true));
+
+        handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "COMPLETED", 3L, null));
+
+        verify(documentRepository).recordVectorConfirmation(OTHER_TENANT_ID, DOCUMENT_ID, 3L, NOW);
+        verify(documentRepository, never()).recordVectorConfirmation(eq(TENANT_ID), any(), anyLong(), any());
+    }
+
+    @Test
     void aFailedVectorChangeKeepsTheBusinessStateAndWritesNothing() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(true)));
+        givenDocument(document(true));
 
         handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "FAILED", null, "VEC-DELETE-001"));
 
@@ -98,8 +105,7 @@ class VectorChangeResultHandlerTest {
 
     @Test
     void aConfirmationWithoutARowCountLeavesTheReconciliationColumnsUnknown() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(true)));
+        givenDocument(document(true));
 
         handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "COMPLETED", null, null));
 
@@ -108,8 +114,7 @@ class VectorChangeResultHandlerTest {
 
     @Test
     void aConfirmationForADocumentThatIsNotDeletedIsIgnored() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(false)));
+        givenDocument(document(false));
 
         handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "COMPLETED", 0L, null));
 
@@ -118,8 +123,7 @@ class VectorChangeResultHandlerTest {
 
     @Test
     void aVersionCleanupConfirmationOnlyLogs() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID))
-                .thenReturn(Optional.of(document(false)));
+        givenDocument(document(false));
 
         handler.handle(MESSAGE_ID, bytes("DELETE_VERSION", "v1", "COMPLETED", 0L, null));
 
@@ -128,7 +132,7 @@ class VectorChangeResultHandlerTest {
 
     @Test
     void anUnknownDocumentIsSkipped() throws Exception {
-        when(documentRepository.findById(TENANT_ID, DOCUMENT_ID)).thenReturn(Optional.empty());
+        when(documentRepository.findTenantDocumentById(DOCUMENT_ID)).thenReturn(Optional.empty());
 
         handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "COMPLETED", 0L, null));
 
@@ -158,6 +162,15 @@ class VectorChangeResultHandlerTest {
 
         verifyNoInteractions(documentRepository);
         verify(valueOperations).set(anyString(), anyString(), eq(Duration.ofDays(7)));
+    }
+
+    private void givenDocument(DocumentRow document) {
+        givenDocument(TENANT_ID, document);
+    }
+
+    private void givenDocument(UUID tenantId, DocumentRow document) {
+        when(documentRepository.findTenantDocumentById(DOCUMENT_ID))
+                .thenReturn(Optional.of(new TenantDocument(tenantId, document)));
     }
 
     private byte[] bytes(String operation, String indexVersion, String status, Long remainingRows,

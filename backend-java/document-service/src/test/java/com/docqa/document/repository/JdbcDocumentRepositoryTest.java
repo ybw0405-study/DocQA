@@ -251,28 +251,42 @@ class JdbcDocumentRepositoryTest {
     }
 
     @Test
-    void deletionSweepSelectsTheCrashWindowOnly() {
-        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        repository.findUnconfirmedDeletions(TENANT_ID, CURSOR_AT, 50);
+    void systemScansAreCrossTenantAndSelectTheOwningTenant() {
+        repository.findUnconfirmedDeletions(CURSOR_AT, 50);
+        repository.findStaleReindex(CURSOR_AT, 50);
+        repository.findStaleParsing(CURSOR_AT, 50);
 
-        verify(jdbcTemplate).query(
-                sqlCaptor.capture(), any(RowMapper.class), eq(TENANT_ID.toString()), eq(Timestamp.from(CURSOR_AT)), eq(50));
-        assertThat(sqlCaptor.getValue())
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, times(3)).query(
+                sqlCaptor.capture(), any(RowMapper.class), eq(Timestamp.from(CURSOR_AT)), eq(50));
+        List<String> sqls = sqlCaptor.getAllValues();
+        assertThat(sqls.get(0))
+                .contains("SELECT tenant_id,")
                 .contains("deleted_at IS NOT NULL")
                 .contains("AND deleted_at < ?")
-                .contains("AND (vector_confirmed_at IS NULL OR vector_confirmed_at < deleted_at)");
+                .contains("AND (vector_confirmed_at IS NULL OR vector_confirmed_at < deleted_at)")
+                .doesNotContain("tenant_id = ?");
+        assertThat(sqls.get(1))
+                .contains("SELECT tenant_id,")
+                .contains("WHERE pending_index_version IS NOT NULL")
+                .doesNotContain("status = 'PARSING'")
+                .doesNotContain("tenant_id = ?");
+        assertThat(sqls.get(2))
+                .contains("SELECT tenant_id,")
+                .contains("WHERE status = 'PARSING'")
+                .doesNotContain("tenant_id = ?");
     }
 
     @Test
-    void staleReindexScanIsIndependentFromTheParsingScan() {
+    void tenantDocumentLookupReadsTheOwningTenantWithoutATenantPredicate() {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        repository.findStaleReindex(TENANT_ID, CURSOR_AT, 50);
+        repository.findTenantDocumentById(DOCUMENT_ID);
 
-        verify(jdbcTemplate).query(
-                sqlCaptor.capture(), any(RowMapper.class), eq(TENANT_ID.toString()), eq(Timestamp.from(CURSOR_AT)), eq(50));
-        String sql = sqlCaptor.getValue();
-        assertThat(sql).contains("WHERE tenant_id = ? AND pending_index_version IS NOT NULL");
-        assertThat(sql).doesNotContain("status = 'PARSING'");
+        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq(DOCUMENT_ID.toString()));
+        assertThat(sqlCaptor.getValue())
+                .contains("SELECT tenant_id,")
+                .contains("FROM document WHERE id = ?")
+                .doesNotContain("tenant_id = ?");
     }
 
     @Test

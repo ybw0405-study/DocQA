@@ -1,13 +1,14 @@
 package com.docqa.document.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.document.domain.DocumentRow;
+import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.DocumentRepository;
 import com.docqa.document.support.TraceScope;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,8 +19,6 @@ public class VectorChangeResultHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(VectorChangeResultHandler.class);
     private static final String EVENT_NAME = "vector-change-completed";
-    // P0: 存量事件归属默认租户，P1 随事件携带 tenant_id
-    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
 
     private final DocumentRepository documentRepository;
     private final MqIdempotencyMarker idempotencyMarker;
@@ -63,11 +62,13 @@ public class VectorChangeResultHandler {
                     event.operation());
             return;
         }
-        DocumentRow document = documentRepository.findById(TENANT_ID, event.documentId()).orElse(null);
-        if (document == null) {
+        Optional<TenantDocument> found = documentRepository.findTenantDocumentById(event.documentId());
+        if (found.isEmpty()) {
             LOGGER.warn("vector-change-completed for unknown document: documentId={}", event.documentId());
             return;
         }
+        UUID tenantId = found.get().tenantId();
+        DocumentRow document = found.get().document();
         if (!event.completed()) {
             LOGGER.warn(
                     "Vector change failed; business state kept and consistency stays readable:"
@@ -101,7 +102,7 @@ public class VectorChangeResultHandler {
             return;
         }
         Instant now = clock.instant();
-        int updated = documentRepository.recordVectorConfirmation(TENANT_ID, document.id(), remainingRows, now);
+        int updated = documentRepository.recordVectorConfirmation(tenantId, document.id(), remainingRows, now);
         LOGGER.info(
                 "Vector rows confirmed after deletion: documentId={}, remainingRows={}, applied={}",
                 document.id(),

@@ -2,6 +2,7 @@ package com.docqa.document.repository;
 
 import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
+import com.docqa.document.domain.TenantDocument;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -38,7 +39,11 @@ public class JdbcDocumentRepository implements DocumentRepository {
                 index_version = pending_index_version,
                 pending_index_version = NULL""";
 
+    private static final String TENANT_COLUMNS = "tenant_id, " + COLUMNS;
+
     private static final RowMapper<DocumentRow> ROW_MAPPER = JdbcDocumentRepository::mapRow;
+
+    private static final RowMapper<TenantDocument> TENANT_ROW_MAPPER = JdbcDocumentRepository::mapTenantRow;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -52,6 +57,16 @@ public class JdbcDocumentRepository implements DocumentRepository {
                         "SELECT " + COLUMNS + " FROM document WHERE tenant_id = ? AND id = ?",
                         ROW_MAPPER,
                         tenantId.toString(),
+                        id.toString())
+                .stream()
+                .findFirst();
+    }
+
+    @Override
+    public Optional<TenantDocument> findTenantDocumentById(UUID id) {
+        return jdbcTemplate.query(
+                        "SELECT " + TENANT_COLUMNS + " FROM document WHERE id = ?",
+                        TENANT_ROW_MAPPER,
                         id.toString())
                 .stream()
                 .findFirst();
@@ -309,50 +324,47 @@ public class JdbcDocumentRepository implements DocumentRepository {
     }
 
     @Override
-    public List<DocumentRow> findStaleParsing(UUID tenantId, Instant threshold, int limit) {
+    public List<TenantDocument> findStaleParsing(Instant threshold, int limit) {
         return jdbcTemplate.query("""
                         SELECT %s
                         FROM document
-                        WHERE tenant_id = ? AND status = 'PARSING' AND parsing_started_at < ? AND deleted_at IS NULL
+                        WHERE status = 'PARSING' AND parsing_started_at < ? AND deleted_at IS NULL
                         ORDER BY parsing_started_at
                         LIMIT ?
-                        """.formatted(COLUMNS),
-                ROW_MAPPER,
-                tenantId.toString(),
+                        """.formatted(TENANT_COLUMNS),
+                TENANT_ROW_MAPPER,
                 Timestamp.from(threshold),
                 limit);
     }
 
     @Override
-    public List<DocumentRow> findStaleReindex(UUID tenantId, Instant threshold, int limit) {
+    public List<TenantDocument> findStaleReindex(Instant threshold, int limit) {
         return jdbcTemplate.query("""
                         SELECT %s
                         FROM document
-                        WHERE tenant_id = ? AND pending_index_version IS NOT NULL
+                        WHERE pending_index_version IS NOT NULL
                           AND parsing_started_at < ?
                           AND deleted_at IS NULL
                         ORDER BY parsing_started_at
                         LIMIT ?
-                        """.formatted(COLUMNS),
-                ROW_MAPPER,
-                tenantId.toString(),
+                        """.formatted(TENANT_COLUMNS),
+                TENANT_ROW_MAPPER,
                 Timestamp.from(threshold),
                 limit);
     }
 
     @Override
-    public List<DocumentRow> findUnconfirmedDeletions(UUID tenantId, Instant deletedBefore, int limit) {
+    public List<TenantDocument> findUnconfirmedDeletions(Instant deletedBefore, int limit) {
         return jdbcTemplate.query("""
                         SELECT %s
                         FROM document
-                        WHERE tenant_id = ? AND deleted_at IS NOT NULL
+                        WHERE deleted_at IS NOT NULL
                           AND deleted_at < ?
                           AND (vector_confirmed_at IS NULL OR vector_confirmed_at < deleted_at)
                         ORDER BY deleted_at
                         LIMIT ?
-                        """.formatted(COLUMNS),
-                ROW_MAPPER,
-                tenantId.toString(),
+                        """.formatted(TENANT_COLUMNS),
+                TENANT_ROW_MAPPER,
                 Timestamp.from(deletedBefore),
                 limit);
     }
@@ -426,6 +438,10 @@ public class JdbcDocumentRepository implements DocumentRepository {
             pattern.append(character);
         }
         return pattern.append('%').toString();
+    }
+
+    private static TenantDocument mapTenantRow(ResultSet rs, int rowNum) throws SQLException {
+        return new TenantDocument(UUID.fromString(rs.getString("tenant_id")), mapRow(rs, rowNum));
     }
 
     private static DocumentRow mapRow(ResultSet rs, int rowNum) throws SQLException {

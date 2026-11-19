@@ -2,11 +2,11 @@ package com.docqa.document.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.metrics.BusinessMetrics;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.document.domain.ChunkEntry;
 import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
+import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.ChunkRepository;
 import com.docqa.document.repository.DocumentRepository;
 import com.docqa.document.support.SafeText;
@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -31,8 +32,6 @@ public class ParseResultHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(ParseResultHandler.class);
     private static final String ERROR_CODE_PATTERN = "^[A-Z]{2,4}-[A-Z_]+-[0-9]{3}$";
     private static final String REBUILD_FAILED_MESSAGE = "重建索引失败，已保留原索引版本，可稍后再次发起重建。";
-    // P0: 存量事件归属默认租户，P1 随事件携带 tenant_id
-    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
 
     private final DocumentRepository documentRepository;
     private final ChunkRepository chunkRepository;
@@ -98,12 +97,14 @@ public class ParseResultHandler {
             idempotencyMarker.markProcessed("parse.completed", messageId);
             return;
         }
-        DocumentRow document = documentRepository.findById(TENANT_ID, event.documentId()).orElse(null);
-        if (document == null) {
+        Optional<TenantDocument> found = documentRepository.findTenantDocumentById(event.documentId());
+        if (found.isEmpty()) {
             LOGGER.warn("parse.completed for unknown document: documentId={}", event.documentId());
             idempotencyMarker.markProcessed("parse.completed", messageId);
             return;
         }
+        UUID tenantId = found.get().tenantId();
+        DocumentRow document = found.get().document();
         if (document.deleted()) {
             LOGGER.warn(
                     "Dropping parse.completed for a deleted document: documentId={}, eventVersion={}",
@@ -131,14 +132,14 @@ public class ParseResultHandler {
             chunks = toChunks(document.id(), event.indexVersion(), event.chunks());
         } catch (IllegalArgumentException ex) {
             LOGGER.error("Invalid parse.completed chunks: documentId={}", document.id(), ex);
-            finishWithoutIndex(document, event.indexVersion(), "DOC-VALIDATION-004", "解析结果不完整，请重新上传。");
+            finishWithoutIndex(tenantId, document, event.indexVersion(), "DOC-VALIDATION-004", "解析结果不完整，请重新上传。");
             idempotencyMarker.markProcessed("parse.completed", messageId);
             return;
         }
 
         Instant now = clock.instant();
         IndexedOutcome outcome = transactionRunner.execute(
-                () -> applyIndexed(document.id(), event.indexVersion(), event.vectorRows(), chunks, now));
+                () -> applyIndexed(tenantId, document.id(), event.indexVersion(), event.vectorRows(), chunks, now));
         idempotencyMarker.markProcessed("parse.completed", messageId);
         if (!outcome.applied()) {
             LOGGER.warn(
@@ -174,29 +175,30 @@ public class ParseResultHandler {
     }
 
     private IndexedOutcome applyIndexed(
+            UUID tenantId,
             UUID documentId,
             String eventVersion,
             Long vectorRows,
             List<ChunkEntry> chunks,
             Instant now) {
-        DocumentRow current = documentRepository.findById(TENANT_ID, documentId).orElse(null);
+        DocumentRow current = documentRepository.findById(tenantId, documentId).orElse(null);
         if (current == null || current.deleted()) {
             return new IndexedOutcome(false, null);
         }
         if (eventVersion.equals(current.pendingIndexVersion())) {
-            chunkRepository.upsertAll(TENANT_ID, chunks);
-            if (documentRepository.promotePendingIndexVersion(TENANT_ID, documentId, eventVersion, vectorRows, now) == 0) {
+            chunkRepository.upsertAll(tenantId, chunks);
+            if (documentRepository.promotePendingIndexVersion(tenantId, documentId, eventVersion, vectorRows, now) == 0) {
                 throw new IllegalStateException("Unable to promote pending index version");
             }
             String obsolete = current.indexVersion();
-            chunkRepository.deleteByVersion(TENANT_ID, documentId, obsolete);
+            chunkRepository.deleteByVersion(tenantId, documentId, obsolete);
             return new IndexedOutcome(true, obsolete);
         }
         if (!isPendingNormalParse(current, eventVersion)) {
             return new IndexedOutcome(false, null);
         }
-        chunkRepository.upsertAll(TENANT_ID, chunks);
-        if (documentRepository.markIndexed(TENANT_ID, documentId, eventVersion, vectorRows, now) == 0) {
+        chunkRepository.upsertAll(tenantId, chunks);
+        if (documentRepository.markIndexed(tenantId, documentId, eventVersion, vectorRows, now) == 0) {
             throw new IllegalStateException("Unable to mark document INDEXED");
         }
         return new IndexedOutcome(true, null);
@@ -208,12 +210,14 @@ public class ParseResultHandler {
             idempotencyMarker.markProcessed("parse.failed", messageId);
             return;
         }
-        DocumentRow document = documentRepository.findById(TENANT_ID, event.documentId()).orElse(null);
-        if (document == null) {
+        Optional<TenantDocument> found = documentRepository.findTenantDocumentById(event.documentId());
+        if (found.isEmpty()) {
             LOGGER.warn("parse.failed for unknown document: documentId={}", event.documentId());
             idempotencyMarker.markProcessed("parse.failed", messageId);
             return;
         }
+        UUID tenantId = found.get().tenantId();
+        DocumentRow document = found.get().document();
         if (document.deleted()) {
             LOGGER.warn("Dropping parse.failed for a deleted document: documentId={}", document.id());
             idempotencyMarker.markProcessed("parse.failed", messageId);
@@ -223,7 +227,7 @@ public class ParseResultHandler {
         String errorMessage = SafeText.errorMessage(event.errorMessage(), "解析失败，请稍后重试。");
 
         if (event.indexVersion().equals(document.pendingIndexVersion())) {
-            documentRepository.abortReindex(TENANT_ID, document.id(), event.indexVersion(), errorCode, REBUILD_FAILED_MESSAGE);
+            documentRepository.abortReindex(tenantId, document.id(), event.indexVersion(), errorCode, REBUILD_FAILED_MESSAGE);
             LOGGER.warn(
                     "Rebuild aborted, old index version kept: documentId={}, failedVersion={}, errorCode={}",
                     document.id(),
@@ -247,30 +251,30 @@ public class ParseResultHandler {
         metrics.documentParse(parseDuration(document, now), "FAILED");
 
         if (!event.retryable()) {
-            markFailed(document.id(), errorCode, errorMessage);
+            markFailed(tenantId, document.id(), errorCode, errorMessage);
             idempotencyMarker.markProcessed("parse.failed", messageId);
             return;
         }
 
         Integer retryCount = transactionRunner.execute(() -> {
-            int updated = documentRepository.incrementRetryAndMarkParsing(TENANT_ID, document.id(), now);
+            int updated = documentRepository.incrementRetryAndMarkParsing(tenantId, document.id(), now);
             if (updated == 0) {
-                DocumentRow current = documentRepository.findById(TENANT_ID, document.id()).orElse(null);
+                DocumentRow current = documentRepository.findById(tenantId, document.id()).orElse(null);
                 if (current != null
                         && (current.status() == DocumentStatus.PARSING
                                 || current.status() == DocumentStatus.FAILED)
                         && current.retryCount() >= current.maxRetry()) {
-                    documentRepository.markDead(TENANT_ID, current.id(), errorCode, "解析重试次数已耗尽。");
+                    documentRepository.markDead(tenantId, current.id(), errorCode, "解析重试次数已耗尽。");
                 }
                 return -1;
             }
-            return documentRepository.findById(TENANT_ID, document.id())
+            return documentRepository.findById(tenantId, document.id())
                     .map(DocumentRow::retryCount)
                     .orElse(-1);
         });
 
         if (retryCount != null && retryCount >= 0) {
-            DocumentRow current = documentRepository.findById(TENANT_ID, document.id()).orElse(null);
+            DocumentRow current = documentRepository.findById(tenantId, document.id()).orElse(null);
             if (current != null) {
                 ParseRequestedEvent requested = new ParseRequestedEvent(
                         UUID.randomUUID(),
@@ -300,16 +304,17 @@ public class ParseResultHandler {
     }
 
     private void finishWithoutIndex(
+            UUID tenantId,
             DocumentRow document,
             String eventVersion,
             String errorCode,
             String errorMessage) {
         if (eventVersion.equals(document.pendingIndexVersion())) {
             transactionRunner.execute(
-                    () -> documentRepository.abortReindex(TENANT_ID, document.id(), eventVersion, errorCode, errorMessage));
+                    () -> documentRepository.abortReindex(tenantId, document.id(), eventVersion, errorCode, errorMessage));
             return;
         }
-        markFailed(document.id(), errorCode, errorMessage);
+        markFailed(tenantId, document.id(), errorCode, errorMessage);
     }
 
     private static boolean isPendingNormalParse(DocumentRow document, String eventVersion) {
@@ -350,8 +355,8 @@ public class ParseResultHandler {
         return chunks;
     }
 
-    private void markFailed(UUID documentId, String errorCode, String errorMessage) {
-        transactionRunner.execute(() -> documentRepository.markFailed(TENANT_ID, documentId, errorCode, errorMessage));
+    private void markFailed(UUID tenantId, UUID documentId, String errorCode, String errorMessage) {
+        transactionRunner.execute(() -> documentRepository.markFailed(tenantId, documentId, errorCode, errorMessage));
     }
 
     private void publishVectorChangeQuietly(VectorChangeRequestedEvent event) {
