@@ -9,12 +9,11 @@
 
 ## 一键启动（2026-11-19 起，推荐）
 
-前置：安装并打开 **Docker Desktop**（本机 `C:\Users\YYYBBW\AppData\Local\Programs\DockerDesktop`）。
+前置：安装并启动 **Docker Desktop**，确认 `docker info` 可正常返回（脚本不依赖任何固定安装路径）。
 旧方案里的 WSL 中间件、Windows 原生 mysqld、开机自启、34 个全局环境变量**全部退役**，本文后半部分保留仅供回滚参考。
 
 ```powershell
-cd C:\Users\YYYBBW\Desktop\DocQA
-
+# 在仓库根目录执行（路径任意；脚本按自身位置推导，目录改名或移动无需改命令）
 # 仅首次：从模板生成项目内配置（gitignored，不写 Windows 全局作用域）
 Copy-Item ops/env/local.env.example ops/env/local.env
 
@@ -27,10 +26,10 @@ Copy-Item ops/env/local.env.example ops/env/local.env
 
 **这套方案的四个性质：**
 
-1. **零全局环境变量**：所有配置在 `ops/env/local.env`（模板 `local.env.example`），由 `start-dev.ps1` 注入**进程作用域**，脚本退出即消失。Windows User / Machine 作用域里 `DOCQA_*` 应为 0 个（与 AgentFlow 的 `AF_*` 对称）。
+1. **零全局环境变量**：所有配置在 `ops/env/local.env`（模板 `local.env.example`），由 `start-dev.ps1` 注入**进程作用域**，脚本退出即消失。Windows User / Machine 作用域里 `DOCQA_*` 应为 0 个（不与其他项目的环境变量约定混用）。
 2. **零 IP 漂移**：中间件全在 Docker Desktop bridge，端点固定 `127.0.0.1:<专属端口>`，不再依赖 WSL `eth0` 地址，也就不需要开机刷环境变量。
 3. **零开机自启**：计划任务 `DocQA Local Stack` 已 Disabled、WSL 三个 `docqa-*.service` 已 `disable`、原生 `MySQL84` 服务由管理员脚本改 Manual。用哪个项目就跑哪个项目的 `start-dev.ps1`。
-4. **可与 AgentFlow 同时运行**：端口段完全错开，不再需要互斥切换。
+4. **可与其他本地项目同时运行**：端口段完全错开，不再需要互斥切换。
 
 ### 端口表（唯一事实来源：`ops/env/local.env`）
 
@@ -49,8 +48,8 @@ Copy-Item ops/env/local.env.example ops/env/local.env
 
 ### 数据库
 
-首次搬迁已完成：原 Windows 原生 `docqa` 库（16 张表、含 Flyway V1–V10 与 `default` 租户行）
-经 `mysqldump` 导入 `docqa-mysql` 容器卷，备份在 `ops/backup/docqa-20261119.sql`（gitignored）。
+首次数据搬迁时，既有 `docqa` 库（16 张表、含 Flyway V1–V10 与 `default` 租户行）经 `mysqldump`
+导入 `docqa-mysql` 容器卷；备份统一放在 `ops/backup/`（gitignored，不入库）。
 `start-dev.ps1` 每次启动会幂等重放 `ops/sql/least-privilege.sql.tmpl`（账号 host 为 `%`，因为
 Windows 侧经端口映射连入时 MySQL 看到的是 bridge 网关地址）。迁移仍由 document-service 启动时跑 Flyway。
 
@@ -75,7 +74,7 @@ Windows 侧经端口映射连入时 MySQL 看到的是 bridge 网关地址）。
 | 主机 | 组件 | 地址 |
 |---|---|---|
 | Windows | MySQL 8 (`MySQL84` 服务) | `127.0.0.1:3306` |
-| 虚拟机 | Redis | `192.168.40.128:6379` |
+| 虚拟机 | Redis | `<VM_IP>:6379` |
 | WSL2 (docker, host 网络) | RocketMQ namesrv / broker | `<WSL_IP>:9876` / `10911` |
 | WSL2 (docker, host 网络) | PostgreSQL 16 + pgvector | `<WSL_IP>:5432` |
 | WSL2 (docker, host 网络) | MinIO | `<WSL_IP>:9100` |

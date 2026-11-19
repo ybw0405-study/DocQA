@@ -18,6 +18,13 @@
 - 仓库转为 **public**，`main` 启用 Branch Protection（必须走 PR、required status checks 指向三端 CI、
   `enforce_admins`、禁 force push / 删除、线性历史）。`SECURITY.md` 与 `git-workflow.md` 中
   「私有仓库免费套餐 403 无法启用」的过时表述已同步更正。
+- `docs/00-infra/getting-started.md` 去除写死的本机用户名、绝对路径、历史备份文件名与内网 VM 地址，
+  改为路径无关表述；公开仓库不再暴露本机环境细节，指南可按任意克隆位置执行。
+
+### Fixed
+
+- 审计页事件类型与写入端 / 来源端文字重叠：事件类型独立成行，审计表列宽重分配并对长标识启用换行。
+- 问答页右栏大片留白：两栏容器用 `.ask__stream` 约束最大宽度，并在窄屏断点收敛布局。
 
 ## [2.1.0] - 2026-11-19
 
