@@ -101,12 +101,34 @@ input[type='file']::file-selector-button:hover {
 
 .app-main:has(.ask__new) > .card {
   margin-top: 0;
-}
-
-.app-main:has(.ask__new) > .card:first-child {
-  grid-row: 1 / span 2;
+  grid-column: 1;
   position: sticky;
   top: calc(var(--header-height) + var(--space-6));
+}
+
+/*
+ * 右栏两张卡片放进同一个流：原先让左栏跨 grid 两行，浏览器会按左栏的内容
+ * 高度撑开两行，「提问」被推到左栏底部，中间留出一大片空白。改成右栏独立
+ * 一列后，对话与提问自然相邻，左栏仍可 sticky。
+ */
+.app-main:has(.ask__new) > .ask__stream {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  min-width: 0;
+}
+
+.app-main:has(.ask__new) .ask__stream > .card + .card {
+  margin-top: 0;
+}
+
+/* 卡片标题样式原本只挂在 .app-main > .card 上，包一层后补回右栏两张。 */
+.app-main:has(.ask__new) .ask__stream > .card > h2:first-child {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
 }
 
 .app-main:has(.ask__new) .ask__new {
@@ -359,6 +381,12 @@ form > button[type='submit']:disabled {
   table-layout: fixed;
 }
 
+/*
+ * 事件类型与写入端都是无空格的长标识符（ADMIN_AI_TENANT_KILL_SWITCH_DISABLED、
+ * admin_gateway）。fixed 布局下浏览器不会在词内断行，36 字符的事件名会直接
+ * 溢到「写入端」列上叠字；写入端原来只有 7%，连自身都放不下。按信息价值
+ * 重分配宽度，并让这两列主动断词。
+ */
 .audit-table th:nth-child(1),
 .audit-table td:nth-child(1) {
   width: 13%;
@@ -366,32 +394,47 @@ form > button[type='submit']:disabled {
 
 .audit-table th:nth-child(2),
 .audit-table td:nth-child(2) {
-  width: 19%;
+  width: 21%;
 }
 
 .audit-table th:nth-child(3),
 .audit-table td:nth-child(3) {
-  width: 7%;
+  width: 10%;
 }
 
 .audit-table th:nth-child(4),
 .audit-table td:nth-child(4) {
-  width: 7%;
+  width: 6%;
 }
 
 .audit-table th:nth-child(5),
 .audit-table td:nth-child(5) {
-  width: 25%;
+  width: 23%;
 }
 
 .audit-table th:nth-child(6),
 .audit-table td:nth-child(6) {
-  width: 23%;
+  width: 21%;
 }
 
 .audit-table th:nth-child(7),
 .audit-table td:nth-child(7) {
   width: 6%;
+}
+
+.audit-table td:nth-child(2),
+.audit-table td:nth-child(3) {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+/* 和 traceId / userId 一致：事件类型也是要整段复制去查日志的标识符。
+   独占一行，避免执行体名称紧跟在 36 字符长串后面被误读成事件名的一部分。 */
+.audit-table__event {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0;
 }
 
 /*
@@ -2116,12 +2159,23 @@ form > button[type='submit']:hover:not(:disabled),
     margin-top: var(--space-6);
   }
 
-  .app-main:has(.ask__new) > .card {
+  .app-main:has(.ask__new) > .card,
+  .app-main:has(.ask__new) > .ask__stream {
     margin-top: var(--space-7);
   }
 
   .app-main:has(.ask__new) > .card:first-child {
     position: static;
+  }
+
+  .app-main:has(.ask__new) > .ask__stream {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-7);
+  }
+
+  .app-main:has(.ask__new) .ask__stream > .card {
+    margin-top: 0;
   }
 
   .document-table__detail {
