@@ -11,7 +11,12 @@ import com.docqa.agentgateway.service.AuthenticatedUser;
 import com.docqa.agentgateway.service.JwtAuthenticator;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockFilterChain;
@@ -52,6 +58,27 @@ class JwtAuthenticationFilterTest {
 
         assertThat(request.getAttribute(JwtAuthenticationFilter.USER_ID_ATTRIBUTE)).isEqualTo(USER_ID);
         assertThat(chain.getRequest()).isNotNull();
+    }
+
+    @Test
+    void mirrorsTenantIdToMdcDuringRequestAndClearsAfterwards() throws Exception {
+        when(jwtAuthenticator.authenticateIdentity("Bearer token")).thenReturn(identity("USER"));
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/conversations");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer token");
+        String[] mdcDuringRequest = new String[1];
+        MockFilterChain chain = new MockFilterChain() {
+            @Override
+            public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse)
+                    throws IOException, ServletException {
+                mdcDuringRequest[0] = MDC.get(TenantContext.MDC_KEY);
+                super.doFilter(servletRequest, servletResponse);
+            }
+        };
+
+        filter.doFilter(request, new MockHttpServletResponse(), chain);
+
+        assertThat(mdcDuringRequest[0]).isEqualTo(TENANT_ID.toString());
+        assertThat(MDC.get(TenantContext.MDC_KEY)).isNull();
     }
 
     @Test

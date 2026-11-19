@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 
 class TenantContextTest {
 
@@ -37,6 +38,24 @@ class TenantContextTest {
 
         assertThat(TenantContext.currentOrNull()).isNull();
         assertThatThrownBy(TenantContext::require).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void setMirrorsTenantIdIntoMdc() {
+        UUID tenantId = UUID.randomUUID();
+        TenantContext.set(tenantId);
+
+        assertThat(MDC.get(TenantContext.MDC_KEY)).isEqualTo(tenantId.toString());
+    }
+
+    @Test
+    void clearRemovesTenantIdFromMdc() {
+        TenantContext.set(UUID.randomUUID());
+        assertThat(MDC.get(TenantContext.MDC_KEY)).isNotNull();
+
+        TenantContext.clear();
+
+        assertThat(MDC.get(TenantContext.MDC_KEY)).isNull();
     }
 
     @Test

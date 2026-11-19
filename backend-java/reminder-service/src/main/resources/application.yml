@@ -65,6 +65,9 @@ docqa:
 logging:
   level:
     com.docqa.reminder: INFO
+  # 租户/链路标签走 MDC：TenantContext.set 写 tenantId，TraceIdFilter 写 traceId
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p ${PID:- } --- [%15.15t] %-40.40logger{39} traceId=%X{traceId:-} tenantId=%X{tenantId:-} : %m%n"
 
 management:
   endpoints:

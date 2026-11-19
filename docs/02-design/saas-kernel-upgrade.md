@@ -394,7 +394,7 @@ DELETE FROM flyway_schema_history WHERE version = '10' AND success = 0;
 **尚未完成（不要误读为 P1 整体交付）**：§5.2 第 3 条由 §5.10 继续收口；第 4 条 MQ/定时任务、
 第 5 条 Java↔Python 协议、第 6 条 pgvector/MinIO/Redis 仍在待办；没有创建真实第二租户的
 管理端点（HTTP 级跨租户验收目前靠带租户 JWT + 仓储打桩），域名路由、OPA ABAC 也未开始。
-§8 的 `tenant_id` 可观测标签尚未落到日志/指标，本阶段只是让隔离效果**在测试里可观测**。
+§8 的 `tenant_id` 可观测标签当时尚未落到日志/指标（日志侧已由 §5.13 + §5.15 补齐，指标仍待评估），本阶段只是让隔离效果**在测试里可观测**。
 
 ### 5.10 管理面租户收口（2026-11-19，§5.2 第 3 条完成）
 
@@ -508,6 +508,26 @@ Redis 键**不盲目加段**：`userId` / `traceId` 是全局唯一 UUID 天然�
 「一键全停」语义，属于产品决策，留待确认。
 
 验证：`mvn -o test -pl document-service -am` → 131 + 214 tests 全绿；全量门禁见本批提交。
+
+### 5.15 Java 侧 tenant_id 可观测标签（2026-11-19，§8 日志侧完成）
+
+Python 侧已在 §5.13 把 `tenantId` 加入日志字段白名单并在 `agent.graph` span 写 `tenant.id`；
+本批补齐 Java 侧对称能力，使 `tenant_id` 真正落在日志行而不只是存在于 `TenantContext`。
+
+| 项 | 实现 |
+|---|---|
+| MDC 镜像 | `TenantContext.set(UUID)` 在写入 ThreadLocal 的同时 `MDC.put("tenantId", tenantId.toString())`；`clear()` 同步 `MDC.remove`。与 `TraceIdContext` 用 MDC 承载 `traceId` 完全对称 |
+| 日志模式 | 实际设置租户上下文的三个服务（agent-gateway / document-service / reminder-service）在 `logging.pattern.console` 渲染 `traceId=%X{traceId:-} tenantId=%X{tenantId:-}`，保留原时间/级别/PID/线程/logger 字段；未设置时渲染为空 |
+| 覆盖面 | 三个 `JwtAuthenticationFilter` 无需改动即可自动获得 MDC；任何今后设置 `TenantContext` 的 MQ 消费者、定时任务也自动获得，无需逐处打点 |
+| 测试 | `TenantContextTest` 新增 set 写 MDC / clear 清 MDC 两例；`JwtAuthenticationFilterTest` 在 MockFilterChain 内断言链路执行期间 MDC 可见且出口已清理 |
+
+**边界**：本批只做日志标签（§8 的可观测部分），**不动 Prometheus 指标**。按 §3 第 7 条，给指标加
+tenant 标签会放大时间序列基数，需先评估租户规模（见 §6 第 1 条）再决定，避免一次改出高基数事故。
+跨租户扫描类后台任务（AuditOutboxRelay / DocumentReconciliationJob / ReminderDueService）逐行携带
+`tenantId` 写库但不设置 `TenantContext`，故这些任务的日志不带租户标签——它们在单条日志里也不对应
+唯一租户，保持现状比强行逐行 set/clear 更不容易误导排障。
+
+验证：`mvn -o test` 全绿；`mvn -o checkstyle:check` 0 违规。
 
 ---
 
