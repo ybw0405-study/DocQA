@@ -562,6 +562,23 @@ extra="forbid"`，向量变更消息字段集合必须同步）、存量向量�
 
 验证：`JdbcDocumentScopeRepositoryTest` 与 Python `test_rag.py` 相关用例已在门禁中全绿；本批仅文档判断，无代码改动。
 
+### 5.17 parse_worker MQ 消息跨语言契约测试（2026-11-19）
+
+`ProtocolTenantContractTest` 只锁住问答协议 `AgentAskRequest`，但 document-service ↔ Python
+parse_worker 之间还有 6 个 MQ 消息同样受 `extra="forbid"` 约束：任一侧增删字段，消息就解析失败
+落入 DLQ，且因为是异步链路不会立即暴露。新增 `ParseWorkerProtocolContractTest`（在
+document-service，复用源码解析范式）一次性钉死双端字段集合：
+
+- 覆盖 `ParseRequestedEvent` / `ParsedChunk` / `ParseCompletedEvent` / `ParseFailedEvent` /
+  `VectorChangeRequestedEvent` / `VectorChangeCompletedEvent` 共 6 个消息；
+- 逐类断言 Java record 组件名集合 == Python `Field(alias=...)` 线上名集合 == 固定期望表；
+- 另断言 6 个消息**均不带 tenantId**，把 §5.12「靠 documentId 全局唯一 + 消费侧反查归属租户、
+  消息体不携带租户字段」的设计决策钉死——防止有人以「补租户维度」为名加字段触发双端破坏性发布。
+
+本批核对结果：双端字段当前完全一致，无漂移；纯增量守护，未改任何生产代码或消息结构。
+
+验证：`mvn -o test -pl document-service -am -Dtest=ParseWorkerProtocolContractTest` → 2 tests 全绿。
+
 ---
 
 ## 6. 待确认事项
