@@ -181,15 +181,16 @@ CREATE TABLE tenant (
 
 ### 5.2 P0 明确的临时口径（P1 必须替换）
 
-> 第 1～5 条已由 §5.9 / §5.10 / §5.11 / §5.12 / §5.13 替换；第 6 条部分由 §5.14 收口（MinIO），
-> pgvector 与 Redis 键仍待办。
+> 第 1～5 条已由 §5.9 / §5.10 / §5.11 / §5.12 / §5.13 替换；第 6 条已评估闭环：MySQL 见 §5.1，
+> MinIO 由 §5.14 收口，pgvector 与 Redis 由 §5.16 / §5.14 论证「维持现状即可，不加租户维度」。
 
 1. **只有一个租户生效**。V10 把全部存量数据回填到默认租户，登录/注册尚无租户解析入口，因此所有请求都拿到默认租户 ID。租户隔离的**结构与约束已就位，但隔离效果要到 P1 接入多租户解析后才可观测**。
 2. **登录/注册用 `DEFAULT_TENANT_ID`**：`AuthService`、`RefreshTokenService`、`DemoUserSeeder` 内有 `tenantId()` 帮助方法，P1 改为按邮箱域名路由解析。
 3. **管理面聚合只看默认租户**：`AdminQuotaService` / `AdminAiUsageService` / `AdminAiControlsService` / `AdminAuditQueryService` / `AdminUserService` 传默认租户，P1 改为按管理员可见租户集过滤。
 4. **MQ / 定时任务**：`AuditOutboxRelay`、`AuditEventService`、`ReminderDueService`、`ReminderTriggerIngestService`、`ParseResultHandler` 等传默认租户，P1 随消息体携带 `tenant_id` 或遍历所有 ACTIVE 租户。（已由 §5.11 / §5.12 全部收口）
 5. **Java↔Python 协议未加 tenant 字段**：Python `AgentAskRequest` 是 `extra="forbid"`，双向必须同批发布，因此放在 P1 与 OPA 一起做。P0 的租户过滤在 Java 侧生效后再把 `documentScopes` 传给 Python。（已由 §5.13 替换）
-6. **pgvector / MinIO / Redis 键未动**：V10 只覆盖 MySQL 业务库。这三者加租户维度是 P1 范围（见 §1.1）。
+6. **pgvector / MinIO / Redis 键未动**：V10 只覆盖 MySQL 业务库。这三者加租户维度是 P1 范围（见 §1.1）；
+   评估结论见 §5.14（MinIO 已加）、§5.16（pgvector / Redis 维持现状）。
 
 ### 5.3 实际落地的契约测试
 
@@ -392,7 +393,8 @@ DELETE FROM flyway_schema_history WHERE version = '10' AND success = 0;
 验证：`mvn -o test` → 1240 tests / 0 failures / 0 errors；`mvn -o checkstyle:check` → 0 违规。
 
 **尚未完成（不要误读为 P1 整体交付）**：§5.2 第 3 条由 §5.10 继续收口；第 4 条 MQ/定时任务、
-第 5 条 Java↔Python 协议、第 6 条 pgvector/MinIO/Redis 仍在待办；没有创建真实第二租户的
+第 5 条 Java↔Python 协议、第 6 条 pgvector/MinIO/Redis 当时仍在待办（此后第 5 条由 §5.13 完成，
+第 6 条由 §5.14 MinIO + §5.16 pgvector/Redis 评估闭环）；没有创建真实第二租户的
 管理端点（HTTP 级跨租户验收目前靠带租户 JWT + 仓储打桩），域名路由、OPA ABAC 也未开始。
 §8 的 `tenant_id` 可观测标签当时尚未落到日志/指标（日志侧已由 §5.13 + §5.15 补齐，指标仍待评估），本阶段只是让隔离效果**在测试里可观测**。
 
@@ -439,7 +441,8 @@ reminder-service / document-service 的生产配置是 `true`，**本批改动�
 暂保留默认租户，待管理面暴露查询时一并收口。
 
 **尚未完成**：`ParseResultHandler`（Python 解析回写）由 §5.12 以「按 documentId 反查」收口，
-不走消息体携带；§5.2 第 5 条协议已由 §5.13 完成，第 6 条 pgvector/MinIO/Redis、域名路由、OPA ABAC 仍未开始。
+不走消息体携带；§5.2 第 5 条协议已由 §5.13 完成，第 6 条 pgvector/Redis 已由 §5.16、MinIO 由
+§5.14 评估/收口；域名路由、OPA ABAC 仍未开始。
 
 验证：`mvn -o test` → 全绿；`mvn -o checkstyle:check` → 0 违规。
 
@@ -465,8 +468,10 @@ UUID，按它反查归属租户既不会串账，也天然覆盖存量在途消�
 documentId 的全局唯一性与写侧谓词共同保证。`TenantIsolationContractTest`
 已在注释中记录这四个方法的有意跨租户性质，文件级判定因写侧仍含 tenant_id 而无需新增豁免。
 
-**尚未完成**：Python 侧的 pgvector 写入仍按 documentId 而非 tenant_id 分片（§5.2 第 6 条）；
-Java→Python 的 `AgentAskRequest` 已由 §5.13 带上 `tenantId`（第 5 条完成）；第 6 条 pgvector/MinIO/Redis、域名路由、OPA ABAC 仍未开始。
+**评估结论**：Python 侧的 pgvector 写入按 documentId 而非 tenant_id 分片，经 §5.16 确认为
+符合 D-87 红线的有意设计（靠授权 scope 隔离），不视为缺陷；Java→Python 的 `AgentAskRequest`
+已由 §5.13 带上 `tenantId`（第 5 条完成）；第 6 条 MinIO 由 §5.14、pgvector/Redis 由 §5.16
+收口；域名路由、OPA ABAC 仍未开始。
 
 验证：`mvn -o test` → 全绿；`mvn -o checkstyle:check` → 0 违规。
 
@@ -487,7 +492,8 @@ Python 侧从此能直接以租户维度做可观测与后续 ABAC 判决。
 **边界**：本批只把租户上下文送过协议边界并使之可观测；Python 侧检索仍以
 `documentScopes` 的全局唯一 `documentId` 为边界（Java 侧 `JdbcDocumentScopeRepository`
 已带 `tenant_id` 谓词）。pgvector 按租户分片仍属 §5.2 第 6 条，届时可直接使用
-`request.tenant_id` 作路由键，无需再改协议字段。
+`request.tenant_id` 作路由键，无需再改协议字段。若未来真要分 collection，协议字段已就位；
+但经 §5.16 评估，维持 D-87 红线、靠授权 scope 隔离即可，当前不分片。
 
 验证：`mvn -o test` → 全绿；Python 全量测试 → 全绿；`mvn -o checkstyle:check` → 0 违规。
 
@@ -502,8 +508,9 @@ Python 侧从此能直接以租户维度做可观测与后续 ABAC 判决。
 两种格式共存，符合 §3 第 6 条「保留旧路径兼容读取」，无需搬对象。Python parse worker 对
 `objectKey` 只校验「相对路径 + 无空段/穿越」，多一段 UUID 不影响校验，故 Java↔Python 消息契约零改动。
 
-**§5.2 第 6 条剩余**：pgvector 按 tenant 分片（写入 + 检索，注意 HNSW 后置过滤）、Redis 键。
-Redis 键**不盲目加段**：`userId` / `traceId` 是全局唯一 UUID 天然不串租户；
+**§5.2 第 6 条剩余**：pgvector 与 Redis 的租户维度均已评估为「维持现状」——pgvector 见 §5.16
+（D-87 红线 + 授权 scope 已隔离，加列反而触发 HNSW 后置过滤）；Redis 键**不盲目加段**：
+`userId` / `traceId` 是全局唯一 UUID 天然不串租户；
 `agent:kill-switch` 是平台级全局熔断（见 `AdminAiControlsService` 注释），改成按租户会破坏
 「一键全停」语义，属于产品决策，留待确认。
 
@@ -528,6 +535,32 @@ tenant 标签会放大时间序列基数，需先评估租户规模（见 §6 �
 唯一租户，保持现状比强行逐行 set/clear 更不容易误导排障。
 
 验证：`mvn -o test` 全绿；`mvn -o checkstyle:check` 0 违规。
+
+### 5.16 pgvector 不加 tenant_id 列的判断（2026-11-19，§5.2 第 6 条评估闭环）
+
+§1.1 D-87 设计红线明确「pgvector 两张向量表没有任何按用户过滤的列」。复核后确认这不是待补的
+缺口，而是**有意且与多租户兼容的边界设计**，本批决定**不**给向量表加 `tenant_id`，理由如下。
+
+**检索隔离已经由上游完整保证，且不依赖向量表内存租户列**：
+
+| 环节 | 保证 | 测试守护 |
+|---|---|---|
+| 用户输入 documentId → 授权 scope | `JdbcDocumentScopeRepository.findByUserAndIds` 的 `WHERE tenant_id = ? AND user_id = ? AND id IN (...)`；跨租户/他人 id 在此被过滤掉，根本进不了 scope | `JdbcDocumentScopeRepositoryTest.softDeletedDocumentsAreOutsideTheScope` |
+| scope → 向量检索 | `PgVectorRepository.search` 只按 `(document_id, index_version) IN scopes` 查询，没有 scope 的文档不可达 | `test_retrieval_only_returns_authorized_document_scopes` / `test_retrieval_empty_scopes_short_circuits` |
+| documentId 唯一性 | 全局唯一 UUID，不存在跨租户撞 id；写入侧由 document-service 的 tenant 谓词收口（§5.12） | `ObjectKeysTest` / §5.12 契约测试 |
+
+**为何不加反而更安全**：§1.1 已记录「HNSW 后置过滤会破坏 top-k，必须用分区表或按 tenant 分
+collection，不能简单加 WHERE」。给两张表加列还要：双端破坏性发布（Python `StrictModel
+extra="forbid"`，向量变更消息字段集合必须同步）、存量向量回填默认租户（两张表、两万个 chunk 量级）、
+以及重建 HNSW 索引。收益仅仅是纵深防御——而它守护的越权路径在上游已经被两层谓词 + 全局唯一 id
+封死。投入产出比与风险都指向「不做」。
+
+**结论**：§5.2 第 6 条的 pgvector 部分以「维持 D-87 红线、靠授权 scope 隔离」收口，不新增列。
+与 §5.14 Redis 的判断一致：先确认隔离语义是否已被上游保证，再决定是否加租户段，避免把「看起来
+该加」误当成「隔离漏洞」。真正需要租户维度的是 MySQL 业务表（已在 V10 完成）与 MinIO 对象键
+（§5.14 完成）；Redis 全局熔断键保持平台级语义不变。
+
+验证：`JdbcDocumentScopeRepositoryTest` 与 Python `test_rag.py` 相关用例已在门禁中全绿；本批仅文档判断，无代码改动。
 
 ---
 
