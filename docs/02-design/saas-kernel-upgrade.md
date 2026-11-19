@@ -729,6 +729,56 @@ D2 / D4 / D5 / D6 为「明确不做」的拍板结论。本批**不新增能力
 （全模块 + Testcontainers 真库 + checkstyle）、Python pytest / ruff ×2、前端
 typecheck / lint / test / build → 全部 PASS、JSON `failed:false`；`git diff --check` → 0。
 
+### 5.22 2.1.0 工程闭环补齐（2026-11-19）
+
+§5.21 的「技术边界内无剩余待办」指的是**已拍板的 P0 地基 + P1-B 改造范围**。随后一次全面
+交付审计发现若干「后端已落地但链条未走完 / 工程基建缺失」的项，本批按用户裁决
+「D2 / D5 / D6 维持不动、其余按推荐补齐」收口，发 **2.1.0**（新增功能、无 BREAKING）。
+
+**前端消费 D3，`tenantId` 语义已在契约中钉死、无需再拍板。** 2.0.0 落地的
+`GET/PUT /api/v1/admin/ai/controls/tenant` 此前只有后端与契约，前端 `admin.ts` 未接。
+本批新增两个 API 函数、独立 store `tenantControls.ts`、管理页「本租户 Kill Switch」
+（路由 `/admin/tenant-controls`、导航「本租户」）。契约要求 `tenantId` **只取自已验签 JWT**、
+需要 ADMIN 角色、不接受请求体或 Header 传参，因此前端不提供选择租户的入口——产品语义
+没有留下新的决策空间，界面只需如实呈现。
+
+**最容易撒谎的一处语义：有效状态是 OR 叠加。** Java `AdminAiControlsService.getTenantKillSwitch`
+返回 `killSwitch.isActiveForTenant(tenantId)`，即「平台级全局键 OR 本租户键」，而
+`updatedAt` / `updatedBy` 只来自**租户键**的 meta。于是：平台级一键全停仍开启时，
+运维关闭本租户键后回显依旧是 `active=true`，且元数据为 null。本批的桩、store 与界面
+都如实模拟并说明这一形态——页面明确写「本页无法判断当前是哪个键在生效」「关闭本租户键后
+若仍显示已开启，说明平台级开关仍开着」「本页无法关闭它」，绝不把该回显写成
+「服务已恢复」或「写入失败」。这与 S9 以来「不伪造治理事实」的纪律一致。
+
+**bootstrap 供给的真库验收（按 D4 边界，不引入全链 e2e）。** 此前 D1 端点只有
+`TenantAdminControllerTest`（MockMvc standalone）、`TenantProvisioningServiceTest`（fake 仓储）、
+`JdbcTenantRepositoryTest`（mock JdbcTemplate 验 SQL 文本）——缺真库语义一层。本批复用的
+`MigrationOnRealMysqlTest`（全仓唯一真库基建，已跑 V1→V10、有 `ss_app` 最小权限账号）
+新增一个用例，在真实 MySQL 8.4 上断言：`INSERT IGNORE INTO tenant` 同 id 重放返回 0 行、
+不同 id 同 slug 被 `uk_tenant_slug` 忽略、换成普通 INSERT 真的抛 `DuplicateKeyException`、
+写入形态为 `ACTIVE / owner_user_id=NULL`（不预设平台管理员）。四层断言合成完整验收链，
+零新增依赖/容器。
+
+**CI 注释与实现矛盾（PR 检查清单明令禁止项）。** `ci.yml` 头部原写「全部离线、真基础设施
+e2e 不属 CI」，但 `mvn verify` 实际会跑 `MigrationOnRealMysqlTest`：GitHub runner 自带 Docker，
+`integrationEnabled()` 的 `DockerClientFactory.isDockerAvailable()` 为真，日志可见
+`mysql:8.4` 容器启动与 7（本批后 8）个测试真跑。本批把注释改为如实描述该边界，写明
+「无需外部预置 MySQL/Redis/RocketMQ/MinIO/PGVector；真库迁移与仓储验收由 Testcontainers
+在 Docker 可用时自动执行；`DOCQA_DB_IT=off` 可跳过；全链 HTTP e2e 按 D4 不引入」。
+**这一项纠正了此前「CI 不跑真基础设施」的误判。**
+
+**release 自动化。** 2.0.0 的 Release 是手工建的；本批新增 `.github/workflows/release.yml`，
+推送 `vX.Y.Z` tag 时从 CHANGELOG 提取对应版本段落自动创建/更新 Release，缺段落则拒绝
+发布空 Release，另支持 `workflow_dispatch` 手动补发。
+
+**维持不动的项**：D2 域名路由、D5 Prometheus tenant 标签、D6 OPA ABAC 按决策清单维持或暂缓；
+D4 全链 HTTP e2e 不引入；P2 / P3 / P4 与 §6 商业层 4 条仍属路线图与业务拍板。
+Branch Protection 因私有仓库免费套餐 403 无法启用，非代码缺口。
+
+验证：前端 typecheck / lint / 全量 vitest（新增 24 个用例，含 a11y 播报区对账）、
+真库 `MigrationOnRealMysqlTest` 8 tests 全绿（MySQL 8.4 容器真跑）；
+最终以 `scripts/verify-all.sh --offline` 全量门禁为准（见本批提交）。
+
 ---
 
 ## 6. 待确认事项
@@ -736,8 +786,8 @@ typecheck / lint / test / build → 全部 PASS、JSON `failed:false`；`git dif
 > 技术/语义层面的遗留决策已逐项拍板，见 `saas-tenant-decisions.md`：**D1（租户供给）与
 > D3（租户级 kill switch）已按推荐落地**，记录见 §5.19 / §5.20；D2 短期维持请求体 slug、
 > D4 暂不引入全链 HTTP e2e、D5 不加 Prometheus tenant 标签、D6 暂缓 OPA ABAC。
-> 技术侧已由 §5.21 收官、无剩余待办；以下保留原始商业 / 合同层事项，需业务侧拍板，
-> 不阻塞本次改造交付。
+> 技术侧已由 §5.21 收官、§5.22 补齐 2.1.0 工程闭环，无剩余待办；以下保留原始商业 /
+> 合同层事项，需业务侧拍板，不阻塞本次改造交付。
 
 1. 租户规模与数据量：决定是否真的需要 L2/L3，还是 L1 + 大客户独立库即可。
 2. 30 秒删除是合同硬承诺还是内部目标？若硬承诺，第三方 LLM 厂商的 DPA 需重新谈。

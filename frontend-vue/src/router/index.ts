@@ -6,6 +6,7 @@ import AskView from '../views/AskView.vue';
 import RemindersView from '../views/RemindersView.vue';
 import NotFoundView from '../views/NotFoundView.vue';
 import AdminControlsView from '../views/admin/AdminControlsView.vue';
+import AdminTenantControlsView from '../views/admin/AdminTenantControlsView.vue';
 import AdminQuotasView from '../views/admin/AdminQuotasView.vue';
 import AdminAuditView from '../views/admin/AdminAuditView.vue';
 import AdminUsageView from '../views/admin/AdminUsageView.vue';
@@ -28,6 +29,7 @@ export const routes: RouteRecordRaw[] = [
   { path: '/reminders', name: 'reminders', component: RemindersView },
   // 管理端页面各自一个 URL：审计查询的游标与用量窗口要能进 query，塞进一个 /admin 的 tab 就做不到（D-195）。
   { path: '/admin/ai-controls', name: 'admin-ai-controls', component: AdminControlsView, meta: { requiresAdmin: true } },
+  { path: '/admin/tenant-controls', name: 'admin-tenant-controls', component: AdminTenantControlsView, meta: { requiresAdmin: true } },
   { path: '/admin/quotas', name: 'admin-quotas', component: AdminQuotasView, meta: { requiresAdmin: true } },
   { path: '/admin/audit', name: 'admin-audit', component: AdminAuditView, meta: { requiresAdmin: true } },
   { path: '/admin/usage', name: 'admin-usage', component: AdminUsageView, meta: { requiresAdmin: true } },

@@ -49,8 +49,8 @@ body:
     id: version
     attributes:
       label: 版本或提交
-      description: 例如 v2.0.0 或 `git rev-parse --short HEAD` 的结果
-      placeholder: v2.0.0 / d98364b
+      description: 例如 v2.1.0 或 `git rev-parse --short HEAD` 的结果
+      placeholder: v2.1.0 / d98364b
     validations:
       required: true
 

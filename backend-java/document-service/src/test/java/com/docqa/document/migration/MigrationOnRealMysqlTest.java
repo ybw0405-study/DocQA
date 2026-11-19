@@ -25,6 +25,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.DefaultApplicationArguments;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.DockerClientFactory;
@@ -271,6 +272,53 @@ class MigrationOnRealMysqlTest {
         initializer.run(new DefaultApplicationArguments());
         assertThat(single(queryAsRoot("SELECT COUNT(*) FROM tenant WHERE id = '" + DEFAULT_TENANT + "'")))
                 .isEqualTo("1");
+    }
+
+    /**
+     * D1 bootstrap 供给端点靠 {@code INSERT IGNORE INTO tenant} 做幂等重放：同一个 slug 被运维
+     * 重复提交时不能报唯一键冲突，也不能插入第二行。这里在真库上验的是端点依赖的**数据库事实**
+     * （主键 + {@code uk_tenant_slug} + CHECK 约束 + app 账号的 INSERT 权限），与
+     * {@code JdbcTenantRepositoryTest} 的 SQL 文本断言、{@code TenantAdminControllerTest} 的
+     * HTTP 形态、{@code TenantProvisioningServiceTest} 的服务编排合成一条完整验收链；
+     * 全链 HTTP e2e 仍按 D4 不引入。
+     */
+    @Test
+    @DisplayName("bootstrap 的 INSERT IGNORE 在真库幂等重放，uk_tenant_slug 拦住不同 id 的同 slug")
+    void bootstrapTenantInsertIsIdempotentAndSlugIsUniqueOnRealMysql() throws SQLException {
+        // SQL 与 JdbcTenantRepository.insert 逐字一致（含 'ACTIVE' 字面量与 NULL owner），
+        // 用 app 账号执行：它只有 tenant 表的 SELECT/INSERT/UPDATE，正是生产供给端点的权限形态。
+        String insert = "INSERT IGNORE INTO tenant (id, slug, name, tier, isolation, status, owner_user_id) "
+                + "VALUES (?, ?, ?, ?, ?, 'ACTIVE', NULL)";
+        String tenantId = "33333333-0000-0000-0000-000000000001";
+        String slug = "bootstrap-replay";
+        JdbcTemplate jdbc = appJdbcTemplate();
+
+        int first = jdbc.update(insert, tenantId, slug, "Replay Inc", "STANDARD", "SHARED");
+        assertThat(first).as("首次供给必须真的插入一行").isEqualTo(1);
+
+        // 运维重放同一请求：同 id 触发主键冲突，INSERT IGNORE 把它降级成 0 行而不是抛异常。
+        int replay = jdbc.update(insert, tenantId, slug, "Replay Inc", "STANDARD", "SHARED");
+        assertThat(replay).as("同 id 重放不得报错、也不得重复插入").isZero();
+
+        // 换了 id 但 slug 相同：uk_tenant_slug 必须接管，否则会出现两个同名租户。
+        String otherId = "33333333-0000-0000-0000-000000000002";
+        int sameSlugOtherId = jdbc.update(insert, otherId, slug, "Impostor Inc", "STANDARD", "SHARED");
+        assertThat(sameSlugOtherId).as("不同 id 复用 slug 应被唯一键忽略").isZero();
+
+        // 换成普通 INSERT 就必须真的抛唯一键冲突，证明上面的 0 行来自 INSERT IGNORE 而非语句没执行。
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO tenant (id, slug, name, tier, isolation, status) VALUES (?, ?, ?, ?, ?, 'ACTIVE')",
+                otherId, slug, "Impostor Inc", "STANDARD", "SHARED"))
+                .isInstanceOf(DuplicateKeyException.class)
+                .hasMessageContaining("uk_tenant_slug");
+
+        // 只认自己这一个 slug：别的用例会往 tenant 表造默认租户与 acme，全局 COUNT 会依赖执行顺序。
+        assertThat(single(queryAsRoot("SELECT COUNT(*) FROM tenant WHERE slug = '" + slug + "'")))
+                .isEqualTo("1");
+        assertThat(single(queryAsRoot("SELECT CONCAT(status, '|', IFNULL(owner_user_id, 'NULL')) "
+                + "FROM tenant WHERE slug = '" + slug + "'")))
+                .as("bootstrap 只建租户行：ACTIVE 且不预设 owner，不定义平台管理员/首管理员运营模型")
+                .isEqualTo("ACTIVE|NULL");
     }
 
     @Test

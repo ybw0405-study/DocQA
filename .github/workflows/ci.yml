@@ -3,9 +3,15 @@ name: CI
 # Three gates, one job each. They are intentionally independent so a Python
 # failure cannot mask a Java regression and vice versa.
 #
-# NOTE: every suite here is offline by design (no MySQL / Redis / RocketMQ /
-# MinIO / PGVector required). Real-infrastructure end-to-end checks are NOT
-# part of CI and must be run manually against a local stack.
+# Infrastructure boundary (D4): no externally provisioned MySQL / Redis / RocketMQ /
+# MinIO / PGVector service is required by any job. The Java job runs `mvn verify`,
+# and `MigrationOnRealMysqlTest` starts its own MySQL 8.4 container via Testcontainers
+# whenever Docker is available (GitHub-hosted runners are), executing V1→V10 for real
+# plus the tenant-scoped repository predicates and the bootstrap INSERT IGNORE replay.
+# Set DOCQA_DB_IT=off to skip that class on a runner without Docker; it is skipped,
+# not failed, by an in-test Assumptions guard. What is deliberately NOT part of CI is
+# a full-chain HTTP end-to-end run across all three services + MQ (decision D4);
+# that still requires a manually started local stack and a real second tenant.
 
 on:
   push:

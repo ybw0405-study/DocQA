@@ -771,7 +771,9 @@ function clearStubState(): void {
   exhaustedReminders.clear();
   notificationReads.clear();
   adminStubState.killSwitch = { active: false, updatedAt: null, updatedBy: null };
+  adminStubState.tenantKillSwitch = { active: false, updatedAt: null, updatedBy: null };
   adminStubState.controlsAuditFails = false;
+  adminStubState.tenantControlsAuditFails = false;
   adminStubState.limitsKnown = true;
   adminStubState.quotaOverrides.clear();
   adminStubState.missingQuotaUsers.clear();
@@ -1225,9 +1227,18 @@ export const DEMO_TARGET_USER_ID = '0192f3a4-9d4e-7f32-8a01-1234567890ab';
  * 于是「写成功后必须重读才拿到新值」这条 store 纪律在测试里是真的，而不是靠夹具硬编码两遍。
  */
 export const adminStubState = {
+  /** 平台级一键全停键：`GET/PUT /admin/ai/controls` 读写它。 */
   killSwitch: { active: false, updatedAt: null as string | null, updatedBy: null as string | null },
-  /** 摆出 S9-5b 的形态：开关已写入 Redis，随后审计失败 → 500 且 detail 说明状态已变更。 */
+  /**
+   * 租户级键：`GET/PUT /admin/ai/controls/tenant` 读写它。与平台级键独立存在，
+   * Java/Python 执行点按 OR 生效；本桩刻意分开两个事实源，才能验出「全局开着时
+   * 关掉本租户键、有效状态仍为 true」这条最容易被界面撒谎掩盖的语义。
+   */
+  tenantKillSwitch: { active: false, updatedAt: null as string | null, updatedBy: null as string | null },
+  /** 摆出 S9-5b 的形态：平台级开关已写入 Redis，随后审计失败 → 500 且 detail 说明状态已变更。 */
   controlsAuditFails: false,
+  /** 租户级开关的同一形态：状态已变更、审计写入失败。 */
+  tenantControlsAuditFails: false,
   /** Python 未发布上限（离线部署或启动晚于网关）时为 false，两个上限随之为 null。 */
   limitsKnown: true,
   quotaOverrides: new Map<string, { dailyQuestionLimit: number | null; dailyTokenLimit: number | null; updatedAt: string }>(),
@@ -1374,10 +1385,13 @@ function pageRows<T>(rows: T[], cursor: string | null, instance: string, pageSiz
 }
 
 /**
- * 管理面六操作。桩按契约校验入参形态（`additionalProperties: false`、配额两字段全量、
- * pattern、`limit` 上下限、31 天窗口、未知游标 400）并把写入结果落到桩态，
- * 这样前端「不乐观合入、成功后重读」的纪律才有可断言的服务端事实。
+ * 管理面八操作（S9 六个平台级 + 2.0.0 两个租户级）。桩按契约校验入参形态
+ * （`additionalProperties: false`、配额两字段全量、pattern、`limit` 上下限、31 天窗口、未知游标 400）
+ * 并把写入结果落到桩态，这样前端「不乐观合入、成功后重读」的纪律才有可断言的服务端事实。
  * Redis 与 MySQL 的真实行为不在这里复刻——那是 S9 各服务与它们自己的测试的范围。
+ *
+ * 租户级两个操作刻意与平台级键分开存：`active` 是「全局 OR 本租户」的叠加结果，
+ * 但 `updatedAt` / `updatedBy` 只来自租户键 meta（对齐 Java `getTenantKillSwitch`）。
  */
 export const adminHandlers = [
   mswHttp.get('/api/v1/admin/ai/controls', ({ request }) => {
@@ -1406,6 +1420,43 @@ export const adminHandlers = [
       );
     }
     return HttpResponse.json(envelope(adminControlsData()));
+  }),
+  mswHttp.get('/api/v1/admin/ai/controls/tenant', ({ request }) => {
+    recordAdminOp('GET', request, null);
+    // 有效状态 = 平台级 OR 本租户；元数据只来自租户键 meta，与 Java getTenantKillSwitch 一致。
+    return HttpResponse.json(envelope({
+      active: adminStubState.killSwitch.active || adminStubState.tenantKillSwitch.active,
+      updatedAt: adminStubState.tenantKillSwitch.updatedAt,
+      updatedBy: adminStubState.tenantKillSwitch.updatedBy,
+    }));
+  }),
+  mswHttp.put('/api/v1/admin/ai/controls/tenant', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    recordAdminOp('PUT', request, body);
+    const instance = '/api/v1/admin/ai/controls/tenant';
+    const extraKeys = Object.keys(body ?? {}).filter((key) => key !== 'killSwitchActive');
+    if (typeof body?.killSwitchActive !== 'boolean' || extraKeys.length > 0) {
+      return adminReject(instance, '请求体只接受 killSwitchActive 一个布尔字段。');
+    }
+    const active = body.killSwitchActive;
+    adminStubState.tenantKillSwitch = { active, updatedAt: KILL_SWITCH_WRITE_AT, updatedBy: DEMO_USER_ID };
+    if (adminStubState.tenantControlsAuditFails) {
+      return HttpResponse.json(
+        problem({
+          status: 500,
+          code: 'COM-INTERNAL-001',
+          detail: '租户 Kill Switch 状态已变更，但管理审计事件写入失败；请重新读取状态。',
+          instance,
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/problem+json' } },
+      );
+    }
+    // 回显仍是 OR 叠加后的有效状态：平台级键开着时，写入 false 拿到的 active 依旧是 true。
+    return HttpResponse.json(envelope({
+      active: adminStubState.killSwitch.active || active,
+      updatedAt: KILL_SWITCH_WRITE_AT,
+      updatedBy: DEMO_USER_ID,
+    }));
   }),
   mswHttp.get('/api/v1/admin/ai/quotas', ({ request }) => {
     recordAdminOp('GET', request, null);

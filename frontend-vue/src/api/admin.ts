@@ -3,6 +3,7 @@ import type {
   AiQuota,
   AiQuotaListData,
   AuditEventListData,
+  KillSwitchState,
   UpdateAiControlsRequest,
   UpdateAiQuotaRequest,
   UsageBucket,
@@ -11,10 +12,11 @@ import type {
 import { get, put } from './http';
 
 /**
- * 管理面六个操作的唯一出口（契约 2.5.0 的 `Admin` tag）。
+ * 管理面八个操作的唯一出口（契约 2.6.0 的 `Admin` tag）：S9 的六个平台级操作，
+ * 加上 2.0.0 新增的两个租户级 Kill Switch 操作（`/admin/ai/controls/tenant`）。
  *
- * **这里不构造任何请求头**：六个管理操作的参数集合里都没有名为 `IdempotencyKey` 的 parameter，
- * 两个 PUT 的请求体也都没有 `version` 字段（D-197）。共享拦截器仍会给非 GET 补一个随机幂等键头
+ * **这里不构造任何请求头**：八个管理操作的参数集合里都没有名为 `IdempotencyKey` 的 parameter，
+ * 三个 PUT 的请求体也都没有 `version` 字段（D-197）。共享拦截器仍会给非 GET 补一个随机幂等键头
  * （那个字面量只存在于 `http.ts`），服务端不消费它——与 `api/notifications.ts` 的已读接口是同一处
  * 既有裁决，因此不为管理端单开一条通道。按值幂等与 last-write-wins 的边界在 store 与界面文案里如实表述。
  */
@@ -55,6 +57,29 @@ export function getAiControls(): Promise<AdminAiControls> {
  */
 export function updateAiControls(request: UpdateAiControlsRequest): Promise<AdminAiControls> {
   return put<AdminAiControls>('/admin/ai/controls', request);
+}
+
+/**
+ * 读取**当前登录租户视角**的 Kill Switch 有效状态（契约 2.6.0 `getTenantAiControls`）。
+ * `tenantId` 只由服务端取自已验签 JWT，不接受请求体或 Header 传参，因此这个方法没有租户参数。
+ *
+ * 返回的 `active` 是「平台级全局键 OR 本租户键」的叠加结果：任一开启即为 `true`。
+ * `updatedAt` / `updatedBy` 只来自**租户键**的 meta——全局键开启但本租户键从未写入时，
+ * 会出现 `active=true` 且两个元数据为 `null`，这不是数据缺失，界面必须如实呈现。
+ * 与平台级快照的区别：本端点不返回实验账本。
+ */
+export function getTenantAiControls(): Promise<KillSwitchState> {
+  return get<KillSwitchState>('/admin/ai/controls/tenant');
+}
+
+/**
+ * 全量赋值当前登录租户的 Kill Switch 键（契约 2.6.0 `updateTenantAiControls`）。
+ * 请求体与平台级端点共用 `UpdateAiControlsRequest`：只有 `killSwitchActive` 一个布尔字段。
+ * **不影响平台级一键全停键**；PUT 回显的仍是 OR 叠加后的有效状态，所以全局键开启时
+ * 写入 `false` 拿到的回显可能依旧是 `active=true`——那不是写入失败，调用方不能据此宣称已恢复服务。
+ */
+export function updateTenantAiControls(request: UpdateAiControlsRequest): Promise<KillSwitchState> {
+  return put<KillSwitchState>('/admin/ai/controls/tenant', request);
 }
 
 /** 只返回**存在覆盖行**的用户；不在列表里表示不设上限，而不是「查不到这个人」。 */
