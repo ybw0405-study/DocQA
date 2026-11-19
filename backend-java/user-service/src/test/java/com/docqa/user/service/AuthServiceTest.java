@@ -429,7 +429,7 @@ class AuthServiceTest {
     void currentUserReadsRolesFromTokenAndStatusFromDatabase() {
         givenUser(UserStatus.ACTIVE);
         JwtIdentity identity = jwtService.verify(
-                jwtService.issue(USER_ID, Set.of(UserRole.USER, UserRole.ADMIN)));
+                jwtService.issue(USER_ID, TenantContext.DEFAULT_TENANT_ID, Set.of(UserRole.USER, UserRole.ADMIN)));
 
         CurrentUserData currentUser = authService.currentUser(identity);
 
@@ -538,6 +538,6 @@ class AuthServiceTest {
     }
 
     private String issueAccessToken() {
-        return jwtService.issue(USER_ID, Set.of(UserRole.USER));
+        return jwtService.issue(USER_ID, TenantContext.DEFAULT_TENANT_ID, Set.of(UserRole.USER));
     }
 }

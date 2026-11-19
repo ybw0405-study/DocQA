@@ -87,7 +87,10 @@ public class AuditEventService {
             throw new IllegalArgumentException(
                     "limit must be between 1 and " + properties.getQueryMaxLimit());
         }
-        // P0: MQ 消息尚未携带 tenant_id，P1 随消息传递；当前全部审计事件归属默认租户。
+        // 本查询目前没有 HTTP 入口：audit-service 是纯 MQ 消费者，管理面审计查询走
+        // agent-gateway 的 AdminAuditQueryService（已按 tenantId 过滤）。这是 §5.11 记录的有意
+        // 边界——待本服务暴露按 traceId 的查询端点时，再让调用方传入 tenantId 一并收口；
+        // 在此之前该方法仅服务于默认租户视图，不随写入侧的租户传播改动，避免凭空变更语义。
         return repository.findByTraceId(TenantContext.DEFAULT_TENANT_ID, normalizedTraceId, effectiveLimit);
     }
 

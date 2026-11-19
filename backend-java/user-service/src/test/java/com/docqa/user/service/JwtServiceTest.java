@@ -12,6 +12,7 @@ import io.jsonwebtoken.security.SecureDigestAlgorithm;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
@@ -41,7 +42,8 @@ class JwtServiceTest {
     void issuesAndVerifiesTokenWithRoles() {
         UUID userId = UUID.randomUUID();
 
-        String token = jwtService.issue(userId, Set.of(UserRole.USER, UserRole.ADMIN));
+        String token = jwtService.issue(
+                userId, TenantContext.DEFAULT_TENANT_ID, Set.of(UserRole.USER, UserRole.ADMIN));
         JwtIdentity identity = jwtService.verify(token);
 
         assertThat(token.split("\\.")).hasSize(3);
@@ -57,7 +59,7 @@ class JwtServiceTest {
 
     @Test
     void rejectsExpiredToken() {
-        String token = jwtService.issue(UUID.randomUUID(), Set.of(UserRole.USER));
+        String token = jwtService.issue(UUID.randomUUID(), TenantContext.DEFAULT_TENANT_ID, Set.of(UserRole.USER));
         clock.advance(Duration.ofHours(2).plusSeconds(1));
 
         assertThatThrownBy(() -> jwtService.verify(token))
@@ -67,7 +69,7 @@ class JwtServiceTest {
     @Test
     void rejectsWrongSignature() {
         JwtService other = service(ISSUER, AUDIENCE, "other-jwt-secret-with-at-least-32-bytes-123456", clock);
-        String token = other.issue(UUID.randomUUID(), Set.of(UserRole.USER));
+        String token = other.issue(UUID.randomUUID(), TenantContext.DEFAULT_TENANT_ID, Set.of(UserRole.USER));
 
         assertThatThrownBy(() -> jwtService.verify(token))
                 .isInstanceOf(InvalidJwtException.class);
@@ -76,7 +78,7 @@ class JwtServiceTest {
     @Test
     void rejectsWrongIssuer() {
         JwtService other = service("other-issuer", AUDIENCE, SECRET, clock);
-        String token = other.issue(UUID.randomUUID(), Set.of(UserRole.USER));
+        String token = other.issue(UUID.randomUUID(), TenantContext.DEFAULT_TENANT_ID, Set.of(UserRole.USER));
 
         assertThatThrownBy(() -> jwtService.verify(token))
                 .isInstanceOf(InvalidJwtException.class);
@@ -85,7 +87,7 @@ class JwtServiceTest {
     @Test
     void rejectsWrongAudience() {
         JwtService other = service(ISSUER, "other-audience", SECRET, clock);
-        String token = other.issue(UUID.randomUUID(), Set.of(UserRole.USER));
+        String token = other.issue(UUID.randomUUID(), TenantContext.DEFAULT_TENANT_ID, Set.of(UserRole.USER));
 
         assertThatThrownBy(() -> jwtService.verify(token))
                 .isInstanceOf(InvalidJwtException.class);
@@ -176,6 +178,16 @@ class JwtServiceTest {
     }
 
     @Test
+    void doesNotExposeIssueOverloadWithoutTenantId() {
+        // P0 曾有 issue(userId, roles) 便利重载，静默把用户签进默认租户。P1 多租户落地后删除：
+        // 用反射钉死「签发入口必须显式带 tenantId」，防止后人图省事把重载加回来。
+        long overloads = Arrays.stream(JwtService.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("issue") && method.getParameterCount() != 3)
+                .count();
+        assertThat(overloads).isZero();
+    }
+
+    @Test
     void rejectsMissingTenantClaim() {
         SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
         String token = Jwts.builder()
@@ -212,9 +224,11 @@ class JwtServiceTest {
 
     @Test
     void refusesToIssueTokenWithoutRoles() {
-        assertThatThrownBy(() -> jwtService.issue(UUID.randomUUID(), Set.of()))
+        assertThatThrownBy(() -> jwtService.issue(
+                UUID.randomUUID(), TenantContext.DEFAULT_TENANT_ID, Set.of()))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> jwtService.issue(UUID.randomUUID(), null))
+        assertThatThrownBy(() -> jwtService.issue(
+                UUID.randomUUID(), TenantContext.DEFAULT_TENANT_ID, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

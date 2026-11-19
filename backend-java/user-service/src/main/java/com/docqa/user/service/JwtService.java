@@ -42,13 +42,11 @@ public class JwtService {
         this.signingKey = Keys.hmacShaKeyFor(secretBytes);
     }
 
-    public String issue(UUID userId, Collection<UserRole> roles) {
-        return issue(userId, TenantContext.DEFAULT_TENANT_ID, roles);
-    }
-
     /**
-     * 签发带租户声明的访问令牌。P0 阶段全部用户归属默认租户（与 V10 存量回填一致），
-     * P1 接入租户解析后改由调用方传入真实 tenantId；验签侧的强制校验无需再改。
+     * 签发带租户声明的访问令牌。P1 起 tenantId 必须由调用方显式传入：登录 / 注册取
+     * TenantResolver.resolve(...) 的解析结果，刷新取 refresh token 家族携带的 tenantId。
+     * 刻意不提供省略 tenantId 的重载——那会静默把用户签进默认租户、破坏多租户隔离，
+     * 而编译器无法拦截这类误用。验签侧强制校验 tenant_id claim，无需再改。
      */
     public String issue(UUID userId, UUID tenantId, Collection<UserRole> roles) {
         if (roles == null || roles.isEmpty()) {

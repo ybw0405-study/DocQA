@@ -13,7 +13,8 @@ import java.util.UUID;
 
 /**
  * 所有查询都要求显式 tenantId：租户依赖出现在方法签名上，由编译器兜底防止漏传。
- * 登录/注册这类尚无 JWT 的路径由调用方显式传 DEFAULT_TENANT_ID（P0 迁移期唯一合法租户）。
+ * 登录 / 注册这类尚无 JWT 的路径由 TenantResolver 从请求体 tenantSlug 解析出 tenantId
+ * （缺省回落默认租户）；刷新令牌从其家族反查 tenantId。二者都不再固定写 DEFAULT_TENANT_ID。
  */
 public interface UserRepository {
 

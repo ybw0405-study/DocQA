@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.config.JwtProperties;
 import com.docqa.user.domain.UserRole;
 import com.docqa.user.support.RecordingRevocationStore;
@@ -20,6 +21,7 @@ class AccessTokenAuthenticatorTest {
 
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
 
     private MutableClock clock;
     private JwtService jwtService;
@@ -42,12 +44,12 @@ class AccessTokenAuthenticatorTest {
     @Test
     void acceptsAValidBearerToken() {
         JwtIdentity identity = authenticator.authenticate(
-                "Bearer " + jwtService.issue(USER_ID, Set.of(UserRole.USER, UserRole.ADMIN)));
+                "Bearer " + jwtService.issue(USER_ID, TENANT_ID, Set.of(UserRole.USER, UserRole.ADMIN)));
 
         assertThat(identity.userId()).isEqualTo(USER_ID);
         assertThat(identity.roles()).containsExactlyInAnyOrder(UserRole.USER, UserRole.ADMIN);
         assertThat(identity.expiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(15)));
-        assertThat(authenticator.tryAuthenticate("bearer " + jwtService.issue(USER_ID, Set.of(UserRole.USER))))
+        assertThat(authenticator.tryAuthenticate("bearer " + jwtService.issue(USER_ID, TENANT_ID, Set.of(UserRole.USER))))
                 .isPresent();
     }
 
@@ -66,7 +68,7 @@ class AccessTokenAuthenticatorTest {
 
     @Test
     void rejectsExpiredToken() {
-        String header = "Bearer " + jwtService.issue(USER_ID, Set.of(UserRole.USER));
+        String header = "Bearer " + jwtService.issue(USER_ID, TENANT_ID, Set.of(UserRole.USER));
         clock.advance(Duration.ofMinutes(16));
 
         assertThat(authenticator.tryAuthenticate(header)).isEmpty();
@@ -74,7 +76,7 @@ class AccessTokenAuthenticatorTest {
 
     @Test
     void rejectsRevokedTokenId() {
-        String header = "Bearer " + jwtService.issue(USER_ID, Set.of(UserRole.USER));
+        String header = "Bearer " + jwtService.issue(USER_ID, TENANT_ID, Set.of(UserRole.USER));
         JwtIdentity identity = authenticator.authenticate(header);
 
         authenticator.revoke(identity, clock.instant());
@@ -85,7 +87,7 @@ class AccessTokenAuthenticatorTest {
 
     @Test
     void revokeUsesTheRemainingLifetime() {
-        String header = "Bearer " + jwtService.issue(USER_ID, Set.of(UserRole.USER));
+        String header = "Bearer " + jwtService.issue(USER_ID, TENANT_ID, Set.of(UserRole.USER));
         JwtIdentity identity = authenticator.authenticate(header);
         clock.advance(Duration.ofMinutes(5));
 
@@ -96,7 +98,7 @@ class AccessTokenAuthenticatorTest {
 
     @Test
     void rejectsTokenIssuedBeforeTheUserWatermark() {
-        String header = "Bearer " + jwtService.issue(USER_ID, Set.of(UserRole.USER));
+        String header = "Bearer " + jwtService.issue(USER_ID, TENANT_ID, Set.of(UserRole.USER));
 
         authenticator.revokeAllIssuedBefore(USER_ID, NOW.plusSeconds(1));
 
@@ -107,7 +109,7 @@ class AccessTokenAuthenticatorTest {
 
     @Test
     void acceptsTokenIssuedExactlyAtTheWatermark() {
-        String header = "Bearer " + jwtService.issue(USER_ID, Set.of(UserRole.USER));
+        String header = "Bearer " + jwtService.issue(USER_ID, TENANT_ID, Set.of(UserRole.USER));
 
         revocationStore.revokeUser(USER_ID, NOW, Duration.ofMinutes(15));
 
@@ -120,7 +122,7 @@ class AccessTokenAuthenticatorTest {
         revocationStore.revokeUser(USER_ID, NOW, Duration.ofMinutes(15));
         clock.advance(Duration.ofSeconds(1));
 
-        String header = "Bearer " + jwtService.issue(USER_ID, Set.of(UserRole.USER));
+        String header = "Bearer " + jwtService.issue(USER_ID, TENANT_ID, Set.of(UserRole.USER));
 
         assertThat(authenticator.tryAuthenticate(header)).isPresent();
     }

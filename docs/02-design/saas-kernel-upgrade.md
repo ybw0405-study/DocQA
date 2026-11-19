@@ -690,12 +690,50 @@ D2 / D4 / D5 / D6 按决策清单维持现状或暂缓，未改动。
 
 ---
 
+### 5.21 P1-B 收官清理与项目终态（2026-11-19）
+
+至此 §5.2 的 6 条 P0 临时口径全部替换或评估闭环，D1 / D3 按决策清单落地，
+D2 / D4 / D5 / D6 为「明确不做」的拍板结论。本批**不新增能力**，只做一次收官核对：
+清掉生产代码里仍停留在 P0 口径的残留、复核签发链路，并跑一次不跳过 Java 的完整三端门禁。
+
+| 清理项 | 原状（P0 口径） | 收官处理 |
+| --- | --- | --- |
+| `JwtService.issue(userId, roles)` | 便利重载静默把用户签进 `DEFAULT_TENANT_ID`；生产零调用、仅测试使用 | **删除重载**，签发统一走三参 `issue(userId, tenantId, roles)`；相关测试改为显式传租户；新增反射守卫测试 `doesNotExposeIssueOverloadWithoutTenantId`，钉死「签发入口必须显式带 tenantId」，防止重载被重新加回 |
+| `JwtService` 三参 javadoc | 「P0 阶段全部用户归属默认租户，P1 改由调用方传入」 | 改为 P1 事实：登录 / 注册取 `TenantResolver.resolve`，刷新取 refresh token 家族 tenantId |
+| `UserRepository` 类注释 | 「登录 / 注册由调用方显式传 DEFAULT_TENANT_ID（P0 迁移期唯一合法租户）」 | 改为按 tenantSlug 解析 / 家族反查的事实 |
+| `AuditEventService.findByTraceId` 注释 | 「P0: MQ 消息尚未携带 tenant_id」 | 改为 §5.11 已记录的有意边界：纯消费者无 HTTP 入口，待暴露查询时随租户上下文收口 |
+
+**核实过、确认不再改动的「默认租户」残留**（避免被误读为遗漏）：
+
+| 位置 | 为何保留 |
+| --- | --- |
+| `AuditEventService.ingest` / `ReminderTriggerIngestService.ingest` 的 `tenantId == null` 分支 | 部署窗口内兼容不带 tenantId 的在途旧消息并打 WARN，新消息必须携带；§5.11 兼容策略 |
+| `AuditEventService.findByTraceId` 的默认租户视图 | 见上表；audit-service 是纯 MQ 消费者，该方法零生产调用，改了等于凭空变更语义 |
+| `JdbcTenantBootstrapRepository` / `DefaultTenantInitializer` / `DemoUserSeeder` | 启动播种默认租户与 demo 账号，本就该用固定 ID |
+| `TenantResolver` 的 slug 缺省回落 | D2 拍板「维持请求体 slug」，缺省回落以保证 P0 存量客户端兼容 |
+
+**签发链路复核**：登录 / 注册 / 刷新三个入口全部调用三参 `issue`，
+`RefreshTokenService` 全链携带 tenantId，不存在「解析出第二租户却签成默认租户」的串扰；
+被删重载生产零调用，本次行为零变化。
+
+**项目终态**：本次 SaaS 多租户改造（P0 地基 + P1-B 租户隔离落地）技术边界内的工作全部完成，
+无剩余待办。§2 的 P2 计量计费 / P3 身份 / P4 可证删除与 §6 的 4 条属产品路线图与商业 /
+合同层事项，不在本次改造范围；D2 / D4 / D5 / D6 是「明确不做」的决策，不是遗漏，
+触发条件与启动依据见 `saas-tenant-decisions.md` 各小节。
+
+验证：`scripts/verify-all.sh --offline`（**不跳过 Java**）一次性跑全 `mvn clean verify`
+（全模块 + Testcontainers 真库 + checkstyle）、Python pytest / ruff ×2、前端
+typecheck / lint / test / build → 全部 PASS、JSON `failed:false`；`git diff --check` → 0。
+
+---
+
 ## 6. 待确认事项
 
 > 技术/语义层面的遗留决策已逐项拍板，见 `saas-tenant-decisions.md`：**D1（租户供给）与
 > D3（租户级 kill switch）已按推荐落地**，记录见 §5.19 / §5.20；D2 短期维持请求体 slug、
 > D4 暂不引入全链 HTTP e2e、D5 不加 Prometheus tenant 标签、D6 暂缓 OPA ABAC。
-> 以下保留原始商业/合同层事项。
+> 技术侧已由 §5.21 收官、无剩余待办；以下保留原始商业 / 合同层事项，需业务侧拍板，
+> 不阻塞本次改造交付。
 
 1. 租户规模与数据量：决定是否真的需要 L2/L3，还是 L1 + 大客户独立库即可。
 2. 30 秒删除是合同硬承诺还是内部目标？若硬承诺，第三方 LLM 厂商的 DPA 需重新谈。
