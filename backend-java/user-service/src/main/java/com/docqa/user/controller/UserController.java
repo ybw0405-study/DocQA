@@ -49,16 +49,16 @@ public class UserController {
             @RequestParam(name = "role", required = false) UserRole role,
             @RequestParam(name = "cursor", required = false) String cursor,
             @RequestParam(name = "limit", defaultValue = "20") int limit) {
-        requireAdmin(authorization);
-        return ApiResponse.ok(adminUserService.list(status, role, cursor, limit));
+        JwtIdentity caller = requireAdmin(authorization);
+        return ApiResponse.ok(adminUserService.list(caller.tenantId(), status, role, cursor, limit));
     }
 
     @GetMapping("/{userId}")
     public ApiResponse<UserSummaryData> get(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @PathVariable UUID userId) {
-        requireAdmin(authorization);
-        return ApiResponse.ok(adminUserService.get(userId));
+        JwtIdentity caller = requireAdmin(authorization);
+        return ApiResponse.ok(adminUserService.get(caller.tenantId(), userId));
     }
 
     @PutMapping("/{userId}/roles")
@@ -68,8 +68,8 @@ public class UserController {
             @PathVariable UUID userId,
             @Valid @RequestBody UserRolesUpdateRequest request) {
         JwtIdentity caller = requireAdmin(authorization);
-        return ApiResponse.ok(
-                adminUserService.replaceRoles(caller.userId(), userId, idempotencyKey, request.roles()));
+        return ApiResponse.ok(adminUserService.replaceRoles(
+                caller.tenantId(), caller.userId(), userId, idempotencyKey, request.roles()));
     }
 
     @PatchMapping("/{userId}/status")
@@ -79,8 +79,8 @@ public class UserController {
             @PathVariable UUID userId,
             @Valid @RequestBody UserStatusUpdateRequest request) {
         JwtIdentity caller = requireAdmin(authorization);
-        return ApiResponse.ok(
-                adminUserService.updateStatus(caller.userId(), userId, idempotencyKey, request.status()));
+        return ApiResponse.ok(adminUserService.updateStatus(
+                caller.tenantId(), caller.userId(), userId, idempotencyKey, request.status()));
     }
 
     private JwtIdentity requireAdmin(String authorization) {

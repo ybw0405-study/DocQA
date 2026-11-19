@@ -160,6 +160,7 @@ class AgentAskService:
                 return prepared
             graph = self._build_graph(request, deadline, prepared)
             with self._tracer.start_as_current_span("agent.graph") as span:
+                span.set_attribute("tenant.id", str(request.tenant_id))
                 span.set_attribute("agent.rounds_limit", request.max_rounds)
                 span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
                 span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)
@@ -237,7 +238,7 @@ class AgentAskService:
         直接返回软降级响应（与同步路径同一 _build_response，零外呼零 delta）。"""
         with self._tracer.start_as_current_span("agent.validate"):
             question = self._validate_request_pii(request, collector)
-        if await self._kill_switch.is_active():
+        if await self._kill_switch.is_active(request.tenant_id):
             collector.add(
                 "AGENT_KILL_SWITCH",
                 "agent_service",
@@ -385,6 +386,7 @@ class AgentAskService:
             async def runner() -> GraphResult:
                 try:
                     with self._tracer.start_as_current_span("agent.graph") as span:
+                        span.set_attribute("tenant.id", str(request.tenant_id))
                         span.set_attribute("agent.rounds_limit", request.max_rounds)
                         span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
                         span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)

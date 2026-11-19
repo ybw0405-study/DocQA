@@ -9,6 +9,7 @@ import java.util.UUID;
 public interface MessageRepository {
 
     void insert(
+            UUID tenantId,
             UUID id,
             UUID conversationId,
             String role,
@@ -19,7 +20,8 @@ public interface MessageRepository {
             String metadataJson,
             Instant createdAt);
 
-    List<StoredMessage> findRecent(UUID conversationId, int limit);
+    List<StoredMessage> findRecent(UUID tenantId, UUID conversationId, int limit);
 
-    List<MessageHistoryRow> findPage(UUID conversationId, Instant beforeCreatedAt, UUID beforeId, int limit);
+    List<MessageHistoryRow> findPage(UUID tenantId, UUID conversationId, Instant beforeCreatedAt, UUID beforeId,
+            int limit);
 }

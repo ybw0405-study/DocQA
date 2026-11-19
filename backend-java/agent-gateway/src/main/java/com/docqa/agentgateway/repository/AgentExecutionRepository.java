@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface AgentExecutionRepository {
 
-    void insert(AgentExecution execution);
+    void insert(UUID tenantId, AgentExecution execution);
 
     List<OutboxExecution> findOutboxBatch(Instant afterRecordedAt, UUID afterId, int limit);
 
@@ -19,6 +19,9 @@ public interface AgentExecutionRepository {
      * <p>{@code audit_outbox} 是 {@code JSON NOT NULL} 且该表「追加写、禁止更新和删除」，
      * 所以没有任何字段可以被清空来标记「已投递」——待投递的唯一判据就是 relay 的游标位置。
      * 这也正是 §4.2 要这两个指标而不是只看 MQ lag 的原因：积压发生在 relay 追上 broker 之前。
+     *
+     * <p>relay 是无 HTTP 行上下文的全局投递任务，跨租户按单一全局游标扫描；
+     * 租户边界由每行自带的 {@code tenant_id} 随消息下发，写侧仍逐行带租户谓词。
      *
      * @param afterRecordedAt 游标时间；null 表示从表头开始（尚未 relay 过任何一批）
      * @param afterId         游标 id，与时间共同构成 keyset 位置

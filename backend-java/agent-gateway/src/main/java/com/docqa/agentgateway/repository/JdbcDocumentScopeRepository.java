@@ -23,14 +23,16 @@ public class JdbcDocumentScopeRepository implements DocumentScopeRepository {
     }
 
     @Override
-    public List<DocumentRecord> findByUserAndIds(UUID userId, List<UUID> documentIds) {
+    public List<DocumentRecord> findByUserAndIds(UUID tenantId, UUID userId, List<UUID> documentIds) {
         String placeholders = documentIds.stream().map(id -> "?").collect(Collectors.joining(", "));
         List<Object> arguments = new ArrayList<>();
+        arguments.add(tenantId.toString());
         arguments.add(userId.toString());
         documentIds.forEach(id -> arguments.add(id.toString()));
         return jdbcTemplate.query(
                 "SELECT id, status, index_version FROM document"
-                        + " WHERE deleted_at IS NULL AND user_id = ? AND id IN (" + placeholders + ")",
+                        + " WHERE tenant_id = ? AND deleted_at IS NULL AND user_id = ? AND id IN ("
+                        + placeholders + ")",
                 ROW_MAPPER,
                 arguments.toArray());
     }

@@ -11,6 +11,7 @@ import com.docqa.agentgateway.dto.UsageDayPoint;
 import com.docqa.agentgateway.dto.UsageStatusCount;
 import com.docqa.agentgateway.dto.UsageTopUser;
 import com.docqa.agentgateway.dto.UsageTotals;
+import com.docqa.common.tenant.TenantContext;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
@@ -24,6 +25,7 @@ import org.springframework.jdbc.core.RowMapper;
 
 class JdbcAiUsageRepositoryTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final Instant FROM = Instant.parse("2026-11-02T09:00:00Z");
     private static final Instant TO = Instant.parse("2026-11-03T09:00:00Z");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
@@ -34,17 +36,18 @@ class JdbcAiUsageRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void totalsCountSuccessBudgetAndFailureSeparately() {
-        repository.totals(FROM, TO);
+        repository.totals(TENANT_ID, FROM, TO);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(
                 sqlCaptor.capture(),
                 any(RowMapper.class),
+                eq(TENANT_ID.toString()),
                 eq(Timestamp.from(FROM)),
                 eq(Timestamp.from(TO)));
         String sql = sqlCaptor.getValue();
         assertThat(sql).contains("FROM agent_execution");
-        assertThat(sql).contains("WHERE started_at >= ? AND started_at <= ?");
+        assertThat(sql).contains("WHERE tenant_id = ? AND started_at >= ? AND started_at <= ?");
         assertThat(sql).contains("status = 'SUCCESS'");
         assertThat(sql).contains("status = 'BUDGET_EXHAUSTED'");
         assertThat(sql).contains("status = 'FAILED'");
@@ -57,9 +60,9 @@ class JdbcAiUsageRepositoryTest {
     @SuppressWarnings("unchecked")
     void mapsTotalsIncludingANullAverage() throws Exception {
         ArgumentCaptor<RowMapper<UsageTotals>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.totals(FROM, TO);
+        repository.totals(TENANT_ID, FROM, TO);
         verify(jdbcTemplate).query(any(String.class), mapperCaptor.capture(),
-                any(Timestamp.class), any(Timestamp.class));
+                any(String.class), any(Timestamp.class), any(Timestamp.class));
 
         UsageTotals totals = mapperCaptor.getValue().mapRow(totalsRow(null), 0);
 
@@ -78,9 +81,9 @@ class JdbcAiUsageRepositoryTest {
     @SuppressWarnings("unchecked")
     void mapsTheAverageLatencyAsANumber() throws Exception {
         ArgumentCaptor<RowMapper<UsageTotals>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.totals(FROM, TO);
+        repository.totals(TENANT_ID, FROM, TO);
         verify(jdbcTemplate).query(any(String.class), mapperCaptor.capture(),
-                any(Timestamp.class), any(Timestamp.class));
+                any(String.class), any(Timestamp.class), any(Timestamp.class));
 
         UsageTotals totals = mapperCaptor.getValue().mapRow(totalsRow(new BigDecimal("2140.5")), 0);
 
@@ -89,10 +92,10 @@ class JdbcAiUsageRepositoryTest {
 
     @Test
     void returnsZeroTotalsWhenTheAggregateProducesNoRow() {
-        when(jdbcTemplate.query(any(String.class), any(RowMapper.class), any(), any()))
+        when(jdbcTemplate.query(any(String.class), any(RowMapper.class), any(), any(), any()))
                 .thenReturn(List.of());
 
-        UsageTotals totals = repository.totals(FROM, TO);
+        UsageTotals totals = repository.totals(TENANT_ID, FROM, TO);
 
         assertThat(totals.questions()).isZero();
         assertThat(totals.avgLatencyMs()).isNull();
@@ -101,11 +104,11 @@ class JdbcAiUsageRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void groupsDaysByTheUtcDateFormattedFromStartedAt() {
-        repository.byDay(FROM, TO);
+        repository.byDay(TENANT_ID, FROM, TO);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class),
-                eq(Timestamp.from(FROM)), eq(Timestamp.from(TO)));
+                eq(TENANT_ID.toString()), eq(Timestamp.from(FROM)), eq(Timestamp.from(TO)));
         String sql = sqlCaptor.getValue();
         assertThat(sql).contains("DATE_FORMAT(started_at, '%Y-%m-%d') AS usage_day");
         assertThat(sql).contains("GROUP BY usage_day");
@@ -117,9 +120,9 @@ class JdbcAiUsageRepositoryTest {
     @SuppressWarnings("unchecked")
     void mapsADayPoint() throws Exception {
         ArgumentCaptor<RowMapper<UsageDayPoint>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.byDay(FROM, TO);
+        repository.byDay(TENANT_ID, FROM, TO);
         verify(jdbcTemplate).query(any(String.class), mapperCaptor.capture(),
-                any(Timestamp.class), any(Timestamp.class));
+                any(String.class), any(Timestamp.class), any(Timestamp.class));
 
         ResultSet rs = mock(ResultSet.class);
         when(rs.getString("usage_day")).thenReturn("2026-11-02");
@@ -139,9 +142,9 @@ class JdbcAiUsageRepositoryTest {
     @SuppressWarnings("unchecked")
     void mapsStatusCounts() throws Exception {
         ArgumentCaptor<RowMapper<UsageStatusCount>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.byStatus(FROM, TO);
+        repository.byStatus(TENANT_ID, FROM, TO);
         verify(jdbcTemplate).query(any(String.class), mapperCaptor.capture(),
-                any(Timestamp.class), any(Timestamp.class));
+                any(String.class), any(Timestamp.class), any(Timestamp.class));
 
         ResultSet rs = mock(ResultSet.class);
         when(rs.getString("status")).thenReturn("SUCCESS");
@@ -156,13 +159,13 @@ class JdbcAiUsageRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void topUsersJoinTheIdentityTableAndTieBreakOnUserId() {
-        repository.topUsers(FROM, TO, 10);
+        repository.topUsers(TENANT_ID, FROM, TO, 10);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class),
-                eq(Timestamp.from(FROM)), eq(Timestamp.from(TO)), eq(10));
+                eq(TENANT_ID.toString()), eq(Timestamp.from(FROM)), eq(Timestamp.from(TO)), eq(10));
         String sql = sqlCaptor.getValue();
-        assertThat(sql).contains("LEFT JOIN app_user u ON u.id = e.user_id");
+        assertThat(sql).contains("LEFT JOIN app_user u ON u.id = e.user_id AND u.tenant_id = e.tenant_id");
         assertThat(sql).contains("GROUP BY e.user_id, u.username");
         assertThat(sql).contains("ORDER BY questions DESC, tokens DESC, e.user_id ASC");
         assertThat(sql).contains("LIMIT ?");
@@ -172,9 +175,9 @@ class JdbcAiUsageRepositoryTest {
     @SuppressWarnings("unchecked")
     void mapsATopUserWithAMissingUsername() throws Exception {
         ArgumentCaptor<RowMapper<UsageTopUser>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.topUsers(FROM, TO, 10);
+        repository.topUsers(TENANT_ID, FROM, TO, 10);
         verify(jdbcTemplate).query(any(String.class), mapperCaptor.capture(),
-                any(Timestamp.class), any(Timestamp.class), eq(10));
+                any(String.class), any(Timestamp.class), any(Timestamp.class), eq(10));
 
         ResultSet rs = mock(ResultSet.class);
         when(rs.getString("user_id")).thenReturn(USER_ID.toString());

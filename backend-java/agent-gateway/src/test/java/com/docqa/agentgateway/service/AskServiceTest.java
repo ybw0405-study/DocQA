@@ -34,6 +34,7 @@ import com.docqa.common.metrics.BusinessMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.time.Clock;
 import java.time.Instant;
@@ -59,6 +60,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AskServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID CONVERSATION_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -115,6 +117,7 @@ class AskServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.set(TENANT_ID);
         auditEventFactory = new AuditEventFactory(Clock.fixed(NOW, ZoneOffset.UTC));
         sseKeepAliveScheduler = new ThreadPoolTaskScheduler();
         sseKeepAliveScheduler.setPoolSize(1);
@@ -155,7 +158,7 @@ class AskServiceTest {
         }).when(transactionRunner).execute(any(Runnable.class));
         lenient().when(auditEventValidator.validateError(any(), anyString(), any(), any()))
                 .thenReturn(new AuditValidation(List.of(), false));
-        lenient().when(messageRepository.findRecent(any(), anyInt())).thenReturn(List.of());
+        lenient().when(messageRepository.findRecent(any(), any(), anyInt())).thenReturn(List.of());
         lenient().when(killSwitch.isActive()).thenReturn(false);
         lenient().when(documentScopeService.resolve(eq(USER_ID), anyList()))
                 .thenReturn(List.of(new AuthorizedDocument(DOCUMENT_ID, "v1")));
@@ -164,6 +167,7 @@ class AskServiceTest {
     @AfterEach
     void tearDown() {
         TraceIdContext.clear();
+        TenantContext.clear();
     }
 
     @Test
@@ -178,9 +182,9 @@ class AskServiceTest {
         assertThat(result.cacheHit()).isFalse();
         assertThat(result.idempotentReplay()).isFalse();
         verify(messageRepository, org.mockito.Mockito.times(2)).insert(
-                any(), eq(CONVERSATION_ID), anyString(), anyString(), anyInt(),
+                any(), any(), eq(CONVERSATION_ID), anyString(), anyString(), anyInt(),
                 any(), any(), any(), any());
-        verify(agentExecutionRepository).insert(any(AgentExecution.class));
+        verify(agentExecutionRepository).insert(any(), any(AgentExecution.class));
         verify(idempotencyStore).complete(eq(USER_ID), eq(CONVERSATION_ID), eq(KEY), anyString(), any(AskData.class), any());
         verify(qaCacheService).put(eq(USER_ID), anyList(), anyList(), eq(QUESTION), any(CachedAnswer.class));
     }
@@ -207,6 +211,7 @@ class AskServiceTest {
         verify(pythonAgentClient).ask(captor.capture(), anyString());
         PythonAskRequest request = captor.getValue();
         assertThat(request.protocolVersion()).isEqualTo("1.0");
+        assertThat(request.tenantId()).isEqualTo(TENANT_ID);
         assertThat(request.question()).isEqualTo(QUESTION);
         assertThat(request.piiMaskedQuestion()).isEqualTo(QUESTION);
         assertThat(request.piiMaskingVersion()).isEqualTo("pii-v1");
@@ -242,7 +247,7 @@ class AskServiceTest {
 
     @Test
     void masksHistoryBeforeSendingToPython() {
-        when(messageRepository.findRecent(CONVERSATION_ID, agentProperties.getHistoryLimit()))
+        when(messageRepository.findRecent(TENANT_ID, CONVERSATION_ID, agentProperties.getHistoryLimit()))
                 .thenReturn(List.of(
                         new StoredMessage(UUID.randomUUID(), "USER", "邮箱 a@b.com", NOW),
                         new StoredMessage(UUID.randomUUID(), "ASSISTANT", "旧回答", NOW)));
@@ -348,9 +353,9 @@ class AskServiceTest {
         assertThat(result.tokenUsed()).isZero();
         verify(pythonAgentClient, never()).ask(any(), anyString());
         verify(messageRepository, org.mockito.Mockito.times(2)).insert(
-                any(), eq(CONVERSATION_ID), anyString(), anyString(), anyInt(),
+                any(), any(), eq(CONVERSATION_ID), anyString(), anyString(), anyInt(),
                 any(), any(), any(), any());
-        verify(agentExecutionRepository).insert(any(AgentExecution.class));
+        verify(agentExecutionRepository).insert(any(), any(AgentExecution.class));
     }
 
     @Test
@@ -366,7 +371,7 @@ class AskServiceTest {
 
         verify(pythonAgentClient, never()).ask(any(), anyString());
         ArgumentCaptor<AgentExecution> execution = ArgumentCaptor.forClass(AgentExecution.class);
-        verify(agentExecutionRepository).insert(execution.capture());
+        verify(agentExecutionRepository).insert(any(), execution.capture());
         assertThat(execution.getValue().status()).isEqualTo("FAILED");
         assertThat(execution.getValue().errorCode()).isEqualTo("AGT-UPSTREAM-003");
     }
@@ -384,7 +389,7 @@ class AskServiceTest {
                 .isEqualTo(ErrorCode.AGT_UPSTREAM_002);
 
         ArgumentCaptor<AgentExecution> execution = ArgumentCaptor.forClass(AgentExecution.class);
-        verify(agentExecutionRepository).insert(execution.capture());
+        verify(agentExecutionRepository).insert(any(), execution.capture());
         assertThat(execution.getValue().status()).isEqualTo("FAILED");
         assertThat(execution.getValue().errorCode()).isEqualTo("AGT-UPSTREAM-002");
         verify(agentStateStore).clear(anyString());
@@ -425,7 +430,7 @@ class AskServiceTest {
     void mapsPersistenceFailureToInternalErrorWithoutCaching() {
         stubHappyPath();
         doThrow(new org.springframework.dao.DataIntegrityViolationException("audit outbox rejected"))
-                .when(agentExecutionRepository).insert(any(AgentExecution.class));
+                .when(agentExecutionRepository).insert(any(), any(AgentExecution.class));
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
                 new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
@@ -444,7 +449,7 @@ class AskServiceTest {
         stubUntilPython();
         doThrow(new DuplicateKeyException("uk_message_client_request"))
                 .when(messageRepository).insert(
-                        any(), any(), anyString(), anyString(), anyInt(), any(), any(), any(), any());
+                        any(), any(), any(), anyString(), anyString(), anyInt(), any(), any(), any(), any());
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
                 new AskRequest(QUESTION, List.of(DOCUMENT_ID))))

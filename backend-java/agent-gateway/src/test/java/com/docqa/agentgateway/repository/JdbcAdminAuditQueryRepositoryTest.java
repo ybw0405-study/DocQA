@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.agentgateway.dto.AuditEventItem;
+import com.docqa.common.tenant.TenantContext;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -38,7 +39,7 @@ class JdbcAdminAuditQueryRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void ordersByOccurredAtThenIdEvenWithoutFilters() {
-        repository.findPage(new AuditQueryFilter(null, null, null, null, null), null, null, 11);
+        repository.findPage(TenantContext.DEFAULT_TENANT_ID, new AuditQueryFilter(null, null, null, null, null), null, null, 11);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
@@ -51,13 +52,14 @@ class JdbcAdminAuditQueryRepositoryTest {
         assertThat(sql).doesNotContain("event_type = ?");
         assertThat(sql).doesNotContain("occurred_at >=");
         assertThat(sql).doesNotContain("*");
-        assertThat(argsCaptor.getValue()).containsExactly(11);
+        assertThat(argsCaptor.getValue()).containsExactly(TenantContext.DEFAULT_TENANT_ID.toString(), 11);
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void appliesEveryFilterAndTheWindowInDeclarationOrder() {
         repository.findPage(
+                TenantContext.DEFAULT_TENANT_ID,
                 new AuditQueryFilter(TRACE_ID, USER_ID, EVENT_TYPE, FROM, TO), null, null, 101);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
@@ -71,6 +73,7 @@ class JdbcAdminAuditQueryRepositoryTest {
         assertThat(sql).contains("AND occurred_at <= ?");
         assertThat(sql).doesNotContain("occurred_at < ?");
         assertThat(argsCaptor.getValue()).containsExactly(
+                TenantContext.DEFAULT_TENANT_ID.toString(),
                 TRACE_ID,
                 USER_ID.toString(),
                 EVENT_TYPE,
@@ -83,6 +86,7 @@ class JdbcAdminAuditQueryRepositoryTest {
     @SuppressWarnings("unchecked")
     void cursorNarrowsStrictlyBelowTheLastVisibleRow() {
         repository.findPage(
+                TenantContext.DEFAULT_TENANT_ID,
                 new AuditQueryFilter(TRACE_ID, null, null, null, null), OCCURRED_AT, CURSOR_ID, 101);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
@@ -91,6 +95,7 @@ class JdbcAdminAuditQueryRepositoryTest {
         String sql = sqlCaptor.getValue();
         assertThat(sql).contains("AND (occurred_at < ? OR (occurred_at = ? AND id < ?))");
         assertThat(argsCaptor.getValue()).containsExactly(
+                TenantContext.DEFAULT_TENANT_ID.toString(),
                 TRACE_ID,
                 Timestamp.from(OCCURRED_AT),
                 Timestamp.from(OCCURRED_AT),
@@ -102,7 +107,7 @@ class JdbcAdminAuditQueryRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void halfCursorIsIgnored() {
-        repository.findPage(new AuditQueryFilter(null, USER_ID, null, null, null), null, CURSOR_ID, 101);
+        repository.findPage(TenantContext.DEFAULT_TENANT_ID, new AuditQueryFilter(null, USER_ID, null, null, null), null, CURSOR_ID, 101);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).query(sqlCaptor.capture(), any(Object[].class), any(RowMapper.class));
@@ -113,7 +118,7 @@ class JdbcAdminAuditQueryRepositoryTest {
     @SuppressWarnings("unchecked")
     void mapsNullAgentNameAndParsesTheRedactedPayload() throws Exception {
         ArgumentCaptor<RowMapper<AuditEventItem>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.findPage(new AuditQueryFilter(null, null, null, null, null), null, null, 1);
+        repository.findPage(TenantContext.DEFAULT_TENANT_ID, new AuditQueryFilter(null, null, null, null, null), null, null, 1);
         verify(jdbcTemplate).query(any(String.class), any(Object[].class), mapperCaptor.capture());
 
         AuditEventItem row = mapperCaptor.getValue().mapRow(
@@ -134,7 +139,7 @@ class JdbcAdminAuditQueryRepositoryTest {
     @SuppressWarnings("unchecked")
     void keepsAgentNameWhenPresent() throws Exception {
         ArgumentCaptor<RowMapper<AuditEventItem>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.findPage(new AuditQueryFilter(null, null, null, null, null), null, null, 1);
+        repository.findPage(TenantContext.DEFAULT_TENANT_ID, new AuditQueryFilter(null, null, null, null, null), null, null, 1);
         verify(jdbcTemplate).query(any(String.class), any(Object[].class), mapperCaptor.capture());
 
         AuditEventItem row = mapperCaptor.getValue().mapRow(resultSet("{}", "rag_retriever"), 0);
@@ -146,7 +151,7 @@ class JdbcAdminAuditQueryRepositoryTest {
     @SuppressWarnings("unchecked")
     void failsLoudlyWhenAStoredPayloadIsNotJson() throws Exception {
         ArgumentCaptor<RowMapper<AuditEventItem>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
-        repository.findPage(new AuditQueryFilter(null, null, null, null, null), null, null, 1);
+        repository.findPage(TenantContext.DEFAULT_TENANT_ID, new AuditQueryFilter(null, null, null, null, null), null, null, 1);
         verify(jdbcTemplate).query(any(String.class), any(Object[].class), mapperCaptor.capture());
 
         RowMapper<AuditEventItem> mapper = mapperCaptor.getValue();

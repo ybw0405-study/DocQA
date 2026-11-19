@@ -3,6 +3,7 @@ package com.docqa.reminder.service;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.common.metrics.BusinessMetrics;
 import com.docqa.reminder.config.ReminderProperties;
+import com.docqa.reminder.domain.DueReminder;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.messaging.ReminderDueEvent;
 import com.docqa.reminder.messaging.ReminderDuePublisher;
@@ -62,15 +63,18 @@ public class ReminderDueService {
             TraceIdContext.set(traceId);
         }
         try {
+            // 定时任务跨租户扫描；每行自带 tenant_id，用于消息 stamp 与后续 CAS 写入。
             Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
-            List<ReminderRow> due = reminderRepository.findDue(now, properties.getScanBatchSize());
+            List<DueReminder> due = reminderRepository.findDue(now, properties.getScanBatchSize());
             int published = 0;
             int duplicates = 0;
             int skipped = 0;
             int failed = 0;
-            for (ReminderRow row : due) {
+            for (DueReminder dueReminder : due) {
+                UUID tenantId = dueReminder.tenantId();
+                ReminderRow row = dueReminder.reminder();
                 try {
-                    Outcome outcome = dispatch(row, now, traceId);
+                    Outcome outcome = dispatch(tenantId, row, now, traceId);
                     // §4.2：按终态计数。OUTCOME 枚举本身就是标签域，直接 name() 落标签，
                     // 避免再维护一份「枚举 → 字符串」映射而两处漂移。
                     metrics.reminderDuePublished(outcome.name());
@@ -107,7 +111,7 @@ public class ReminderDueService {
         }
     }
 
-    private Outcome dispatch(ReminderRow row, Instant now, String traceId) {
+    private Outcome dispatch(UUID tenantId, ReminderRow row, Instant now, String traceId) {
         Instant occurrence = row.nextTriggerAt().truncatedTo(ChronoUnit.SECONDS);
         Instant graceThreshold = now.minus(properties.getPastGrace());
         if (occurrence.isBefore(graceThreshold)) {
@@ -118,7 +122,7 @@ public class ReminderDueService {
                     row.id(),
                     occurrence,
                     next.orElse(null));
-            advance(row, row.lastTriggeredAt(), next);
+            advance(tenantId, row, row.lastTriggeredAt(), next);
             return Outcome.SKIPPED;
         }
         Optional<Instant> next = nextOccurrence(row, occurrence);
@@ -135,7 +139,7 @@ public class ReminderDueService {
                     "Reminder occurrence already published; advancing state only: reminderId={}, occurrenceStartUtc={}",
                     row.id(),
                     occurrence);
-            advance(row, occurrence, next);
+            advance(tenantId, row, occurrence, next);
             return Outcome.DUPLICATE;
         }
 
@@ -151,7 +155,8 @@ public class ReminderDueService {
                 row.timezone(),
                 occurrence,
                 next.orElse(null),
-                now);
+                now,
+                tenantId);
         try {
             reminderDuePublisher.publish(event);
         } catch (RuntimeException ex) {
@@ -165,7 +170,7 @@ public class ReminderDueService {
         }
 
         firedOccurrenceStore.markFired(row.id(), occurrence);
-        advance(row, occurrence, next);
+        advance(tenantId, row, occurrence, next);
         return Outcome.PUBLISHED;
     }
 
@@ -208,12 +213,12 @@ public class ReminderDueService {
         return occurrence.minusSeconds(row.leadMinutes() * 60L);
     }
 
-    private void advance(ReminderRow row, Instant lastTriggeredAt, Optional<Instant> next) {
+    private void advance(UUID tenantId, ReminderRow row, Instant lastTriggeredAt, Optional<Instant> next) {
         int updated;
         if (next.isPresent()) {
-            updated = reminderRepository.advance(row.id(), row.version(), next.get(), lastTriggeredAt);
+            updated = reminderRepository.advance(tenantId, row.id(), row.version(), next.get(), lastTriggeredAt);
         } else {
-            updated = reminderRepository.complete(row.id(), row.version(), lastTriggeredAt);
+            updated = reminderRepository.complete(tenantId, row.id(), row.version(), lastTriggeredAt);
         }
         if (updated == 0) {
             LOGGER.info(

@@ -4,6 +4,7 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.domain.ReminderKind;
 import com.docqa.reminder.domain.ReminderTriggerRow;
 import com.docqa.reminder.dto.NotificationData;
@@ -37,12 +38,14 @@ public class NotificationService {
     }
 
     public NotificationListData list(UUID userId, boolean unreadOnly, String cursorToken, int limit) {
+        UUID tenantId = TenantContext.require();
         if (limit < MIN_PAGE_SIZE || limit > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.COM_VALIDATION_001, "limit out of range",
                     List.of(FieldViolation.of("limit", "must be between 1 and 100")));
         }
         KeysetCursor cursor = parseCursor(cursorToken);
         List<ReminderTriggerRow> rows = reminderTriggerRepository.findUserPage(
+                tenantId,
                 userId,
                 unreadOnly,
                 cursor == null ? null : cursor.sortKey(),
@@ -60,6 +63,7 @@ public class NotificationService {
     }
 
     public NotificationReadData markRead(UUID userId, NotificationReadRequest request) {
+        UUID tenantId = TenantContext.require();
         boolean all = Boolean.TRUE.equals(request.all());
         List<UUID> ids = request.ids();
         if (all && ids != null) {
@@ -73,8 +77,8 @@ public class NotificationService {
         // 与 delivered_at 同口径截断到秒：DATETIME(3) 存毫秒，未截断时同一秒内多次操作会读出无意义的毫秒差。
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         int updated = all
-                ? reminderTriggerRepository.markAllUnreadAsRead(userId, now)
-                : reminderTriggerRepository.markRead(userId, ids, now);
+                ? reminderTriggerRepository.markAllUnreadAsRead(tenantId, userId, now)
+                : reminderTriggerRepository.markRead(tenantId, userId, ids, now);
         return new NotificationReadData(updated, all);
     }
 

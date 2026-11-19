@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.docqa.agentgateway.config.JwtProperties;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 class JwtAuthenticatorTest {
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID TENANT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final String ISSUER = "docqa-user-service";
     private static final String AUDIENCE = "docqa-api";
     private static final String SECRET = "0123456789abcdef0123456789abcdef";
@@ -182,6 +184,7 @@ class JwtAuthenticatorTest {
         AuthenticatedUser identity = authenticator.authenticateIdentity("Bearer " + token);
 
         assertThat(identity.userId()).isEqualTo(USER_ID);
+        assertThat(identity.tenantId()).isEqualTo(TENANT_ID);
         assertThat(identity.roles()).containsExactlyInAnyOrder("USER", "ADMIN");
         assertThat(identity.isAdmin()).isTrue();
         assertThat(authenticator.authenticate("Bearer " + token)).isEqualTo(USER_ID);
@@ -220,6 +223,7 @@ class JwtAuthenticatorTest {
                 .issuedAt(Date.from(NOW.minusSeconds(10)))
                 .expiration(Date.from(NOW.plusSeconds(3600)))
                 .id(UUID.randomUUID().toString())
+                .claim(TenantContext.CLAIM_NAME, TENANT_ID.toString())
                 .claim("roles", roles)
                 .signWith(signingKey)
                 .compact();
@@ -237,7 +241,8 @@ class JwtAuthenticatorTest {
                 .issuer(issuer)
                 .audience().add(audience).and()
                 .issuedAt(Date.from(NOW.minusSeconds(10)))
-                .expiration(Date.from(expiration));
+                .expiration(Date.from(expiration))
+                .claim(TenantContext.CLAIM_NAME, TENANT_ID.toString());
         if (jti != null) {
             builder.id(jti);
         }

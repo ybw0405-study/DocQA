@@ -15,5 +15,6 @@ public record ReminderDueEvent(
         String timezone,
         Instant occurrenceStartUtc,
         Instant nextTriggerAt,
-        Instant occurredAt) {
+        Instant occurredAt,
+        UUID tenantId) {
 }

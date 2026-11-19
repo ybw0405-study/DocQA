@@ -12,8 +12,11 @@ import com.docqa.agentgateway.dto.AuthorizedDocument;
 import com.docqa.agentgateway.repository.DocumentScopeRepository;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -22,12 +25,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class DocumentScopeServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID OTHER_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
 
     @Mock
     private DocumentScopeRepository repository;
+
+    @BeforeEach
+    void setUp() {
+        TenantContext.set(TENANT_ID);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
 
     @Test
     void rejectsEmptyScopeWithoutQuerying() {
@@ -37,7 +51,7 @@ class DocumentScopeServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_VALIDATION_001);
-        verify(repository, never()).findByUserAndIds(any(), any());
+        verify(repository, never()).findByUserAndIds(any(), any(), any());
     }
 
     @Test
@@ -53,7 +67,7 @@ class DocumentScopeServiceTest {
     @Test
     void rejectsForeignOrMissingDocument() {
         DocumentScopeService service = new DocumentScopeService(repository);
-        when(repository.findByUserAndIds(USER_ID, List.of(DOCUMENT_ID))).thenReturn(List.of());
+        when(repository.findByUserAndIds(TENANT_ID, USER_ID, List.of(DOCUMENT_ID))).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.resolve(USER_ID, List.of(DOCUMENT_ID)))
                 .isInstanceOf(BusinessException.class)
@@ -64,7 +78,7 @@ class DocumentScopeServiceTest {
     @Test
     void rejectsUnindexedDocument() {
         DocumentScopeService service = new DocumentScopeService(repository);
-        when(repository.findByUserAndIds(USER_ID, List.of(DOCUMENT_ID)))
+        when(repository.findByUserAndIds(TENANT_ID, USER_ID, List.of(DOCUMENT_ID)))
                 .thenReturn(List.of(document(DOCUMENT_ID, "PARSING")));
 
         assertThatThrownBy(() -> service.resolve(USER_ID, List.of(DOCUMENT_ID)))
@@ -76,7 +90,7 @@ class DocumentScopeServiceTest {
     @Test
     void returnsAuthorizedDocumentsInRequestOrder() {
         DocumentScopeService service = new DocumentScopeService(repository);
-        when(repository.findByUserAndIds(USER_ID, List.of(OTHER_ID, DOCUMENT_ID)))
+        when(repository.findByUserAndIds(TENANT_ID, USER_ID, List.of(OTHER_ID, DOCUMENT_ID)))
                 .thenReturn(List.of(
                         document(DOCUMENT_ID, "INDEXED"),
                         document(OTHER_ID, "INDEXED")));
@@ -94,13 +108,13 @@ class DocumentScopeServiceTest {
 
         service.assertOwned(USER_ID, List.of());
 
-        verify(repository, never()).findByUserAndIds(any(), any());
+        verify(repository, never()).findByUserAndIds(any(), any(), any());
     }
 
     @Test
     void assertOwnedAcceptsNonIndexedDocument() {
         DocumentScopeService service = new DocumentScopeService(repository);
-        when(repository.findByUserAndIds(USER_ID, List.of(DOCUMENT_ID)))
+        when(repository.findByUserAndIds(TENANT_ID, USER_ID, List.of(DOCUMENT_ID)))
                 .thenReturn(List.of(document(DOCUMENT_ID, "UPLOADED")));
 
         service.assertOwned(USER_ID, List.of(DOCUMENT_ID));
@@ -109,7 +123,7 @@ class DocumentScopeServiceTest {
     @Test
     void assertOwnedRejectsForeignDocument() {
         DocumentScopeService service = new DocumentScopeService(repository);
-        when(repository.findByUserAndIds(USER_ID, List.of(DOCUMENT_ID))).thenReturn(List.of());
+        when(repository.findByUserAndIds(TENANT_ID, USER_ID, List.of(DOCUMENT_ID))).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.assertOwned(USER_ID, List.of(DOCUMENT_ID)))
                 .isInstanceOf(BusinessException.class)

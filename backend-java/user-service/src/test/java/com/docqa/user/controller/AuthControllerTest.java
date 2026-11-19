@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.common.web.GlobalExceptionHandler;
 import com.docqa.common.web.TraceIdFilter;
@@ -21,6 +22,7 @@ import com.docqa.user.config.AuthProperties;
 import com.docqa.user.config.JwtProperties;
 import com.docqa.user.domain.AppUserRow;
 import com.docqa.user.domain.RefreshTokenStatus;
+import com.docqa.user.domain.TenantRecord;
 import com.docqa.user.domain.UserCredentials;
 import com.docqa.user.domain.UserRole;
 import com.docqa.user.domain.UserStatus;
@@ -28,6 +30,7 @@ import com.docqa.user.dto.ChangePasswordRequest;
 import com.docqa.user.dto.LoginRequest;
 import com.docqa.user.error.AuthExceptionHandler;
 import com.docqa.user.repository.RoleRepository;
+import com.docqa.user.repository.TenantRepository;
 import com.docqa.user.repository.UserRepository;
 import com.docqa.user.service.AccessTokenAuthenticator;
 import com.docqa.user.service.AuthService;
@@ -39,6 +42,7 @@ import com.docqa.user.service.PasswordPolicy;
 import com.docqa.user.service.RateLimitDecision;
 import com.docqa.user.service.RefreshTokenService;
 import com.docqa.user.service.RegistrationRateLimiter;
+import com.docqa.user.service.TenantResolver;
 import com.docqa.user.support.InMemoryIdempotencyStore;
 import com.docqa.user.support.InMemoryRefreshTokenRepository;
 import com.docqa.user.support.RecordingRevocationStore;
@@ -70,6 +74,8 @@ class AuthControllerTest {
     private static final String PASSWORD = "test-password-123";
     private static final String NEW_PASSWORD = "new-battery-11";
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID SECOND_TENANT = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final String SECOND_SLUG = "acme";
     private static final String TRACE_ID_PATTERN = "^[0-9a-f]{32}$";
     private static final String IDEMPOTENCY_KEY = "idem-key-0001";
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
@@ -81,6 +87,7 @@ class AuthControllerTest {
     private AuthProperties authProperties;
     private UserRepository userRepository;
     private RoleRepository roleRepository;
+    private JwtService jwtService;
     private InMemoryRefreshTokenRepository refreshTokenRepository;
     private MockMvc mockMvc;
 
@@ -100,12 +107,20 @@ class AuthControllerTest {
 
         UserCredentials credentials = new UserCredentials(
                 USER_ID, USERNAME, passwordEncoder.encode(PASSWORD), UserStatus.ACTIVE);
-        when(userRepository.findCredentialsByUsername(USERNAME)).thenReturn(Optional.of(credentials));
-        when(userRepository.findCredentialsById(USER_ID)).thenReturn(Optional.of(credentials));
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
+        when(userRepository.findCredentialsByUsername(TenantContext.DEFAULT_TENANT_ID, USERNAME))
+                .thenReturn(Optional.of(credentials));
+        when(userRepository.findCredentialsById(TenantContext.DEFAULT_TENANT_ID, USER_ID))
+                .thenReturn(Optional.of(credentials));
+        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, USER_ID)).thenReturn(Optional.of(
                 new AppUserRow(USER_ID, USERNAME, UserStatus.ACTIVE, null, NOW)));
-        when(userRepository.existsByUsername(any())).thenReturn(false);
-        when(roleRepository.findRoles(any())).thenReturn(Set.of(UserRole.USER));
+        when(userRepository.existsByUsername(any(), any())).thenReturn(false);
+        when(roleRepository.findRoles(any(), any())).thenReturn(Set.of(UserRole.USER));
+
+        TenantRepository tenantRepository = mock(TenantRepository.class);
+        when(tenantRepository.findBySlug(SECOND_SLUG))
+                .thenReturn(Optional.of(new TenantRecord(SECOND_TENANT, SECOND_SLUG, "ACTIVE")));
+        when(userRepository.findCredentialsByUsername(SECOND_TENANT, USERNAME))
+                .thenReturn(Optional.of(credentials));
 
         authProperties = new AuthProperties();
         authProperties.setMaxLoginFailures(5);
@@ -118,7 +133,7 @@ class AuthControllerTest {
         jwtProperties.setAudience("test-audience");
         jwtProperties.setTtl(Duration.ofMinutes(15));
         jwtProperties.setSecret("test-jwt-secret-with-at-least-32-bytes-1234567890");
-        JwtService jwtService = new JwtService(jwtProperties, clock);
+        jwtService = new JwtService(jwtProperties, clock);
         AccessTokenAuthenticator authenticator =
                 new AccessTokenAuthenticator(jwtService, new RecordingRevocationStore());
 
@@ -137,6 +152,7 @@ class AuthControllerTest {
                 jwtService,
                 passwordEncoder,
                 authProperties,
+                new TenantResolver(tenantRepository),
                 clock);
 
         mockMvc = MockMvcBuilders
@@ -366,6 +382,47 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("USR-AUTH-001"));
+    }
+
+    @Test
+    void loginWithTenantSlugPutsTheResolvedTenantIntoTheJwt() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new LoginRequest(USERNAME, PASSWORD, SECOND_SLUG))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(jwtService.verify(accessTokenOf(result)).tenantId()).isEqualTo(SECOND_TENANT);
+    }
+
+    @Test
+    void loginWithUnknownTenantSlugIsRejectedWithTheGenericCredentialError() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"demo\",\"password\":\"test-password-123\","
+                                + "\"tenantSlug\":\"ghost\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("USR-AUTH-001"));
+    }
+
+    @Test
+    void registerWithTenantSlugAssignsTheNewUserToThatTenant() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+                        .header("Idempotency-Key", "idem-key-0002")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new com.docqa.user.dto.RegisterRequest(
+                                        "new.user", "correct-horse-9", SECOND_SLUG))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        assertThat(jwtService.verify(accessTokenOf(result)).tenantId()).isEqualTo(SECOND_TENANT);
+    }
+
+    private String accessTokenOf(MvcResult result) throws Exception {
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+                .path("data").path("accessToken").asText();
     }
 
     private String loginAndReadCookie() throws Exception {

@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.config.ReminderProperties;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.domain.ReminderStatus;
@@ -25,6 +26,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +36,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class ReminderListServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID FIRST_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID SECOND_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -61,11 +64,17 @@ class ReminderListServiceTest {
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new ObjectMapper().findAndRegisterModules(),
                 new ReminderProperties());
+        TenantContext.set(TENANT_ID);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test
     void mapsRowsIntoDashboardItemsWithKindAndExdates() {
-        when(reminderRepository.findUserPage(eq(USER_ID), isNull(), isNull(), isNull(), eq(false), eq(21)))
+        when(reminderRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), isNull(), eq(false), eq(21)))
                 .thenReturn(List.of(row(FIRST_ID, ReminderStatus.ACTIVE, FIRST_TRIGGER, "DEADLINE", List.of(), 0)));
 
         ReminderListData data = service.list(USER_ID, null, null, 20);
@@ -88,7 +97,7 @@ class ReminderListServiceTest {
      */
     @Test
     void projectsTheCourseLeadMinutesOntoTheDashboardItem() {
-        when(reminderRepository.findUserPage(eq(USER_ID), isNull(), isNull(), isNull(), eq(false), eq(21)))
+        when(reminderRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), isNull(), eq(false), eq(21)))
                 .thenReturn(List.of(row(FIRST_ID, ReminderStatus.ACTIVE, FIRST_TRIGGER, "COURSE", List.of(), 30)));
 
         ReminderListData data = service.list(USER_ID, null, null, 20);
@@ -101,7 +110,7 @@ class ReminderListServiceTest {
     @Test
     void encodesNextCursorFromTheLastReturnedRow() {
         UUID lookaheadId = UUID.fromString("00000000-0000-0000-0000-000000000004");
-        when(reminderRepository.findUserPage(eq(USER_ID), isNull(), isNull(), isNull(), eq(false), eq(3)))
+        when(reminderRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), isNull(), eq(false), eq(3)))
                 .thenReturn(List.of(
                         row(FIRST_ID, ReminderStatus.ACTIVE, FIRST_TRIGGER, "CUSTOM", List.of(), 0),
                         row(SECOND_ID, ReminderStatus.ACTIVE, SECOND_TRIGGER, "CUSTOM", List.of(), 0),
@@ -118,7 +127,7 @@ class ReminderListServiceTest {
     @Test
     void passesStatusFilterAndNonNullCursorDownToTheRepository() {
         String token = KeysetCursor.of(FIRST_TRIGGER, FIRST_ID).encode();
-        when(reminderRepository.findUserPage(eq(USER_ID), eq(ReminderStatus.PAUSED),
+        when(reminderRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), eq(ReminderStatus.PAUSED),
                 eq(FIRST_TRIGGER), eq(FIRST_ID), eq(false), eq(11)))
                 .thenReturn(List.of());
 
@@ -131,7 +140,7 @@ class ReminderListServiceTest {
     @Test
     void flagsTheNoNextTriggerGroupToTheRepository() {
         String token = KeysetCursor.of(null, SECOND_ID).encode();
-        when(reminderRepository.findUserPage(eq(USER_ID), isNull(), isNull(), eq(SECOND_ID), eq(true), eq(21)))
+        when(reminderRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), eq(SECOND_ID), eq(true), eq(21)))
                 .thenReturn(List.of(row(SECOND_ID, ReminderStatus.COMPLETED, null, "DEADLINE", List.of(), 0)));
 
         ReminderListData data = service.list(USER_ID, null, token, 20);

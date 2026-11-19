@@ -14,6 +14,7 @@ import com.docqa.agentgateway.dto.CreateConversationRequest;
 import com.docqa.agentgateway.repository.ConversationRepository;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class ConversationServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID CONVERSATION_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID DOCUMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -50,6 +53,7 @@ class ConversationServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.set(TENANT_ID);
         service = new ConversationService(
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 conversationRepository,
@@ -58,10 +62,15 @@ class ConversationServiceTest {
                 rateLimiter);
     }
 
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
     @Test
     void createsNewConversation() {
         when(creationStore.tryStart(eq(USER_ID), eq(KEY), anyString(), eq(NOW))).thenReturn(true);
-        when(conversationRepository.createOwned(any(), eq(USER_ID), eq("线性代数"), eq(List.of(DOCUMENT_ID)), eq(NOW)))
+        when(conversationRepository.createOwned(any(), any(), eq(USER_ID), eq("线性代数"), eq(List.of(DOCUMENT_ID)), eq(NOW)))
                 .thenReturn(true);
 
         ConversationData data = service.create(
@@ -79,7 +88,7 @@ class ConversationServiceTest {
     @Test
     void usesDefaultTitleWhenTitleIsAbsent() {
         when(creationStore.tryStart(any(), anyString(), anyString(), any())).thenReturn(true);
-        when(conversationRepository.createOwned(any(), eq(USER_ID), eq(ConversationService.DEFAULT_TITLE), eq(List.of()), any()))
+        when(conversationRepository.createOwned(any(), any(), eq(USER_ID), eq(ConversationService.DEFAULT_TITLE), eq(List.of()), any()))
                 .thenReturn(true);
 
         ConversationData data = service.create(USER_ID, KEY, new CreateConversationRequest(null, null));
@@ -145,7 +154,7 @@ class ConversationServiceTest {
 
         assertThat(replay.conversationId()).isEqualTo(CONVERSATION_ID);
         assertThat(replay.idempotentReplay()).isTrue();
-        verify(conversationRepository, never()).createOwned(any(), any(), anyString(), any(), any());
+        verify(conversationRepository, never()).createOwned(any(), any(), any(), anyString(), any(), any());
     }
 
     @Test
@@ -177,7 +186,7 @@ class ConversationServiceTest {
     @Test
     void clearsIdempotencyRecordWhenInsertFails() {
         when(creationStore.tryStart(any(), anyString(), anyString(), any())).thenReturn(true);
-        when(conversationRepository.createOwned(any(), any(), anyString(), any(), any())).thenReturn(false);
+        when(conversationRepository.createOwned(any(), any(), any(), anyString(), any(), any())).thenReturn(false);
 
         assertThatThrownBy(() -> service.create(
                 USER_ID, KEY, new CreateConversationRequest("title", List.of())))
@@ -199,41 +208,42 @@ class ConversationServiceTest {
 
     @Test
     void ensureOwnedDoesNothingForOwnedConversation() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(true);
+        when(conversationRepository.existsByIdAndUser(any(), eq(CONVERSATION_ID), eq(USER_ID))).thenReturn(true);
 
         service.ensureOwned(CONVERSATION_ID, USER_ID, List.of(DOCUMENT_ID));
 
-        verify(conversationRepository, never()).createOwned(any(), any(), anyString(), any(), any());
+        verify(conversationRepository, never()).createOwned(any(), any(), any(), anyString(), any(), any());
     }
 
     @Test
     void ensureOwnedCreatesMissingConversation() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(false);
+        when(conversationRepository.existsByIdAndUser(any(), eq(CONVERSATION_ID), eq(USER_ID))).thenReturn(false);
         when(conversationRepository.createOwned(
-                CONVERSATION_ID, USER_ID, ConversationService.DEFAULT_TITLE, List.of(DOCUMENT_ID), NOW))
+                any(), eq(CONVERSATION_ID), eq(USER_ID), eq(ConversationService.DEFAULT_TITLE),
+                eq(List.of(DOCUMENT_ID)), eq(NOW)))
                 .thenReturn(true);
 
         service.ensureOwned(CONVERSATION_ID, USER_ID, List.of(DOCUMENT_ID));
 
         ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
         verify(conversationRepository).createOwned(
-                eq(CONVERSATION_ID), eq(USER_ID), title.capture(), eq(List.of(DOCUMENT_ID)), eq(NOW));
+                any(), eq(CONVERSATION_ID), eq(USER_ID), title.capture(), eq(List.of(DOCUMENT_ID)), eq(NOW));
         assertThat(title.getValue()).isEqualTo(ConversationService.DEFAULT_TITLE);
     }
 
     @Test
     void ensureOwnedToleratesConcurrentCreation() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID))
+        when(conversationRepository.existsByIdAndUser(any(), eq(CONVERSATION_ID), eq(USER_ID)))
                 .thenReturn(false, true);
-        when(conversationRepository.createOwned(any(), any(), anyString(), any(), any())).thenReturn(false);
+        when(conversationRepository.createOwned(any(), any(), any(), anyString(), any(), any())).thenReturn(false);
 
         service.ensureOwned(CONVERSATION_ID, USER_ID, List.of(DOCUMENT_ID));
     }
 
     @Test
     void ensureOwnedRejectsForeignConversation() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(false);
-        when(conversationRepository.createOwned(any(), any(), anyString(), any(), any())).thenReturn(false);
+        when(conversationRepository.existsByIdAndUser(any(), eq(CONVERSATION_ID), eq(USER_ID))).thenReturn(false);
+        when(conversationRepository.createOwned(any(), any(), any(), anyString(), any(), any())).thenReturn(false);
 
         assertThatThrownBy(() -> service.ensureOwned(CONVERSATION_ID, USER_ID, List.of(DOCUMENT_ID)))
                 .isInstanceOf(BusinessException.class)
@@ -243,16 +253,16 @@ class ConversationServiceTest {
 
     @Test
     void requireAccessibleAllowsMissingConversation() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(false);
-        when(conversationRepository.existsById(CONVERSATION_ID)).thenReturn(false);
+        when(conversationRepository.existsByIdAndUser(any(), eq(CONVERSATION_ID), eq(USER_ID))).thenReturn(false);
+        when(conversationRepository.existsById(any(), eq(CONVERSATION_ID))).thenReturn(false);
 
         service.requireAccessible(CONVERSATION_ID, USER_ID);
     }
 
     @Test
     void requireAccessibleRejectsForeignConversation() {
-        when(conversationRepository.existsByIdAndUser(CONVERSATION_ID, USER_ID)).thenReturn(false);
-        when(conversationRepository.existsById(CONVERSATION_ID)).thenReturn(true);
+        when(conversationRepository.existsByIdAndUser(any(), eq(CONVERSATION_ID), eq(USER_ID))).thenReturn(false);
+        when(conversationRepository.existsById(any(), eq(CONVERSATION_ID))).thenReturn(true);
 
         assertThatThrownBy(() -> service.requireAccessible(CONVERSATION_ID, USER_ID))
                 .isInstanceOf(BusinessException.class)

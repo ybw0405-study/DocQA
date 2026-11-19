@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.domain.RefreshTokenRow;
 import com.docqa.user.domain.RefreshTokenStatus;
 import java.sql.Timestamp;
@@ -33,11 +34,12 @@ class JdbcRefreshTokenRepositoryTest {
 
     @Test
     void insertBindsEveryColumn() {
-        repository.insert(row(RefreshTokenStatus.ACTIVE));
+        repository.insert(TenantContext.DEFAULT_TENANT_ID, row(RefreshTokenStatus.ACTIVE));
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).update(
                 sqlCaptor.capture(),
+                eq(TenantContext.DEFAULT_TENANT_ID.toString()),
                 eq(TOKEN_ID.toString()),
                 eq(USER_ID.toString()),
                 eq(FAMILY_ID.toString()),
@@ -46,58 +48,81 @@ class JdbcRefreshTokenRepositoryTest {
                 eq(Timestamp.from(EXPIRES_AT)),
                 eq(Timestamp.from(NOW)),
                 eq(Timestamp.from(NOW)));
-        assertThat(sqlCaptor.getValue()).contains("INSERT INTO refresh_token");
+        assertThat(sqlCaptor.getValue())
+                .contains("INSERT INTO refresh_token")
+                .contains("tenant_id");
     }
 
     @Test
     void findByHashReadsTheRow() {
         RefreshTokenRow stored = row(RefreshTokenStatus.ACTIVE);
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq("hash-1"))).thenReturn(List.of(stored));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class),
+                eq(TenantContext.DEFAULT_TENANT_ID.toString()), eq("hash-1"))).thenReturn(List.of(stored));
 
-        Optional<RefreshTokenRow> found = repository.findByHash("hash-1");
+        Optional<RefreshTokenRow> found =
+                repository.findByHash(TenantContext.DEFAULT_TENANT_ID, "hash-1");
 
         assertThat(found).contains(stored);
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq("hash-1"));
-        assertThat(sqlCaptor.getValue()).contains("FROM refresh_token WHERE token_hash = ?");
+        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class),
+                eq(TenantContext.DEFAULT_TENANT_ID.toString()), eq("hash-1"));
+        assertThat(sqlCaptor.getValue())
+                .contains("FROM refresh_token WHERE tenant_id = ? AND token_hash = ?");
         assertThat(sqlCaptor.getValue()).contains("token_hash").doesNotContain("hash-1");
     }
 
     @Test
-    void consumeActiveIsAConditionalUpdate() {
-        when(jdbcTemplate.update(anyString(), eq(Timestamp.from(NOW)), eq(TOKEN_ID.toString()))).thenReturn(1);
+    void findTenantIdByHashReadsOnlyTheTenantOfTheCredential() {
+        UUID tenantId = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+        when(jdbcTemplate.query(
+                anyString(), any(RowMapper.class), eq("hash-1"))).thenReturn(List.of(tenantId));
 
-        assertThat(repository.consumeActive(TOKEN_ID, NOW)).isEqualTo(1);
+        assertThat(repository.findTenantIdByHash("hash-1")).contains(tenantId);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).update(sqlCaptor.capture(), eq(Timestamp.from(NOW)), eq(TOKEN_ID.toString()));
+        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq("hash-1"));
+        assertThat(sqlCaptor.getValue())
+                .contains("SELECT tenant_id FROM refresh_token WHERE token_hash = ?")
+                .doesNotContain("hash-1");
+    }
+
+    @Test
+    void consumeActiveIsAConditionalUpdate() {
+        when(jdbcTemplate.update(anyString(), eq(Timestamp.from(NOW)),
+                eq(TenantContext.DEFAULT_TENANT_ID.toString()), eq(TOKEN_ID.toString()))).thenReturn(1);
+
+        assertThat(repository.consumeActive(TenantContext.DEFAULT_TENANT_ID, TOKEN_ID, NOW)).isEqualTo(1);
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).update(sqlCaptor.capture(), eq(Timestamp.from(NOW)),
+                eq(TenantContext.DEFAULT_TENANT_ID.toString()), eq(TOKEN_ID.toString()));
         assertThat(sqlCaptor.getValue())
                 .contains("SET status = 'USED'")
-                .contains("WHERE id = ? AND status = 'ACTIVE'");
+                .contains("WHERE tenant_id = ? AND id = ? AND status = 'ACTIVE'");
     }
 
     @Test
     void revokeFamilyOnlyTouchesActiveRows() {
-        repository.revokeFamily(FAMILY_ID, NOW);
+        repository.revokeFamily(TenantContext.DEFAULT_TENANT_ID, FAMILY_ID, NOW);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).update(
-                sqlCaptor.capture(), eq(Timestamp.from(NOW)), eq(FAMILY_ID.toString()));
+        verify(jdbcTemplate).update(sqlCaptor.capture(), eq(Timestamp.from(NOW)),
+                eq(TenantContext.DEFAULT_TENANT_ID.toString()), eq(FAMILY_ID.toString()));
         assertThat(sqlCaptor.getValue())
                 .contains("SET status = 'REVOKED'")
-                .contains("WHERE family_id = ? AND status = 'ACTIVE'");
+                .contains("WHERE tenant_id = ? AND family_id = ? AND status = 'ACTIVE'");
     }
 
     @Test
     void revokeAllActiveForUserOnlyTouchesActiveRows() {
-        repository.revokeAllActiveForUser(USER_ID, NOW);
+        repository.revokeAllActiveForUser(TenantContext.DEFAULT_TENANT_ID, USER_ID, NOW);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).update(
-                sqlCaptor.capture(), eq(Timestamp.from(NOW)), eq(USER_ID.toString()));
+        verify(jdbcTemplate).update(sqlCaptor.capture(), eq(Timestamp.from(NOW)),
+                eq(TenantContext.DEFAULT_TENANT_ID.toString()), eq(USER_ID.toString()));
         assertThat(sqlCaptor.getValue())
                 .contains("SET status = 'REVOKED'")
-                .contains("WHERE user_id = ? AND status = 'ACTIVE'");
+                .contains("WHERE tenant_id = ? AND user_id = ? AND status = 'ACTIVE'");
     }
 
     @Test

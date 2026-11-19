@@ -45,7 +45,8 @@ public class AdminQuotaService {
         this.clock = clock;
     }
 
-    public AiQuotaListData list(String cursorToken, int limit) {
+    /** tenantId 必须来自已验签 JWT，不接受请求参数；配额只在租户内可见、可改。 */
+    public AiQuotaListData list(UUID tenantId, String cursorToken, int limit) {
         if (limit < MIN_PAGE_SIZE || limit > MAX_PAGE_SIZE) {
             throw new BusinessException(
                     ErrorCode.COM_VALIDATION_001,
@@ -54,6 +55,7 @@ public class AdminQuotaService {
         }
         KeysetCursor cursor = parseCursor(cursorToken);
         List<AiQuota> rows = quotaRepository.findPage(
+                tenantId,
                 cursor == null ? null : cursor.sortKey(),
                 cursor == null ? null : cursor.id(),
                 limit + 1);
@@ -65,19 +67,25 @@ public class AdminQuotaService {
         return new AiQuotaListData(page, nextCursor, limit);
     }
 
-    public AiQuota update(UUID adminId, UUID targetUserId, Long dailyQuestionLimit, Long dailyTokenLimit) {
-        String username = quotaRepository.findUsername(targetUserId)
+    /** tenantId 必须来自已验签 JWT；审计条目也落在同一租户，避免管理操作跨租户留痕。 */
+    public AiQuota update(
+            UUID tenantId,
+            UUID adminId,
+            UUID targetUserId,
+            Long dailyQuestionLimit,
+            Long dailyTokenLimit) {
+        String username = quotaRepository.findUsername(tenantId, targetUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USR_NOT_FOUND_001));
         Instant now = clock.instant();
         boolean cleared = dailyQuestionLimit == null && dailyTokenLimit == null;
         String traceId = TraceIdContext.currentOrCreate();
         transactionRunner.execute(() -> {
             if (cleared) {
-                quotaRepository.delete(targetUserId);
+                quotaRepository.delete(tenantId, targetUserId);
             } else {
-                quotaRepository.upsert(targetUserId, dailyQuestionLimit, dailyTokenLimit, adminId, now);
+                quotaRepository.upsert(tenantId, targetUserId, dailyQuestionLimit, dailyTokenLimit, adminId, now);
             }
-            auditRepository.insert(new AdminAuditEntry(
+            auditRepository.insert(tenantId, new AdminAuditEntry(
                     UUID.randomUUID(),
                     traceId,
                     adminId,

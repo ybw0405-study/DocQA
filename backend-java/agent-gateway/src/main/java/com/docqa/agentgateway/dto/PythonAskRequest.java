@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record PythonAskRequest(
         String protocolVersion,
+        UUID tenantId,
         UUID userId,
         String traceId,
         UUID conversationId,

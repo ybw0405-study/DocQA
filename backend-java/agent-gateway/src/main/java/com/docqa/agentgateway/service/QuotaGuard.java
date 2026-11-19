@@ -2,6 +2,7 @@ package com.docqa.agentgateway.service;
 
 import com.docqa.agentgateway.dto.AiQuota;
 import com.docqa.agentgateway.repository.AiQuotaRepository;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.time.Clock;
 import java.time.Duration;
@@ -33,7 +34,7 @@ public class QuotaGuard {
      * 但仍累计当日用量，这样管理员当天中途设置配额时能看到之前已用的次数。
      */
     public void reserve(UUID userId) {
-        AiQuota quota = quotaRepository.findByUserId(userId).orElse(null);
+        AiQuota quota = quotaRepository.findByUserId(TenantContext.require(), userId).orElse(null);
         boolean allowed = usageStore.tryConsume(
                 userId,
                 currentDay(),

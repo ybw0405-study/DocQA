@@ -14,6 +14,7 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.domain.ReminderTriggerRow;
 import com.docqa.reminder.dto.NotificationData;
 import com.docqa.reminder.dto.NotificationListData;
@@ -25,6 +26,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -37,6 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID REMINDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID FIRST_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
@@ -51,10 +55,20 @@ class NotificationServiceTest {
     @Mock
     private ReminderTriggerRepository reminderTriggerRepository;
 
+    @BeforeEach
+    void setUp() {
+        TenantContext.set(TENANT_ID);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
     @Test
     void firstPageFetchesOneExtraRowAndHandsBackTheCursorOfTheLastKeptItem() {
         NotificationService service = service(NOW);
-        when(reminderTriggerRepository.findUserPage(eq(USER_ID), eq(false), isNull(), isNull(), eq(3)))
+        when(reminderTriggerRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), eq(false), isNull(), isNull(), eq(3)))
                 .thenReturn(List.of(row(FIRST_ID, LATEST), row(SECOND_ID, MIDDLE), row(THIRD_ID, OLDEST)));
 
         NotificationListData page = service.list(USER_ID, false, null, 2);
@@ -70,7 +84,7 @@ class NotificationServiceTest {
     @Test
     void aPageThatIsExactlyAsLongAsTheLimitHasNoNextCursor() {
         NotificationService service = service(NOW);
-        when(reminderTriggerRepository.findUserPage(eq(USER_ID), eq(false), isNull(), isNull(), eq(3)))
+        when(reminderTriggerRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), eq(false), isNull(), isNull(), eq(3)))
                 .thenReturn(List.of(row(FIRST_ID, LATEST), row(SECOND_ID, MIDDLE)));
 
         NotificationListData page = service.list(USER_ID, false, null, 2);
@@ -82,12 +96,12 @@ class NotificationServiceTest {
     @Test
     void unreadOnlyIsForwardedVerbatimRatherThanInverted() {
         NotificationService service = service(NOW);
-        when(reminderTriggerRepository.findUserPage(eq(USER_ID), eq(true), isNull(), isNull(), eq(2)))
+        when(reminderTriggerRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), eq(true), isNull(), isNull(), eq(2)))
                 .thenReturn(List.of());
 
         service.list(USER_ID, true, null, 1);
 
-        verify(reminderTriggerRepository).findUserPage(USER_ID, true, null, null, 2);
+        verify(reminderTriggerRepository).findUserPage(TENANT_ID, USER_ID, true, null, null, 2);
     }
 
     @Test
@@ -113,7 +127,7 @@ class NotificationServiceTest {
     void aCursorDecodesIntoBothSortComponentsInTheSameOrderAsTheSortKey() {
         NotificationService service = service(NOW);
         String token = KeysetCursor.of(MIDDLE, SECOND_ID).encode();
-        when(reminderTriggerRepository.findUserPage(eq(USER_ID), eq(false), eq(MIDDLE), eq(SECOND_ID), eq(21)))
+        when(reminderTriggerRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), eq(false), eq(MIDDLE), eq(SECOND_ID), eq(21)))
                 .thenReturn(List.of());
 
         assertThat(service.list(USER_ID, false, token, 20).items()).isEmpty();
@@ -139,7 +153,7 @@ class NotificationServiceTest {
     @Test
     void sourceTypeMapsOntoTheReadSideKindForAllThreeValues() {
         NotificationService service = service(NOW);
-        when(reminderTriggerRepository.findUserPage(eq(USER_ID), eq(false), isNull(), isNull(), eq(4)))
+        when(reminderTriggerRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), eq(false), isNull(), isNull(), eq(4)))
                 .thenReturn(List.of(
                         row(FIRST_ID, LATEST, "COURSE"),
                         row(SECOND_ID, MIDDLE, "DEADLINE"),
@@ -157,7 +171,7 @@ class NotificationServiceTest {
                 FIRST_ID, USER_ID, REMINDER_ID, "线性代数", null, "COURSE", LATEST,
                 NOW.plusSeconds(3600), TRACE_ID, LATEST.minusSeconds(1), LATEST,
                 LATEST.minusSeconds(1), LATEST);
-        when(reminderTriggerRepository.findUserPage(eq(USER_ID), eq(false), isNull(), isNull(), eq(2)))
+        when(reminderTriggerRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), eq(false), isNull(), isNull(), eq(2)))
                 .thenReturn(List.of(read));
 
         NotificationData item = service.list(USER_ID, false, null, 1).items().get(0);
@@ -169,27 +183,27 @@ class NotificationServiceTest {
     @Test
     void allTrueCoversRowsTheClientHasNotEvenLoaded() {
         NotificationService service = service(NOW);
-        when(reminderTriggerRepository.markAllUnreadAsRead(USER_ID, NOW)).thenReturn(3);
+        when(reminderTriggerRepository.markAllUnreadAsRead(TENANT_ID, USER_ID, NOW)).thenReturn(3);
 
         NotificationReadData data = service.markRead(USER_ID, new NotificationReadRequest(true, null));
 
         assertThat(data.updated()).isEqualTo(3);
         assertThat(data.all()).isTrue();
-        verify(reminderTriggerRepository, never()).markRead(any(), any(), any());
+        verify(reminderTriggerRepository, never()).markRead(any(), any(), any(), any());
     }
 
     @Test
     void theIdsPathReturnsTheAffectedRowCountAndZeroIsLegallyASuccess() {
         NotificationService service = service(NOW);
         // 已读过的 id 撞上 read_at IS NULL 就是 0 行：不报错、不逐项说明，红点照常消失（D-66 的代价）。
-        when(reminderTriggerRepository.markRead(USER_ID, List.of(FIRST_ID, SECOND_ID), NOW)).thenReturn(0);
+        when(reminderTriggerRepository.markRead(TENANT_ID, USER_ID, List.of(FIRST_ID, SECOND_ID), NOW)).thenReturn(0);
 
         NotificationReadData data = service.markRead(
                 USER_ID, new NotificationReadRequest(false, List.of(FIRST_ID, SECOND_ID)));
 
         assertThat(data.updated()).isZero();
         assertThat(data.all()).isFalse();
-        verify(reminderTriggerRepository, never()).markAllUnreadAsRead(any(), any());
+        verify(reminderTriggerRepository, never()).markAllUnreadAsRead(any(), any(), any());
     }
 
     @Test
@@ -241,7 +255,7 @@ class NotificationServiceTest {
     @Test
     void theReadTimestampIsTruncatedToWholeSecondsJustLikeDeliveredAt() {
         NotificationService service = service(NOW.plusMillis(470));
-        when(reminderTriggerRepository.markAllUnreadAsRead(USER_ID, NOW)).thenReturn(1);
+        when(reminderTriggerRepository.markAllUnreadAsRead(TENANT_ID, USER_ID, NOW)).thenReturn(1);
 
         assertThat(service.markRead(USER_ID, new NotificationReadRequest(true, null)).updated()).isEqualTo(1);
     }

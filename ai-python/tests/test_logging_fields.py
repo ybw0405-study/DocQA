@@ -57,6 +57,13 @@ def test_blocked_fields_are_dropped_before_formatting() -> None:
     assert set(payload) == {"ts", "level", "service", "logger", "message", "traceId"}
 
 
+def test_tenant_id_reaches_the_log() -> None:
+    """P1 可观测：租户标签必须穿过日志白名单，否则跨租户问题无法定位。"""
+    tenant = "44444444-4444-4444-8444-444444444444"
+    payload = _format(traceId="0" * 32, tenantId=tenant)
+    assert payload["tenantId"] == tenant
+
+
 def test_allowed_string_fields_are_pii_masked() -> None:
     payload = _format(operation="DELETE_VERSION 13800138000 a@b.com")
     masked = str(payload["operation"])

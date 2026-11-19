@@ -8,13 +8,14 @@ import java.util.UUID;
 
 public interface AiQuotaRepository {
 
-    Optional<String> findUsername(UUID userId);
+    Optional<String> findUsername(UUID tenantId, UUID userId);
 
-    Optional<AiQuota> findByUserId(UUID userId);
+    Optional<AiQuota> findByUserId(UUID tenantId, UUID userId);
 
-    List<AiQuota> findPage(Instant beforeUpdatedAt, UUID beforeUserId, int limit);
+    List<AiQuota> findPage(UUID tenantId, Instant beforeUpdatedAt, UUID beforeUserId, int limit);
 
-    void upsert(UUID userId, Long dailyQuestionLimit, Long dailyTokenLimit, UUID updatedBy, Instant now);
+    void upsert(UUID tenantId, UUID userId, Long dailyQuestionLimit, Long dailyTokenLimit, UUID updatedBy,
+            Instant now);
 
-    void delete(UUID userId);
+    void delete(UUID tenantId, UUID userId);
 }

@@ -2,11 +2,14 @@ package com.docqa.document.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.document.domain.DocumentRow;
+import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.DocumentRepository;
 import com.docqa.document.support.TraceScope;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -59,11 +62,13 @@ public class VectorChangeResultHandler {
                     event.operation());
             return;
         }
-        DocumentRow document = documentRepository.findById(event.documentId()).orElse(null);
-        if (document == null) {
+        Optional<TenantDocument> found = documentRepository.findTenantDocumentById(event.documentId());
+        if (found.isEmpty()) {
             LOGGER.warn("vector-change-completed for unknown document: documentId={}", event.documentId());
             return;
         }
+        UUID tenantId = found.get().tenantId();
+        DocumentRow document = found.get().document();
         if (!event.completed()) {
             LOGGER.warn(
                     "Vector change failed; business state kept and consistency stays readable:"
@@ -97,7 +102,7 @@ public class VectorChangeResultHandler {
             return;
         }
         Instant now = clock.instant();
-        int updated = documentRepository.recordVectorConfirmation(document.id(), remainingRows, now);
+        int updated = documentRepository.recordVectorConfirmation(tenantId, document.id(), remainingRows, now);
         LOGGER.info(
                 "Vector rows confirmed after deletion: documentId={}, remainingRows={}, applied={}",
                 document.id(),

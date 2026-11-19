@@ -15,10 +15,12 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.reminder.service.ReminderTriggerIngestService;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -129,6 +131,20 @@ class ReminderDueMessageHandlerTest {
         // 本用例钉的是 handler 不做二次校验：载荷 traceId 非法由落库侧拒绝，但线程上下文不能被脏值污染。
         assertThat(result).isEqualTo(ConsumeResult.ACK);
         assertThat(TraceIdContext.current()).isEqualTo(TRACE_ID);
+    }
+
+    @Test
+    void carriesTenantIdFromTheWireBodyIntoTheEvent() {
+        UUID tenantId = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
+        String json = new String(body(TRACE_ID), StandardCharsets.UTF_8);
+        json = json.substring(0, json.length() - 1) + ",\"tenantId\":\"" + tenantId + "\"}";
+
+        ConsumeResult result = handler.handle(json.getBytes(StandardCharsets.UTF_8), MESSAGE_ID);
+
+        assertThat(result).isEqualTo(ConsumeResult.ACK);
+        ArgumentCaptor<ReminderDueEvent> captor = ArgumentCaptor.forClass(ReminderDueEvent.class);
+        verify(ingestService).ingest(captor.capture(), eq(MESSAGE_ID));
+        assertThat(captor.getValue().tenantId()).isEqualTo(tenantId);
     }
 
     private byte[] body(String traceId) {

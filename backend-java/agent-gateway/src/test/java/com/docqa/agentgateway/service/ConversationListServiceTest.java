@@ -14,9 +14,11 @@ import com.docqa.agentgateway.repository.ConversationRepository;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class ConversationListServiceTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID FIRST_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID SECOND_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -42,12 +45,18 @@ class ConversationListServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.set(TENANT_ID);
         service = new ConversationListService(conversationRepository);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test
     void mapsRowsIntoItemsWithScopeAndActivityTimestamps() {
-        when(conversationRepository.findUserPage(eq(USER_ID), isNull(), isNull(), eq(false), eq(3)))
+        when(conversationRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), eq(false), eq(3)))
                 .thenReturn(List.of(
                         row(FIRST_ID, "线性代数", List.of(DOCUMENT_ID), FIRST_ACTIVITY),
                         row(SECOND_ID, "新会话", List.of(), null)));
@@ -68,7 +77,7 @@ class ConversationListServiceTest {
 
     @Test
     void encodesNextCursorFromTheLastReturnedRow() {
-        when(conversationRepository.findUserPage(eq(USER_ID), isNull(), isNull(), eq(false), eq(3)))
+        when(conversationRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), eq(false), eq(3)))
                 .thenReturn(List.of(
                         row(FIRST_ID, "A", List.of(), FIRST_ACTIVITY),
                         row(SECOND_ID, "B", List.of(), SECOND_ACTIVITY),
@@ -86,7 +95,7 @@ class ConversationListServiceTest {
     @Test
     void resumesInsideTheNoMessageGroupWhenCursorCarriesNoSortKey() {
         String token = KeysetCursor.of(null, THIRD_ID).encode();
-        when(conversationRepository.findUserPage(eq(USER_ID), isNull(), eq(THIRD_ID), eq(true), eq(21)))
+        when(conversationRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), eq(THIRD_ID), eq(true), eq(21)))
                 .thenReturn(List.of(row(SECOND_ID, "B", List.of(), null)));
 
         ConversationListData data = service.list(USER_ID, token, 20);
@@ -99,7 +108,7 @@ class ConversationListServiceTest {
     void passesDecodedCursorDownToTheRepository() {
         String token = KeysetCursor.of(FIRST_ACTIVITY, FIRST_ID).encode();
         when(conversationRepository.findUserPage(
-                eq(USER_ID), eq(FIRST_ACTIVITY), eq(FIRST_ID), eq(false), eq(21)))
+                eq(TENANT_ID), eq(USER_ID), eq(FIRST_ACTIVITY), eq(FIRST_ID), eq(false), eq(21)))
                 .thenReturn(List.of());
 
         ConversationListData data = service.list(USER_ID, token, 20);

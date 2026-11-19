@@ -7,13 +7,13 @@ import java.util.UUID;
 
 public interface ChunkRepository {
 
-    void upsertAll(List<ChunkEntry> chunks);
+    void upsertAll(UUID tenantId, List<ChunkEntry> chunks);
 
-    long count(UUID documentId, String indexVersion);
+    long count(UUID tenantId, UUID documentId, String indexVersion);
 
-    Map<UUID, Long> countByDocuments(List<UUID> documentIds);
+    Map<UUID, Long> countByDocuments(UUID tenantId, List<UUID> documentIds);
 
-    int deleteByDocument(UUID documentId);
+    int deleteByDocument(UUID tenantId, UUID documentId);
 
-    int deleteByVersion(UUID documentId, String indexVersion);
+    int deleteByVersion(UUID tenantId, UUID documentId, String indexVersion);
 }

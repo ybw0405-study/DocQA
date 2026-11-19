@@ -1,6 +1,7 @@
 package com.docqa.reminder.service;
 
 import com.docqa.common.trace.TraceIdContext;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.config.RocketMqProperties;
 import com.docqa.reminder.domain.ReminderTriggerRow;
 import com.docqa.reminder.messaging.MqIdempotencyMarker;
@@ -78,8 +79,17 @@ public class ReminderTriggerIngestService {
                 null,
                 deliveredAt,
                 deliveredAt);
+        UUID tenantId = event.tenantId();
+        if (tenantId == null) {
+            // 部署窗口内可能还有不带 tenantId 的在途旧消息；P0 存量数据全在默认租户，
+            // 按默认租户收敛并告警，新消息必须携带 tenantId。
+            LOGGER.warn(
+                    "Reminder due event missing tenantId, falling back to default tenant: reminderId={}, traceId={}",
+                    event.reminderId(), traceId);
+            tenantId = TenantContext.DEFAULT_TENANT_ID;
+        }
         try {
-            reminderTriggerRepository.insert(row);
+            reminderTriggerRepository.insert(tenantId, row);
         } catch (DuplicateKeyException ex) {
             // 重投或发布失败后的重发：通知早已存在，不刷新 delivered_at，按「已处理」静默收敛。
             LOGGER.info("Reminder trigger already recorded; acknowledging duplicate: reminderId={}, traceId={}",

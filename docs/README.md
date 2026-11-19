@@ -29,6 +29,8 @@
 | [storage.md](02-design/storage.md) | 表结构、索引、向量存储与迁移 |
 | [openapi-java.yaml](02-design/openapi-java.yaml) | Java 对外接口契约（OpenAPI 3.0） |
 | [cross-language-protocol.md](02-design/cross-language-protocol.md) | Java ↔ Python 跨语言治理协议 |
+| [saas-kernel-upgrade.md](02-design/saas-kernel-upgrade.md) | SaaS 内核升级方案与 P1-B 落地记录（§5.9～§5.21） |
+| [saas-tenant-decisions.md](02-design/saas-tenant-decisions.md) | 多租户遗留决策清单（D1～D6 拍板结论） |
 
 ## 其他
 

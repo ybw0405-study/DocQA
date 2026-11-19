@@ -5,6 +5,71 @@
 
 命名边界（哪些名字会随目录变、哪些绝对不能改）见 [naming.md](naming.md)。
 
+---
+
+## 一键启动（2026-11-19 起，推荐）
+
+前置：安装并打开 **Docker Desktop**（本机 `C:\Users\YYYBBW\AppData\Local\Programs\DockerDesktop`）。
+旧方案里的 WSL 中间件、Windows 原生 mysqld、开机自启、34 个全局环境变量**全部退役**，本文后半部分保留仅供回滚参考。
+
+```powershell
+cd C:\Users\YYYBBW\Desktop\DocQA
+
+# 仅首次：从模板生成项目内配置（gitignored，不写 Windows 全局作用域）
+Copy-Item ops/env/local.env.example ops/env/local.env
+
+.\scripts\start-dev.ps1          # compose up → 等健康 → 幂等授权 → 构建 → 起 5 个 Java 服务
+.\scripts\stop-dev.ps1           # 只停应用进程
+.\scripts\stop-dev.ps1 -Infra    # 连容器一起停（卷保留，数据不丢）
+```
+
+脚本选项：`-NoBuild` 跳过 `mvn package`（jar 已最新时）、`-InfraOnly` 只起中间件、`-SkipGrants` 跳过授权重放。
+
+**这套方案的四个性质：**
+
+1. **零全局环境变量**：所有配置在 `ops/env/local.env`（模板 `local.env.example`），由 `start-dev.ps1` 注入**进程作用域**，脚本退出即消失。Windows User / Machine 作用域里 `DOCQA_*` 应为 0 个（与 AgentFlow 的 `AF_*` 对称）。
+2. **零 IP 漂移**：中间件全在 Docker Desktop bridge，端点固定 `127.0.0.1:<专属端口>`，不再依赖 WSL `eth0` 地址，也就不需要开机刷环境变量。
+3. **零开机自启**：计划任务 `DocQA Local Stack` 已 Disabled、WSL 三个 `docqa-*.service` 已 `disable`、原生 `MySQL84` 服务由管理员脚本改 Manual。用哪个项目就跑哪个项目的 `start-dev.ps1`。
+4. **可与 AgentFlow 同时运行**：端口段完全错开，不再需要互斥切换。
+
+### 端口表（唯一事实来源：`ops/env/local.env`）
+
+| 服务 | 地址 | 服务 | 地址 |
+|---|---|---|---|
+| MySQL 8.4 | `127.0.0.1:13306` | RocketMQ NameServer | `127.0.0.1:19876` |
+| PostgreSQL + pgvector | `127.0.0.1:15432` | RocketMQ Broker / VIP | `127.0.0.1:20911` / `20909` |
+| Redis | `127.0.0.1:16380` | Python 数据面 API | `127.0.0.1:18000` |
+| MinIO API / Console | `127.0.0.1:19100` / `19101` | Java 网关 / user / document / reminder | `18080` / `18081` / `18082` / `18083` |
+| 前端 Vite | `127.0.0.1:5173` | | |
+
+> RocketMQ 的 broker 会把 `brokerIP1:listenPort` 注册进 NameServer，客户端按此直连；
+> `ops/infra/broker.conf` 显式写 `brokerIP1=127.0.0.1` / `listenPort=20911`，VIP 端口为 `listenPort-2=20909`，
+> 三者都映射到宿主 `127.0.0.1`。**不要只改宿主映射端口而不改 listenPort**，客户端会连到旧端口。
+> 同理 NameServer 端口由 `ops/infra/namesrv.properties` 的 `listenPort=19876` 指定。
+
+### 数据库
+
+首次搬迁已完成：原 Windows 原生 `docqa` 库（16 张表、含 Flyway V1–V10 与 `default` 租户行）
+经 `mysqldump` 导入 `docqa-mysql` 容器卷，备份在 `ops/backup/docqa-20261119.sql`（gitignored）。
+`start-dev.ps1` 每次启动会幂等重放 `ops/sql/least-privilege.sql.tmpl`（账号 host 为 `%`，因为
+Windows 侧经端口映射连入时 MySQL 看到的是 bridge 网关地址）。迁移仍由 document-service 启动时跑 Flyway。
+
+### Python 数据面与前端
+
+`start-dev.ps1` 默认只起中间件 + 5 个 Java 服务。Python 数据面与前端仍按本文后半部分的
+「手动启动顺序」单独启动（端口 `18000` / `5173`）；它们依赖 WSL venv 与 librocketmq，暂未容器化。
+
+### 回滚
+
+旧链路文件全部保留、未修改：`docs/00-infra/start-local.ps1`、`run-local.ps1`、
+`prepare-local-stack.sh`、`local-stack.compose.yaml`、`install-wsl-autostart.sh`。
+回滚步骤：管理员启用 `MySQL84` 服务 → WSL 里 `systemctl enable --now docqa-infra.service ...` →
+启用计划任务 → 用旧脚本启动。数据库备份见上。
+
+---
+
+## 以下为 legacy 方案（WSL + 原生 mysqld，已退役，仅供回滚参考）
+
 ## 拓扑总览
 
 | 主机 | 组件 | 地址 |

@@ -6,6 +6,7 @@ import com.docqa.agentgateway.dto.UpdateAiQuotaRequest;
 import com.docqa.agentgateway.service.AdminQuotaService;
 import com.docqa.agentgateway.web.JwtAuthenticationFilter;
 import com.docqa.common.api.ApiResponse;
+import com.docqa.common.tenant.TenantContext;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,17 +30,23 @@ public class AdminAiQuotaController {
 
     @GetMapping
     public ApiResponse<AiQuotaListData> list(
+            @RequestAttribute(TenantContext.REQUEST_ATTRIBUTE) UUID tenantId,
             @RequestParam(name = "cursor", required = false) String cursor,
             @RequestParam(name = "limit", defaultValue = "50") int limit) {
-        return ApiResponse.ok(quotaService.list(cursor, limit));
+        return ApiResponse.ok(quotaService.list(tenantId, cursor, limit));
     }
 
     @PutMapping("/{userId}")
     public ApiResponse<AiQuota> update(
+            @RequestAttribute(TenantContext.REQUEST_ATTRIBUTE) UUID tenantId,
             @RequestAttribute(JwtAuthenticationFilter.USER_ID_ATTRIBUTE) UUID adminId,
             @PathVariable UUID userId,
             @Valid @RequestBody UpdateAiQuotaRequest request) {
         return ApiResponse.ok(quotaService.update(
-                adminId, userId, request.dailyQuestionLimit(), request.dailyTokenLimit()));
+                tenantId,
+                adminId,
+                userId,
+                request.dailyQuestionLimit(),
+                request.dailyTokenLimit()));
     }
 }

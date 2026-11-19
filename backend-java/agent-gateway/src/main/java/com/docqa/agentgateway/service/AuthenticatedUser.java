@@ -4,7 +4,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /** 已验签令牌的身份视图；roles 只保留字符串元素，未知角色忽略。 */
-public record AuthenticatedUser(UUID userId, Set<String> roles) {
+public record AuthenticatedUser(UUID userId, UUID tenantId, Set<String> roles) {
 
     public static final String ADMIN = "ADMIN";
 

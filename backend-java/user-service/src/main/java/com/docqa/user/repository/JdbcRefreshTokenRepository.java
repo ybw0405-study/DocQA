@@ -26,12 +26,13 @@ public class JdbcRefreshTokenRepository implements RefreshTokenRepository {
     }
 
     @Override
-    public void insert(RefreshTokenRow token) {
+    public void insert(UUID tenantId, RefreshTokenRow token) {
         jdbcTemplate.update("""
                         INSERT INTO refresh_token (
-                            id, user_id, family_id, token_hash, status, expires_at, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            tenant_id, id, user_id, family_id, token_hash, status, expires_at, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
+                tenantId.toString(),
                 token.id().toString(),
                 token.userId().toString(),
                 token.familyId().toString(),
@@ -43,46 +44,54 @@ public class JdbcRefreshTokenRepository implements RefreshTokenRepository {
     }
 
     @Override
-    public Optional<RefreshTokenRow> findByHash(String tokenHash) {
+    public Optional<RefreshTokenRow> findByHash(UUID tenantId, String tokenHash) {
         return jdbcTemplate.query(
-                        "SELECT " + COLUMNS + " FROM refresh_token WHERE token_hash = ?",
+                        "SELECT " + COLUMNS + " FROM refresh_token WHERE tenant_id = ? AND token_hash = ?",
                         ROW_MAPPER,
+                        tenantId.toString(), tokenHash)
+                .stream()
+                .findFirst();
+    }
+
+    @Override
+    public Optional<UUID> findTenantIdByHash(String tokenHash) {
+        // 控制面：凭据本身即作用域，见 RefreshTokenRepository#findTenantIdByHash 的约定。
+        return jdbcTemplate.query(
+                        "SELECT tenant_id FROM refresh_token WHERE token_hash = ?",
+                        (rs, rowNum) -> UUID.fromString(rs.getString("tenant_id")),
                         tokenHash)
                 .stream()
                 .findFirst();
     }
 
     @Override
-    public int consumeActive(UUID id, Instant now) {
+    public int consumeActive(UUID tenantId, UUID id, Instant now) {
         return jdbcTemplate.update("""
                         UPDATE refresh_token
                         SET status = 'USED', updated_at = ?
-                        WHERE id = ? AND status = 'ACTIVE'
+                        WHERE tenant_id = ? AND id = ? AND status = 'ACTIVE'
                         """,
-                Timestamp.from(now),
-                id.toString());
+                Timestamp.from(now), tenantId.toString(), id.toString());
     }
 
     @Override
-    public int revokeFamily(UUID familyId, Instant now) {
+    public int revokeFamily(UUID tenantId, UUID familyId, Instant now) {
         return jdbcTemplate.update("""
                         UPDATE refresh_token
                         SET status = 'REVOKED', updated_at = ?
-                        WHERE family_id = ? AND status = 'ACTIVE'
+                        WHERE tenant_id = ? AND family_id = ? AND status = 'ACTIVE'
                         """,
-                Timestamp.from(now),
-                familyId.toString());
+                Timestamp.from(now), tenantId.toString(), familyId.toString());
     }
 
     @Override
-    public int revokeAllActiveForUser(UUID userId, Instant now) {
+    public int revokeAllActiveForUser(UUID tenantId, UUID userId, Instant now) {
         return jdbcTemplate.update("""
                         UPDATE refresh_token
                         SET status = 'REVOKED', updated_at = ?
-                        WHERE user_id = ? AND status = 'ACTIVE'
+                        WHERE tenant_id = ? AND user_id = ? AND status = 'ACTIVE'
                         """,
-                Timestamp.from(now),
-                userId.toString());
+                Timestamp.from(now), tenantId.toString(), userId.toString());
     }
 
     @Override

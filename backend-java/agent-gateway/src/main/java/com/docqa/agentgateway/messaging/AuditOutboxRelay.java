@@ -50,6 +50,8 @@ public class AuditOutboxRelay {
         Cursor cursor = null;
         try {
             cursor = readCursor();
+            // relay 是全局定时任务：按单一游标跨租户扫描 outbox，每条行的 tenant_id 随消息下发。
+            // 租户边界在写侧逐行保证，投递侧不再回落默认租户。
             List<OutboxExecution> executions = repository.findOutboxBatch(
                     cursor == null ? null : cursor.recordedAt(),
                     cursor == null ? null : cursor.id(),
@@ -67,6 +69,7 @@ public class AuditOutboxRelay {
 
     private void refreshBacklog(Cursor cursor) {
         try {
+            // 积压指标按全局游标统计（与投递扫描同一口径），不按单租户回落。
             OutboxBacklog backlog = repository.outboxBacklog(
                     cursor == null ? null : cursor.recordedAt(),
                     cursor == null ? null : cursor.id());
@@ -88,7 +91,8 @@ public class AuditOutboxRelay {
                 continue;
             }
             for (AuditEvent event : execution.events()) {
-                publisher.publish(event);
+                // outbox 行的 tenant_id 是租户归属的权威来源；覆盖事件里可能残留的旧值（含 null）。
+                publisher.publish(event.withTenant(execution.tenantId()));
             }
             writeCursor(execution);
         }

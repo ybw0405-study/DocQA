@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.config.JwtProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -132,6 +133,7 @@ class JwtAuthenticatorTest {
                 .subject(subject)
                 .issuer(issuer)
                 .audience().add(audience).and()
+                .claim(TenantContext.CLAIM_NAME, TenantContext.DEFAULT_TENANT_ID.toString())
                 .issuedAt(Date.from(NOW.minusSeconds(5)))
                 .expiration(Date.from(expiration));
         if (jti != null) {

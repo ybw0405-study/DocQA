@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.audit.domain.AuditEventRow;
+import com.docqa.common.tenant.TenantContext;
 import java.lang.reflect.Method;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
@@ -24,6 +25,7 @@ import org.springframework.jdbc.core.RowMapper;
 
 class JdbcAuditEventRepositoryTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID EVENT_ID = UUID.fromString("0192f3a4-a1b2-7c33-9d01-1234567890ab");
     private static final UUID USER_ID = UUID.fromString("0192f3a4-7b2c-7d10-9e8f-1234567890ab");
     private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
@@ -37,22 +39,23 @@ class JdbcAuditEventRepositoryTest {
 
     @Test
     void insertsEveryColumnWithAParameterizedStatement() {
-        repository.insert(row());
+        repository.insert(TENANT_ID, row());
 
         ArgumentCaptor<Object[]> captor = ArgumentCaptor.forClass(Object[].class);
         verify(jdbcTemplate).update(eq(JdbcAuditEventRepository.INSERT_SQL), captor.capture());
         Object[] args = captor.getValue();
-        assertThat(args).hasSize(10);
-        assertThat(args[0]).isEqualTo(EVENT_ID.toString());
-        assertThat(args[1]).isEqualTo(TRACE_ID);
-        assertThat(args[2]).isEqualTo(USER_ID.toString());
-        assertThat(args[3]).isEqualTo("RAG_RETRIEVED");
-        assertThat(args[4]).isEqualTo("rag_retriever");
-        assertThat(args[5]).isEqualTo("PYTHON");
-        assertThat(args[6]).isEqualTo("INFO");
-        assertThat(args[7]).isEqualTo("{\"chunkCount\":6,\"durationMs\":182}");
-        assertThat(args[8]).isEqualTo(Timestamp.from(OCCURRED_AT));
-        assertThat(args[9]).isEqualTo(Timestamp.from(INGESTED_AT));
+        assertThat(args).hasSize(11);
+        assertThat(args[0]).isEqualTo(TENANT_ID.toString());
+        assertThat(args[1]).isEqualTo(EVENT_ID.toString());
+        assertThat(args[2]).isEqualTo(TRACE_ID);
+        assertThat(args[3]).isEqualTo(USER_ID.toString());
+        assertThat(args[4]).isEqualTo("RAG_RETRIEVED");
+        assertThat(args[5]).isEqualTo("rag_retriever");
+        assertThat(args[6]).isEqualTo("PYTHON");
+        assertThat(args[7]).isEqualTo("INFO");
+        assertThat(args[8]).isEqualTo("{\"chunkCount\":6,\"durationMs\":182}");
+        assertThat(args[9]).isEqualTo(Timestamp.from(OCCURRED_AT));
+        assertThat(args[10]).isEqualTo(Timestamp.from(INGESTED_AT));
     }
 
     @Test
@@ -60,17 +63,19 @@ class JdbcAuditEventRepositoryTest {
         when(jdbcTemplate.query(
                 eq(JdbcAuditEventRepository.SELECT_BY_TRACE_SQL),
                 any(RowMapper.class),
+                eq(TENANT_ID.toString()),
                 eq(TRACE_ID),
                 eq(50)))
                 .thenReturn(List.<AuditEventRow>of());
 
-        List<AuditEventRow> result = repository.findByTraceId(TRACE_ID, 50);
+        List<AuditEventRow> result = repository.findByTraceId(TENANT_ID, TRACE_ID, 50);
         assertThat(result).isEmpty();
 
         ArgumentCaptor<RowMapper<AuditEventRow>> mapperCaptor = mapperCaptor();
         verify(jdbcTemplate).query(
                 eq(JdbcAuditEventRepository.SELECT_BY_TRACE_SQL),
                 mapperCaptor.capture(),
+                eq(TENANT_ID.toString()),
                 eq(TRACE_ID),
                 eq(50));
         ResultSet resultSet = resultSet();

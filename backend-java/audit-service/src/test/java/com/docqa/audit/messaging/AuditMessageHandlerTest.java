@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -124,6 +125,20 @@ class AuditMessageHandlerTest {
         }).when(auditEventService).ingest(any(), eq(traceIdProperty));
         handler.handle(body(TRACE_ID), traceIdProperty);
         return captured[0];
+    }
+
+    @Test
+    void carriesTenantIdFromTheWireBodyIntoTheMessage() {
+        UUID tenantId = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
+        String json = new String(body(TRACE_ID), StandardCharsets.UTF_8);
+        json = json.substring(0, json.length() - 1) + ",\"tenantId\":\"" + tenantId + "\"}";
+
+        ConsumeResult result = handler.handle(json.getBytes(StandardCharsets.UTF_8), TRACE_ID);
+
+        assertThat(result).isEqualTo(ConsumeResult.ACK);
+        ArgumentCaptor<AuditEventMessage> captor = ArgumentCaptor.forClass(AuditEventMessage.class);
+        verify(auditEventService).ingest(captor.capture(), eq(TRACE_ID));
+        assertThat(captor.getValue().tenantId()).isEqualTo(tenantId);
     }
 
     private byte[] body(String payloadTraceId) {

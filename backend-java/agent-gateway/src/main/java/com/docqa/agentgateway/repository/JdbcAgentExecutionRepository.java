@@ -32,14 +32,16 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
     }
 
     @Override
-    public void insert(AgentExecution execution) {
+    public void insert(UUID tenantId, AgentExecution execution) {
         jdbcTemplate.update("""
                         INSERT INTO agent_execution (
-                            id, trace_id, user_id, conversation_id, request_message_id, response_message_id,
-                            status, budget_status, token_budget, token_used, tool_calls_made, rounds_used,
-                            cache_hit, latency_ms, error_code, audit_outbox, started_at, finished_at, recorded_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            tenant_id, id, trace_id, user_id, conversation_id, request_message_id,
+                            response_message_id, status, budget_status, token_budget, token_used,
+                            tool_calls_made, rounds_used, cache_hit, latency_ms, error_code, audit_outbox,
+                            started_at, finished_at, recorded_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
+                tenantId.toString(),
                 execution.id().toString(),
                 execution.traceId(),
                 execution.userId().toString(),
@@ -65,7 +67,7 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
     public List<OutboxExecution> findOutboxBatch(Instant afterRecordedAt, UUID afterId, int limit) {
         if (afterRecordedAt == null || afterId == null) {
             return jdbcTemplate.query("""
-                            SELECT id, recorded_at, audit_outbox
+                            SELECT id, tenant_id, recorded_at, audit_outbox
                             FROM agent_execution
                             ORDER BY recorded_at, id
                             LIMIT ?
@@ -74,7 +76,7 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
                     limit);
         }
         return jdbcTemplate.query("""
-                        SELECT id, recorded_at, audit_outbox
+                        SELECT id, tenant_id, recorded_at, audit_outbox
                         FROM agent_execution
                         WHERE recorded_at > ? OR (recorded_at = ? AND id > ?)
                         ORDER BY recorded_at, id
@@ -121,6 +123,7 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
     private OutboxExecution mapRow(ResultSet rs) throws SQLException {
         return new OutboxExecution(
                 UUID.fromString(rs.getString("id")),
+                UUID.fromString(rs.getString("tenant_id")),
                 rs.getTimestamp("recorded_at").toInstant(),
                 deserialize(rs.getString("audit_outbox")));
     }

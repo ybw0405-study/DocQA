@@ -16,6 +16,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.docqa.common.config.CommonWebAutoConfiguration;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
+import com.docqa.reminder.service.AuthenticatedUser;
 import com.docqa.reminder.service.JwtAuthenticator;
 import com.docqa.reminder.service.NotificationService;
 import com.docqa.reminder.service.ReminderService;
@@ -54,6 +56,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 class ReminderAuthenticationChainTest {
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final String NOTIFICATIONS = "/api/v1/notifications";
     private static final String NOTIFICATIONS_READ = "/api/v1/notifications/read";
     private static final String CONTROLLER_PACKAGE_PREFIX = "com.docqa.reminder.controller";
@@ -81,7 +84,8 @@ class ReminderAuthenticationChainTest {
 
     @Test
     void listNotificationsWithoutTokenIsRejectedBeforeTheController() throws Exception {
-        when(jwtAuthenticator.authenticate(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
+        when(jwtAuthenticator.authenticateIdentity(null))
+                .thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
 
         mockMvc.perform(get(NOTIFICATIONS))
                 .andExpect(status().isUnauthorized())
@@ -95,7 +99,8 @@ class ReminderAuthenticationChainTest {
 
     @Test
     void markReadWithoutTokenIsRejectedBeforeTheController() throws Exception {
-        when(jwtAuthenticator.authenticate(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
+        when(jwtAuthenticator.authenticateIdentity(null))
+                .thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
 
         mockMvc.perform(post(NOTIFICATIONS_READ)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -109,7 +114,8 @@ class ReminderAuthenticationChainTest {
     /** 带合法令牌时属性由过滤器写入，{@code @RequestAttribute} 绑定成功，控制器拿到同一个用户。 */
     @Test
     void listNotificationsWithTokenBindsUserIdFromTheFilter() throws Exception {
-        when(jwtAuthenticator.authenticate("Bearer token")).thenReturn(USER_ID);
+        when(jwtAuthenticator.authenticateIdentity("Bearer token"))
+                .thenReturn(new AuthenticatedUser(USER_ID, TENANT_ID));
 
         mockMvc.perform(get(NOTIFICATIONS).header(HttpHeaders.AUTHORIZATION, "Bearer token"))
                 .andExpect(status().isOk());
@@ -119,7 +125,8 @@ class ReminderAuthenticationChainTest {
 
     @Test
     void reminderListIsGuardedByTheSameFilter() throws Exception {
-        when(jwtAuthenticator.authenticate(null)).thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
+        when(jwtAuthenticator.authenticateIdentity(null))
+                .thenThrow(new BusinessException(ErrorCode.USR_AUTH_001));
 
         mockMvc.perform(get("/api/v1/reminders"))
                 .andExpect(status().isUnauthorized());

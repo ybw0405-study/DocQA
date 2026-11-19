@@ -527,6 +527,7 @@ const ENVELOPE_SCHEMAS = [
   'NotificationListEnvelope',
   'NotificationReadEnvelope',
   'AdminAiControlsEnvelope',
+  'KillSwitchStateEnvelope',
   'AiQuotaEnvelope',
   'AiQuotaListEnvelope',
   'AuditEventListEnvelope',
@@ -928,8 +929,8 @@ describe('契约 ↔ 前端类型对账', () => {
 
     expect(unaccounted, `契约新增/改名的 schema 未经裁决：${unaccounted.join(', ')}`).toEqual([]);
     expect(stale, `前端镜像表里的 schema 在契约中已不存在：${stale.join(', ')}`).toEqual([]);
-    // 契约 2.5.0 的 schema 计数。契约一旦增删，这一条先红，逼着来做一次裁决。
-    expect(SCHEMA_NAMES).toHaveLength(98);
+    // 契约 2.6.0 的 schema 计数（新增 KillSwitchStateEnvelope）。契约一旦增删，这一条先红，逼着来做一次裁决。
+    expect(SCHEMA_NAMES).toHaveLength(99);
   });
 
   it('mirrors every object schema field-for-field', () => {
@@ -1225,6 +1226,8 @@ describe('契约 ↔ 前端类型对账', () => {
     const expectedParameters: Record<string, string[]> = {
       getAiControls: [],
       updateAiControls: [],
+      getTenantAiControls: [],
+      updateTenantAiControls: [],
       listAiQuotas: ['QuotaListLimit', 'KeysetCursor'],
       updateAiQuota: ['UserId'],
       listAuditEvents: [

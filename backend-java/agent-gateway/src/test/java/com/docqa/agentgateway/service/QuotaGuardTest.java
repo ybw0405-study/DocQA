@@ -13,12 +13,15 @@ import static org.mockito.Mockito.when;
 
 import com.docqa.agentgateway.dto.AiQuota;
 import com.docqa.agentgateway.repository.AiQuotaRepository;
+import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -27,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class QuotaGuardTest {
 
+    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
     private static final Instant NOW = Instant.parse("2026-11-03T10:00:00Z");
@@ -37,9 +41,19 @@ class QuotaGuardTest {
     @Mock
     private QuotaUsageStore usageStore;
 
+    @BeforeEach
+    void setUp() {
+        TenantContext.set(TENANT_ID);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
     @Test
     void countsEveryQuestionEvenWithoutAnOverride() {
-        when(quotaRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+        when(quotaRepository.findByUserId(TENANT_ID, USER_ID)).thenReturn(Optional.empty());
         when(usageStore.tryConsume(USER_ID, DAY, null, null)).thenReturn(true);
         QuotaGuard guard = guardAt(NOW);
 
@@ -50,7 +64,7 @@ class QuotaGuardTest {
 
     @Test
     void forwardsTheConfiguredLimitsToTheStore() {
-        when(quotaRepository.findByUserId(USER_ID)).thenReturn(Optional.of(quota(30L, 60_000L)));
+        when(quotaRepository.findByUserId(TENANT_ID, USER_ID)).thenReturn(Optional.of(quota(30L, 60_000L)));
         when(usageStore.tryConsume(USER_ID, DAY, 30L, 60_000L)).thenReturn(true);
         QuotaGuard guard = guardAt(NOW);
 
@@ -61,7 +75,7 @@ class QuotaGuardTest {
 
     @Test
     void rejectsWithRetryAfterUntilTheNextUtcMidnight() {
-        when(quotaRepository.findByUserId(USER_ID)).thenReturn(Optional.of(quota(1L, null)));
+        when(quotaRepository.findByUserId(TENANT_ID, USER_ID)).thenReturn(Optional.of(quota(1L, null)));
         when(usageStore.tryConsume(USER_ID, DAY, 1L, null)).thenReturn(false);
         QuotaGuard guard = guardAt(Instant.parse("2026-11-03T23:59:00Z"));
 
@@ -76,14 +90,14 @@ class QuotaGuardTest {
 
     @Test
     void readsTheQuotaOnEveryReservation() {
-        when(quotaRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+        when(quotaRepository.findByUserId(TENANT_ID, USER_ID)).thenReturn(Optional.empty());
         when(usageStore.tryConsume(USER_ID, DAY, null, null)).thenReturn(true);
         QuotaGuard guard = guardAt(NOW);
 
         guard.reserve(USER_ID);
         guard.reserve(USER_ID);
 
-        verify(quotaRepository, times(2)).findByUserId(USER_ID);
+        verify(quotaRepository, times(2)).findByUserId(TENANT_ID, USER_ID);
     }
 
     @Test

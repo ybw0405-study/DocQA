@@ -4,6 +4,7 @@ import com.docqa.common.trace.TraceIdContext;
 import com.docqa.document.config.DocumentProperties;
 import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
+import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.DocumentRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -42,11 +43,11 @@ public class DocumentReconciliationJob {
     public void reconcileStaleParsing() {
         Instant now = clock.instant();
         Instant threshold = now.minus(properties.getStaleThreshold());
-        List<DocumentRow> documents = documentRepository.findStaleParsing(
+        List<TenantDocument> documents = documentRepository.findStaleParsing(
                 threshold,
                 properties.getReconcileBatchSize());
-        for (DocumentRow document : documents) {
-            reconcile(document, now);
+        for (TenantDocument entry : documents) {
+            reconcile(entry.tenantId(), entry.document(), now);
         }
     }
 
@@ -56,17 +57,20 @@ public class DocumentReconciliationJob {
     public void abortStaleReindex() {
         Instant now = clock.instant();
         Instant threshold = now.minus(properties.getStaleThreshold());
-        List<DocumentRow> documents = documentRepository.findStaleReindex(
+        List<TenantDocument> documents = documentRepository.findStaleReindex(
                 threshold,
                 properties.getReconcileBatchSize());
-        for (DocumentRow document : documents) {
+        for (TenantDocument entry : documents) {
+            DocumentRow document = entry.document();
             int updated = documentRepository.abortReindex(
+                    entry.tenantId(),
                     document.id(),
                     document.pendingIndexVersion(),
                     "COM-INTERNAL-001",
                     REINDEX_TIMEOUT_MESSAGE);
             LOGGER.warn(
-                    "Rebuild timed out, old index version kept: documentId={}, pendingVersion={}, aborted={}",
+                    "Rebuild timed out, old index version kept: tenantId={}, documentId={}, pendingVersion={}, aborted={}",
+                    entry.tenantId(),
                     document.id(),
                     document.pendingIndexVersion(),
                     updated);
@@ -79,10 +83,11 @@ public class DocumentReconciliationJob {
     public void republishUnconfirmedDeletions() {
         Instant now = clock.instant();
         Instant deletedBefore = now.minus(properties.getStaleThreshold());
-        List<DocumentRow> documents = documentRepository.findUnconfirmedDeletions(
+        List<TenantDocument> documents = documentRepository.findUnconfirmedDeletions(
                 deletedBefore,
                 properties.getReconcileBatchSize());
-        for (DocumentRow document : documents) {
+        for (TenantDocument entry : documents) {
+            DocumentRow document = entry.document();
             publishVectorChange(VectorChangeRequestedEvent.deleteDocument(
                     TraceIdContext.currentOrCreate(),
                     document.id(),
@@ -91,9 +96,9 @@ public class DocumentReconciliationJob {
         }
     }
 
-    private void reconcile(DocumentRow document, Instant now) {
+    private void reconcile(UUID tenantId, DocumentRow document, Instant now) {
         if (document.retryCount() >= document.maxRetry()) {
-            documentRepository.markDead(document.id(), "COM-INTERNAL-001", "解析超时，已达到最大重试次数。");
+            documentRepository.markDead(tenantId, document.id(), "COM-INTERNAL-001", "解析超时，已达到最大重试次数。");
             return;
         }
         int nextRetry = document.retryCount() + 1;
@@ -117,14 +122,14 @@ public class DocumentReconciliationJob {
             return;
         }
 
-        int updated = documentRepository.incrementRetryAndMarkParsing(document.id(), now);
+        int updated = documentRepository.incrementRetryAndMarkParsing(tenantId, document.id(), now);
         if (updated == 0) {
-            DocumentRow current = documentRepository.findById(document.id()).orElse(null);
+            DocumentRow current = documentRepository.findById(tenantId, document.id()).orElse(null);
             if (current != null
                     && current.retryCount() >= current.maxRetry()
                     && (current.status() == DocumentStatus.PARSING
                             || current.status() == DocumentStatus.FAILED)) {
-                documentRepository.markDead(current.id(), "COM-INTERNAL-001", "解析超时，已达到最大重试次数。");
+                documentRepository.markDead(tenantId, current.id(), "COM-INTERNAL-001", "解析超时，已达到最大重试次数。");
             }
             return;
         }

@@ -11,6 +11,7 @@ from docqa_ai.config import Settings
 from docqa_ai.protocol.models import AgentAskRequest
 
 TRACE_ID = "0123456789abcdef0123456789abcdef"
+TENANT_ID = uuid.UUID("44444444-4444-4444-8444-444444444444")
 USER_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 CONVERSATION_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
 DOCUMENT_ID = uuid.UUID("33333333-3333-4333-8333-333333333333")
@@ -41,6 +42,7 @@ def settings() -> Settings:
 def request_payload(**overrides: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "protocolVersion": "1.0",
+        "tenantId": str(TENANT_ID),
         "userId": str(USER_ID),
         "traceId": TRACE_ID,
         "conversationId": str(CONVERSATION_ID),

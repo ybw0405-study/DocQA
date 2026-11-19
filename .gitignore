@@ -55,6 +55,8 @@ tmp/
 .env
 .env.*
 !.env.example
+ops/env/local.env
+ops/backup/
 *.pem
 *.key
 *.p12

@@ -45,12 +45,14 @@ public class JdbcAdminAuditQueryRepository implements AdminAuditQueryRepository 
 
     @Override
     public List<AuditEventItem> findPage(
+            UUID tenantId,
             AuditQueryFilter filter,
             Instant beforeOccurredAt,
             UUID beforeEventId,
             int limit) {
-        StringBuilder sql = new StringBuilder(PROJECTION).append(" WHERE 1 = 1");
+        StringBuilder sql = new StringBuilder(PROJECTION).append(" WHERE tenant_id = ?");
         List<Object> args = new ArrayList<>();
+        args.add(tenantId.toString());
         if (filter.traceId() != null) {
             sql.append(" AND trace_id = ?");
             args.add(filter.traceId());

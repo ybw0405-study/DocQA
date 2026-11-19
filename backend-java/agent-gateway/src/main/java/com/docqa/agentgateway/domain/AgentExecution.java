@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public record AgentExecution(
         UUID id,
+        UUID tenantId,
         String traceId,
         UUID userId,
         UUID conversationId,

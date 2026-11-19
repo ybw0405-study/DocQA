@@ -12,6 +12,7 @@ import com.docqa.common.error.ErrorCode;
 import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
@@ -36,7 +37,8 @@ public class AdminAiUsageService {
         this.clock = clock;
     }
 
-    public UsageSummary summarize(String from, String to, String bucket, int topUsers) {
+    /** tenantId 必须来自已验签 JWT；四组聚合只统计该租户的用量。 */
+    public UsageSummary summarize(UUID tenantId, String from, String to, String bucket, int topUsers) {
         if (bucket != null && !bucket.isBlank() && !BUCKET_DAY.equals(bucket)) {
             throw new BusinessException(
                     ErrorCode.COM_VALIDATION_001,
@@ -50,10 +52,11 @@ public class AdminAiUsageService {
                     List.of(FieldViolation.of("topUsers", "must be between 1 and 50")));
         }
         AdminQueryWindow window = AdminQueryWindow.resolve(from, to, clock, true);
-        UsageTotals totals = usageRepository.totals(window.from(), window.to());
-        List<UsageDayPoint> byDay = usageRepository.byDay(window.from(), window.to());
-        List<UsageStatusCount> byStatus = sortStatuses(usageRepository.byStatus(window.from(), window.to()));
-        List<UsageTopUser> top = usageRepository.topUsers(window.from(), window.to(), topUsers);
+        UsageTotals totals = usageRepository.totals(tenantId, window.from(), window.to());
+        List<UsageDayPoint> byDay = usageRepository.byDay(tenantId, window.from(), window.to());
+        List<UsageStatusCount> byStatus =
+                sortStatuses(usageRepository.byStatus(tenantId, window.from(), window.to()));
+        List<UsageTopUser> top = usageRepository.topUsers(tenantId, window.from(), window.to(), topUsers);
         return new UsageSummary(window.from(), window.to(), BUCKET_DAY, totals, byDay, byStatus, top);
     }
 

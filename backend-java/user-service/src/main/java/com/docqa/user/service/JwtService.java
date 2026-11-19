@@ -1,5 +1,6 @@
 package com.docqa.user.service;
 
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.config.JwtProperties;
 import com.docqa.user.domain.UserRole;
 import io.jsonwebtoken.Claims;
@@ -41,9 +42,18 @@ public class JwtService {
         this.signingKey = Keys.hmacShaKeyFor(secretBytes);
     }
 
-    public String issue(UUID userId, Collection<UserRole> roles) {
+    /**
+     * 签发带租户声明的访问令牌。P1 起 tenantId 必须由调用方显式传入：登录 / 注册取
+     * TenantResolver.resolve(...) 的解析结果，刷新取 refresh token 家族携带的 tenantId。
+     * 刻意不提供省略 tenantId 的重载——那会静默把用户签进默认租户、破坏多租户隔离，
+     * 而编译器无法拦截这类误用。验签侧强制校验 tenant_id claim，无需再改。
+     */
+    public String issue(UUID userId, UUID tenantId, Collection<UserRole> roles) {
         if (roles == null || roles.isEmpty()) {
             throw new IllegalArgumentException("access token requires at least one role");
+        }
+        if (tenantId == null) {
+            throw new IllegalArgumentException("access token requires a tenantId");
         }
         Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plus(properties.getTtl());
@@ -55,6 +65,7 @@ public class JwtService {
                 .expiration(Date.from(expiresAt))
                 .id(UUID.randomUUID().toString())
                 .claim(ROLES_CLAIM, Arrays.asList(UserRole.claimValues(roles)))
+                .claim(TenantContext.CLAIM_NAME, tenantId.toString())
                 .signWith(signingKey, Jwts.SIG.HS256)
                 .compact();
     }
@@ -82,6 +93,7 @@ public class JwtService {
             }
             return new JwtIdentity(
                     userId,
+                    parseTenantId(claims),
                     parseRoles(claims),
                     claims.getId(),
                     claims.getIssuedAt().toInstant(),
@@ -97,6 +109,18 @@ public class JwtService {
 
     public Duration accessTtl() {
         return properties.getTtl();
+    }
+
+    private UUID parseTenantId(Claims claims) {
+        Object raw = claims.get(TenantContext.CLAIM_NAME);
+        if (!(raw instanceof String value) || value.isBlank()) {
+            throw new InvalidJwtException("JWT tenant_id claim is missing");
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidJwtException("JWT tenant_id claim is not a UUID", ex);
+        }
     }
 
     private Set<UserRole> parseRoles(Claims claims) {

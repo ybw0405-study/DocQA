@@ -9,6 +9,7 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -33,15 +34,17 @@ public class ConversationHistoryService {
     }
 
     public MessageHistoryData list(UUID userId, UUID conversationId, String cursorToken, int limit) {
+        UUID tenantId = TenantContext.require();
         if (limit < MIN_PAGE_SIZE || limit > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.COM_VALIDATION_001, "limit out of range",
                     List.of(FieldViolation.of("limit", "must be between 1 and 100")));
         }
         KeysetCursor cursor = parseCursor(cursorToken);
-        if (!conversationRepository.existsByIdAndUser(conversationId, userId)) {
+        if (!conversationRepository.existsByIdAndUser(tenantId, conversationId, userId)) {
             throw new BusinessException(ErrorCode.AGT_NOT_FOUND_001);
         }
         List<MessageHistoryRow> rows = messageRepository.findPage(
+                tenantId,
                 conversationId,
                 cursor == null ? null : cursor.sortKey(),
                 cursor == null ? null : cursor.id(),

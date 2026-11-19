@@ -50,6 +50,8 @@ class UserControllerTest {
     private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
     private static final UUID TARGET_ID = UUID.fromString("00000000-0000-0000-0000-0000000000c3");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+    private static final UUID FOREIGN_TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d5");
     private static final String IDEMPOTENCY_KEY = "idem-key-0001";
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -92,7 +94,7 @@ class UserControllerTest {
     @Test
     void adminCanListUsersWithFilters() throws Exception {
         UserSummaryData summary = summary(TARGET_ID, "zhang.wei");
-        when(adminUserService.list(UserStatus.ACTIVE, UserRole.ADMIN, null, 5))
+        when(adminUserService.list(TENANT_ID, UserStatus.ACTIVE, UserRole.ADMIN, null, 5))
                 .thenReturn(new UserListData(List.of(summary), "next-cursor", 5));
 
         mockMvc.perform(get("/api/v1/users")
@@ -109,14 +111,14 @@ class UserControllerTest {
 
     @Test
     void listUsesTheDefaultPageSize() throws Exception {
-        when(adminUserService.list(null, null, null, 20))
+        when(adminUserService.list(TENANT_ID, null, null, null, 20))
                 .thenReturn(new UserListData(List.of(), null, 20));
 
         mockMvc.perform(get("/api/v1/users")
                         .header(HttpHeaders.AUTHORIZATION, bearer(ADMIN_ID, UserRole.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.limit").value(20));
-        verify(adminUserService).list(null, null, null, 20);
+        verify(adminUserService).list(TENANT_ID, null, null, null, 20);
     }
 
     @Test
@@ -127,7 +129,7 @@ class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COM-VALIDATION-001"))
                 .andExpect(jsonPath("$.errors[0].field").value("status"));
-        verify(adminUserService, never()).list(any(), any(), any(), anyInt());
+        verify(adminUserService, never()).list(any(), any(), any(), any(), anyInt());
     }
 
     @Test
@@ -147,7 +149,7 @@ class UserControllerTest {
 
     @Test
     void unknownUserIsNotFound() throws Exception {
-        when(adminUserService.get(TARGET_ID)).thenThrow(new BusinessException(ErrorCode.USR_NOT_FOUND_001));
+        when(adminUserService.get(TENANT_ID, TARGET_ID)).thenThrow(new BusinessException(ErrorCode.USR_NOT_FOUND_001));
 
         mockMvc.perform(get("/api/v1/users/{userId}", TARGET_ID)
                         .header(HttpHeaders.AUTHORIZATION, bearer(ADMIN_ID, UserRole.ADMIN)))
@@ -168,7 +170,7 @@ class UserControllerTest {
 
     @Test
     void replaceRolesDelegatesCallerIdentityAndTarget() throws Exception {
-        when(adminUserService.replaceRoles(ADMIN_ID, TARGET_ID, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN)))
+        when(adminUserService.replaceRoles(TENANT_ID, ADMIN_ID, TARGET_ID, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN)))
                 .thenReturn(summary(TARGET_ID, "zhang.wei"));
 
         mockMvc.perform(put("/api/v1/users/{userId}/roles", TARGET_ID)
@@ -179,12 +181,14 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userId").value(TARGET_ID.toString()));
 
-        verify(adminUserService).replaceRoles(ADMIN_ID, TARGET_ID, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN));
+        verify(adminUserService)
+                .replaceRoles(TENANT_ID, ADMIN_ID, TARGET_ID, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN));
     }
 
     @Test
     void updateStatusDelegatesToTheService() throws Exception {
-        when(adminUserService.updateStatus(ADMIN_ID, TARGET_ID, IDEMPOTENCY_KEY, UserStatus.DISABLED))
+        when(adminUserService.updateStatus(
+                        TENANT_ID, ADMIN_ID, TARGET_ID, IDEMPOTENCY_KEY, UserStatus.DISABLED))
                 .thenReturn(summary(TARGET_ID, "zhang.wei"));
 
         mockMvc.perform(patch("/api/v1/users/{userId}/status", TARGET_ID)
@@ -205,7 +209,7 @@ class UserControllerTest {
                         .content("{\"status\":\"BANNED\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COM-VALIDATION-001"));
-        verify(adminUserService, never()).updateStatus(any(), any(), any(), any());
+        verify(adminUserService, never()).updateStatus(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -229,8 +233,27 @@ class UserControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void adminTokenFromAnotherTenantCannotReadThisTenantsUser() throws Exception {
+        when(adminUserService.get(FOREIGN_TENANT_ID, TARGET_ID))
+                .thenThrow(new BusinessException(ErrorCode.USR_NOT_FOUND_001));
+
+        mockMvc.perform(get("/api/v1/users/{userId}", TARGET_ID)
+                        .header(HttpHeaders.AUTHORIZATION,
+                                bearer(FOREIGN_TENANT_ID, ADMIN_ID, UserRole.ADMIN)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("USR-NOT_FOUND-001"));
+
+        verify(adminUserService).get(FOREIGN_TENANT_ID, TARGET_ID);
+        verify(adminUserService, never()).get(TENANT_ID, TARGET_ID);
+    }
+
     private String bearer(UUID userId, UserRole... roles) {
-        return "Bearer " + jwtService.issue(userId, Set.of(roles));
+        return bearer(TENANT_ID, userId, roles);
+    }
+
+    private String bearer(UUID tenantId, UUID userId, UserRole... roles) {
+        return "Bearer " + jwtService.issue(userId, tenantId, Set.of(roles));
     }
 
     private UserSummaryData summary(UUID userId, String username) {

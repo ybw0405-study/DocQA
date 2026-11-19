@@ -35,7 +35,9 @@ public class AdminAuditQueryService {
         this.clock = clock;
     }
 
+    /** tenantId 必须来自已验签 JWT；审计查询不允许靠请求参数切换租户。 */
     public AuditEventListData list(
+            UUID tenantId,
             String traceId,
             String userId,
             String eventType,
@@ -64,6 +66,7 @@ public class AdminAuditQueryService {
         KeysetCursor cursor = parseCursor(cursorToken);
 
         List<AuditEventItem> rows = auditRepository.findPage(
+                tenantId,
                 new AuditQueryFilter(
                         normalizedTraceId,
                         targetUserId,

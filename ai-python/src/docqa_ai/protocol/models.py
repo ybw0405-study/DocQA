@@ -41,6 +41,7 @@ class HistoryMessage(StrictModel):
 
 class AgentAskRequest(StrictModel):
     protocol_version: str = Field(alias="protocolVersion", pattern=r"^[0-9]+\.[0-9]+$")
+    tenant_id: uuid.UUID = Field(alias="tenantId")
     user_id: uuid.UUID = Field(alias="userId")
     trace_id: str = Field(alias="traceId", pattern=r"^[0-9a-f]{32}$")
     conversation_id: uuid.UUID = Field(alias="conversationId")

@@ -37,7 +37,7 @@ public class JdbcAiUsageRepository implements AiUsageRepository {
                    COALESCE(SUM(CASE WHEN cache_hit THEN 1 ELSE 0 END), 0) AS cache_hits,
                    AVG(latency_ms) AS avg_latency_ms
             FROM agent_execution
-            WHERE started_at >= ? AND started_at <= ?
+            WHERE tenant_id = ? AND started_at >= ? AND started_at <= ?
             """;
 
     static final String BY_DAY_SQL = """
@@ -46,7 +46,7 @@ public class JdbcAiUsageRepository implements AiUsageRepository {
                    COALESCE(SUM(token_used), 0) AS tokens,
                    COALESCE(SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END), 0) AS failures
             FROM agent_execution
-            WHERE started_at >= ? AND started_at <= ?
+            WHERE tenant_id = ? AND started_at >= ? AND started_at <= ?
             GROUP BY usage_day
             ORDER BY usage_day
             """;
@@ -54,15 +54,15 @@ public class JdbcAiUsageRepository implements AiUsageRepository {
     static final String BY_STATUS_SQL = """
             SELECT status, COUNT(*) AS executions
             FROM agent_execution
-            WHERE started_at >= ? AND started_at <= ?
+            WHERE tenant_id = ? AND started_at >= ? AND started_at <= ?
             GROUP BY status
             """;
 
     static final String TOP_USERS_SQL = """
             SELECT e.user_id, u.username, COUNT(*) AS questions, COALESCE(SUM(e.token_used), 0) AS tokens
             FROM agent_execution e
-            LEFT JOIN app_user u ON u.id = e.user_id
-            WHERE e.started_at >= ? AND e.started_at <= ?
+            LEFT JOIN app_user u ON u.id = e.user_id AND u.tenant_id = e.tenant_id
+            WHERE e.tenant_id = ? AND e.started_at >= ? AND e.started_at <= ?
             GROUP BY e.user_id, u.username
             ORDER BY questions DESC, tokens DESC, e.user_id ASC
             LIMIT ?
@@ -79,26 +79,29 @@ public class JdbcAiUsageRepository implements AiUsageRepository {
     }
 
     @Override
-    public UsageTotals totals(Instant from, Instant to) {
+    public UsageTotals totals(UUID tenantId, Instant from, Instant to) {
         List<UsageTotals> rows = jdbcTemplate.query(
-                TOTALS_SQL, totalsMapper, Timestamp.from(from), Timestamp.from(to));
+                TOTALS_SQL, totalsMapper, tenantId.toString(), Timestamp.from(from), Timestamp.from(to));
         return rows.isEmpty() ? emptyTotals() : rows.get(0);
     }
 
     @Override
-    public List<UsageDayPoint> byDay(Instant from, Instant to) {
-        return jdbcTemplate.query(BY_DAY_SQL, dayMapper, Timestamp.from(from), Timestamp.from(to));
-    }
-
-    @Override
-    public List<UsageStatusCount> byStatus(Instant from, Instant to) {
-        return jdbcTemplate.query(BY_STATUS_SQL, statusMapper, Timestamp.from(from), Timestamp.from(to));
-    }
-
-    @Override
-    public List<UsageTopUser> topUsers(Instant from, Instant to, int limit) {
+    public List<UsageDayPoint> byDay(UUID tenantId, Instant from, Instant to) {
         return jdbcTemplate.query(
-                TOP_USERS_SQL, topUserMapper, Timestamp.from(from), Timestamp.from(to), limit);
+                BY_DAY_SQL, dayMapper, tenantId.toString(), Timestamp.from(from), Timestamp.from(to));
+    }
+
+    @Override
+    public List<UsageStatusCount> byStatus(UUID tenantId, Instant from, Instant to) {
+        return jdbcTemplate.query(
+                BY_STATUS_SQL, statusMapper, tenantId.toString(), Timestamp.from(from), Timestamp.from(to));
+    }
+
+    @Override
+    public List<UsageTopUser> topUsers(UUID tenantId, Instant from, Instant to, int limit) {
+        return jdbcTemplate.query(
+                TOP_USERS_SQL, topUserMapper, tenantId.toString(), Timestamp.from(from), Timestamp.from(to),
+                limit);
     }
 
     private UsageTotals mapTotals(ResultSet rs, int rowNum) throws SQLException {

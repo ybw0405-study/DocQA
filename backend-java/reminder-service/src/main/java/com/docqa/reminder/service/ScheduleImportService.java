@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.domain.IdempotencyOperation;
 import com.docqa.reminder.domain.ScheduleImportAction;
 import com.docqa.reminder.dto.ScheduleImportData;
@@ -85,6 +86,7 @@ public class ScheduleImportService {
             IcsUpload upload,
             String fallbackTimezone,
             int leadMinutes) {
+        UUID tenantId = TenantContext.require();
         // 契约规定预览接受但不消费幂等键：非法值仍 400，合法值用完即弃，不写幂等记录。
         if (idempotencyKey != null) {
             IdempotencyKeys.requireValid(idempotencyKey);
@@ -92,7 +94,7 @@ public class ScheduleImportService {
         rateLimiter.check(userId);
         ZoneId zone = accept(upload, fallbackTimezone);
         List<ScheduleDecision> decisions = evaluator.evaluate(
-                userId, PREVIEW_REQUEST_KEY, leadMinutes, parse(upload, zone));
+                tenantId, userId, PREVIEW_REQUEST_KEY, leadMinutes, parse(upload, zone));
         return new SchedulePreviewData(
                 decisions.size(),
                 count(decisions, ScheduleImportAction.CREATE),
@@ -110,6 +112,7 @@ public class ScheduleImportService {
             IcsUpload upload,
             String fallbackTimezone,
             int leadMinutes) {
+        UUID tenantId = TenantContext.require();
         String key = IdempotencyKeys.requireValid(requestKey);
         rateLimiter.check(userId);
         ZoneId zone = accept(upload, fallbackTimezone);
@@ -131,8 +134,8 @@ public class ScheduleImportService {
         boolean finished = false;
         try {
             List<ScheduleDecision> decisions = evaluator.evaluate(
-                    userId, key, leadMinutes, parse(upload, zone));
-            persist(decisions);
+                    tenantId, userId, key, leadMinutes, parse(upload, zone));
+            persist(tenantId, decisions);
             ScheduleImportData data = new ScheduleImportData(
                     decisions.size(),
                     count(decisions, ScheduleImportAction.CREATE),
@@ -169,9 +172,9 @@ public class ScheduleImportService {
         return icsParser.parse(upload.content(), fallbackZone);
     }
 
-    private void persist(List<ScheduleDecision> decisions) {
+    private void persist(UUID tenantId, List<ScheduleDecision> decisions) {
         try {
-            writer.persist(decisions);
+            writer.persist(tenantId, decisions);
         } catch (DuplicateKeyException ex) {
             // 并发导入同一 UID 时 uk_reminder_user_source 命中；整批已回滚，重试即可，所以是可恢复的 409 而不是 500。
             throw new BusinessException(ErrorCode.REM_CONFLICT_002, null, ex);

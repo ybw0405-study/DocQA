@@ -16,12 +16,18 @@
 | 账号 | 能力 | 谁用 |
 |---|---|---|
 | `ss_migrator` | schema 级 DDL（`CREATE/ALTER/DROP/INDEX/REFERENCES/CREATE VIEW/CREATE ROUTINE/ALTER ROUTINE/EXECUTE/TRIGGER`）+ `flyway_schema_history` 的 DML | `document-service` 的 Flyway（`spring.flyway.user/password`） |
-| `ss_app` | 13 张业务表的 `SELECT/INSERT/UPDATE/DELETE`；`audit_event` 只有 `SELECT/INSERT` | user / document / reminder / agent-gateway |
+| `ss_app` | 14 张业务表的 `SELECT/INSERT/UPDATE/DELETE`；`audit_event` 只有 `SELECT/INSERT`；`tenant` 只有 `SELECT/INSERT/UPDATE`（注销是软删，不给 `DELETE`） | user / document / reminder / agent-gateway |
 | `ss_audit` | 只有 `audit_event` 的 `SELECT/INSERT` | audit-service |
 
-`ss_migrator` 故意**不拿业务表 DML**：现有 V1–V9 迁移是纯 DDL（0 条 `INSERT/UPDATE/DELETE`），
+`ss_migrator` 故意**不拿业务表 DML**：现有 V1–V10 迁移是纯 DDL（0 条 `INSERT/UPDATE/DELETE`），
 所以「迁移不需要写业务数据」这条约束今天成立。将来要回填数据，另开一次性 DML 授权，
 不要把 DML 常驻给 migrator。
+
+这条约束由 `MigrationV10ContractTest.migrationStaysPureDdl` 强制：迁移文件里只要出现
+`INSERT` / `UPDATE` / `DELETE` / `REPLACE` 开头的语句就红。V10 初版曾在迁移中间种一行
+默认租户，本机 MySQL 8.4 实测报 `INSERT command denied to user 'ss_migrator'`，
+且 DDL 不参与事务，迁移停在「表已建、其余未跑」的半迁移状态——种子数据现在由
+`document-service` 启动期的 `DefaultTenantInitializer` 用 app 账号幂等写入。
 
 ## 怎么用
 

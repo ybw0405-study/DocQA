@@ -3,6 +3,7 @@ package com.docqa.reminder.service;
 import com.docqa.reminder.repository.ReminderRepository;
 import com.docqa.reminder.schedule.ScheduleDecision;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,11 +24,11 @@ public class ScheduleImportWriter {
     }
 
     @Transactional
-    public void persist(List<ScheduleDecision> decisions) {
+    public void persist(UUID tenantId, List<ScheduleDecision> decisions) {
         for (ScheduleDecision decision : decisions) {
             switch (decision.action()) {
-                case CREATE -> reminderRepository.insert(decision.row());
-                case UPDATE -> reminderRepository.updateFromImport(decision.row());
+                case CREATE -> reminderRepository.insert(tenantId, decision.row());
+                case UPDATE -> reminderRepository.updateFromImport(tenantId, decision.row());
                 case UNCHANGED, STALE -> {
                     // 判定为「不写」的事件不产生任何 SQL：UNCHANGED 是内容没变，STALE 是文件比库里更旧。
                 }

@@ -113,6 +113,31 @@ class RedisAdminControlsStoreTest {
     }
 
     @Test
+    void tenantKillSwitchUsesItsOwnKeyAndMetaKey() {
+        UUID tenant = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(hashOperations.entries(KillSwitch.tenantMetaKey(tenant)))
+                .thenReturn(Map.<Object, Object>of("updatedAt", NOW_MILLIS, "updatedBy", ADMIN_ID.toString()));
+
+        store.writeTenantKillSwitch(tenant, true, ADMIN_ID, NOW);
+
+        verify(valueOperations).set(KillSwitch.tenantKey(tenant), "1");
+        verify(redisTemplate, never()).delete(KillSwitch.KEY);
+        assertThat(store.tenantKillSwitchMeta(tenant))
+                .contains(new KillSwitchMeta(Instant.ofEpochMilli(1767225600000L), ADMIN_ID));
+    }
+
+    @Test
+    void disablingTenantSwitchDeletesOnlyTheTenantKey() {
+        UUID tenant = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+
+        store.writeTenantKillSwitch(tenant, false, ADMIN_ID, NOW);
+
+        verify(redisTemplate).delete(KillSwitch.tenantKey(tenant));
+        verify(redisTemplate, never()).delete(KillSwitch.KEY);
+    }
+
+    @Test
     void readsCountersWithoutLimits() {
         when(hashOperations.entries(BUDGET_KEY))
                 .thenReturn(Map.<Object, Object>of("callsUsed", "12", "tokensUsed", "345"));
