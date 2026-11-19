@@ -120,7 +120,7 @@ describe('adminControls store', () => {
   });
 
   it('exposes no backoff field because no admin operation is rate-limited', () => {
-    // 六个管理操作的响应集合里没有 429，管理面因此不能凭空造一个等待窗口。
+    // 管理面八个操作的响应集合里没有 429，管理面因此不能凭空造一个等待窗口。
     expect('retryAfterSeconds' in store.$state).toBe(false);
   });
 });

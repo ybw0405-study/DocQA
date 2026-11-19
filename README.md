@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/ybw0405-study/DocQA/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ybw0405-study/DocQA/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/badge/release-v2.0.0-blue?style=flat-square)](https://github.com/ybw0405-study/DocQA/releases)
+[![Release](https://img.shields.io/badge/release-v2.1.0-blue?style=flat-square)](https://github.com/ybw0405-study/DocQA/releases)
 [![Java](https://img.shields.io/badge/Java-17-orange?style=flat-square)](https://openjdk.org/projects/jdk/17/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Node](https://img.shields.io/badge/Node-22.22%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -196,6 +196,14 @@ powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -Includ
 | [cross-language-protocol.md](docs/02-design/cross-language-protocol.md) | Java ↔ Python 治理协议 |
 | [saas-kernel-upgrade.md](docs/02-design/saas-kernel-upgrade.md) | SaaS 内核升级方案与 P1-B 落地记录 |
 | [saas-tenant-decisions.md](docs/02-design/saas-tenant-decisions.md) | 多租户遗留决策清单（D1～D6） |
+
+### 版本号说明
+
+**产品版本**（当前 `2.1.0`，三端 `pom.xml` / `package.json` / `pyproject.toml` 与 Release tag `v2.1.0`）
+与 **OpenAPI 契约版本**（`docs/02-design/openapi-java.yaml` 当前 `2.6.0`）是**两条独立的编号线**：
+前者遵循语义化版本描述整个产品发布，后者只描述 Java 对外接口的契约演进，契约文件头部
+`2.0.0` 指的是它自己的一次历史身份模型改造，与产品版本号无关。改动接口时升契约版本，
+发版时升产品版本，两者不要求同步。
 
 ## 参与贡献
 

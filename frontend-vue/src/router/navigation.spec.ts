@@ -88,11 +88,12 @@ describe('site navigation and route table', () => {
     }
   });
 
-  it('marks exactly the five admin pages and keeps the two nav groups covering every protected page', () => {
+  it('marks exactly the six admin pages and keeps the two nav groups covering every protected page', () => {
     expect(ADMIN_PAGES).toEqual([
       '/admin/ai-controls',
       '/admin/audit',
       '/admin/quotas',
+      '/admin/tenant-controls',
       '/admin/usage',
       '/admin/users',
     ]);
@@ -103,7 +104,7 @@ describe('site navigation and route table', () => {
     expect(await mountChrome(DEMO_TOKEN, ['USER'])).toEqual(USER_PAGES);
   });
 
-  it('adds the five admin entries only for an ADMIN session', async () => {
+  it('adds the six admin entries only for an ADMIN session', async () => {
     expect(await mountChrome(DEMO_TOKEN, DEMO_USER.roles)).toEqual([...USER_PAGES, ...ADMIN_PAGES].sort());
   });
 

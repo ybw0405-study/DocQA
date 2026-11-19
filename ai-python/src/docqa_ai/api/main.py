@@ -409,7 +409,7 @@ def create_app(
 
     app = FastAPI(
         title="docqa-ai",
-        version="2.0.0",
+        version="2.1.0",
         lifespan=lifespan,
     )
     app.state.settings = settings

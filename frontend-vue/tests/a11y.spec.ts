@@ -22,6 +22,7 @@ const STATUS_OWNERS = [
   'src/views/RemindersView.vue',
   'src/views/admin/AdminControlsView.vue',
   'src/views/admin/AdminQuotasView.vue',
+  'src/views/admin/AdminTenantControlsView.vue',
   'src/views/admin/AdminUsersView.vue',
 ];
 
@@ -204,6 +205,9 @@ describe('live region 范围（D-193）', () => {
       'role="status"',
     );
     expect(openingTagOf(read('src/views/admin/AdminQuotasView.vue'), 'class="admin-quotas__result"')).toContain(
+      'role="status"',
+    );
+    expect(openingTagOf(read('src/views/admin/AdminTenantControlsView.vue'), 'class="admin-controls__result"')).toContain(
       'role="status"',
     );
     expect(openingTagOf(read('src/views/admin/AdminUsersView.vue'), 'class="admin-users__result"')).toContain(

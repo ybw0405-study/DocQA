@@ -1,0 +1,93 @@
+name: Release
+
+# Publishing a Release is a tag-driven side effect, deliberately separate from
+# ci.yml: the latter's `push` only watches `main`, so pushing a tag does not
+# re-run the three gates. The tag must already point at a merged, green main
+# commit (enforced by --verify-tag and the CHANGELOG guard below).
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to publish (e.g. v2.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish GitHub Release from CHANGELOG
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag and extract its CHANGELOG section
+        id: notes
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # push 事件用 GITHUB_REF_NAME（即 tag 名）；workflow_dispatch 没有 tag 上下文，
+          # 只能取显式输入。两者都不做「从 GITHUB_REF 猜 tag」的兜底，猜错会发错版本。
+          if [ "${GITHUB_EVENT_NAME:-}" = "workflow_dispatch" ]; then
+            TAG="${INPUT_TAG:-}"
+          else
+            TAG="${GITHUB_REF_NAME:-}"
+          fi
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag resolved (neither GITHUB_REF_NAME nor inputs.tag)."
+            exit 1
+          fi
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::Tag '$TAG' is not a vX.Y.Z release tag."; exit 1 ;;
+          esac
+          VERSION="${TAG#v}"
+
+          # Print the section for exactly this version, stopping at the next
+          # `## [` heading. A missing section must fail the release rather than
+          # silently publish an empty or wrong-versions note.
+          awk -v v="$VERSION" '
+            /^## \[/ { if (printing) exit }
+            $0 ~ "^## \\[" v "\\]" { printing = 1; next }
+            printing { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' > release-notes.md
+
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md has no [$VERSION] section; refusing to publish an empty Release."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Release notes preview'
+            echo '```'
+            cat release-notes.md
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.notes.outputs.tag }}
+          VERSION: ${{ steps.notes.outputs.version }}
+        run: |
+          set -euo pipefail
+          TITLE="DocQA ${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; updating its notes instead of failing a re-run."
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md
+          else
+            gh release create "$TAG" \
+              --verify-tag \
+              --title "$TITLE" \
+              --notes-file release-notes.md
+          fi
+          gh release view "$TAG" --json tagName,name,isDraft,isPrerelease,url

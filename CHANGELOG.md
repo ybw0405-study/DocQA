@@ -5,6 +5,42 @@
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-19
+
+> 2.0.0 之后的工程闭环批次（分支 `feature/REQ-2.1.0-tenant-controls-ui`）。
+> **无 BREAKING 变更**，从 2.0.0 直接升级即可，无需迁移步骤。
+> 落地记录见 [saas-kernel-upgrade.md](docs/02-design/saas-kernel-upgrade.md) §5.22。
+
+### Added
+
+- **前端消费 D3 租户级熔断**：新增 `/admin/ai/controls/tenant` 的 API、独立 store 与管理页
+  「本租户 Kill Switch」（导航新增「本租户」入口）。契约把权限语义钉死为「`tenantId` 只取自
+  已验签 JWT、需要 ADMIN 角色、只影响当前登录租户」，前端不提供选择租户的入口。
+  界面如实呈现**有效状态**（平台级全局键 OR 本租户键）：全局开关仍开启时关闭本租户键，
+  回显依旧是 `active=true`，页面明确提示「平台级一键全停仍在生效、本页无法关闭它」，
+  不谎称服务已恢复；元数据只记录本租户键的写入，缺失不改变状态判读。
+- **bootstrap 供给的真库验收**：`MigrationOnRealMysqlTest` 新增用例，在真实 MySQL 8.4 上验证
+  `INSERT IGNORE INTO tenant` 同 id 重放幂等、`uk_tenant_slug` 拦住不同 id 的同 slug、
+  以及写入形态为 `ACTIVE / owner_user_id=NULL`。与既有 HTTP 形态、服务编排、SQL 文本断言
+  合成完整验收链；按 D4 仍不引入全链 HTTP e2e。
+- **release 自动化**：新增 `.github/workflows/release.yml`，推送 `vX.Y.Z` tag 时从 CHANGELOG
+  提取对应版本段落自动创建/更新 GitHub Release；缺少该段落则拒绝发布空 Release。
+  另支持 `workflow_dispatch` 手动补发。
+
+### Changed
+
+- 修正 `ci.yml` 头部注释与实现矛盾：CI 并非「全部离线」——`MigrationOnRealMysqlTest` 在
+  runner 有 Docker 时通过 Testcontainers 自动执行 V1→V10 迁移与仓储谓词验收；
+  注释改为如实描述该边界，并写明 `DOCQA_DB_IT=off` 可在无 Docker 环境跳过。
+- 前端测试桩区分平台级键与本租户键、如实模拟 OR 叠加与「元数据只来自租户键」，
+  新增 24 个前端用例（API / store / view / a11y 播报区对账）。
+- 管理面描述口径由「六个操作 / 契约 2.5.0」校准为「八个操作 / 契约 2.6.0」。
+
+### Decisions
+
+- D2 域名路由、D5 Prometheus tenant 标签、D6 OPA ABAC 维持「维持或暂缓」，本批不改动。
+- D4 全链 HTTP e2e 仍不引入；P2 计费 / P3 身份 / P4 可证删除与 §6 商业层 4 条仍属路线图与业务拍板范围。
+
 ## [2.0.0] - 2026-11-19
 
 > 本轮为 SaaS 多租户内核升级（分支 `feat/saas-tenant-foundation`，2026-11-18～19）。
@@ -134,7 +170,8 @@
 - 数据库最小权限：`audit_event` 对运行时账号只允许 `SELECT` / `INSERT`
 - 审计只追加守卫支持 `off` / `warn` / `enforce` 三种模式
 
-[Unreleased]: https://github.com/ybw0405-study/DocQA/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/ybw0405-study/DocQA/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/ybw0405-study/DocQA/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/ybw0405-study/DocQA/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/ybw0405-study/DocQA/releases/tag/v1.0.1
 [1.0.0]: https://github.com/ybw0405-study/DocQA/releases/tag/v1.0.0

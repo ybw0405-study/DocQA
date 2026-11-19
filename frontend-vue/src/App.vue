@@ -36,6 +36,7 @@ const primaryNav: readonly NavItem[] = [
 
 const adminNav: readonly NavItem[] = [
   { name: 'admin-ai-controls', label: '治理', paths: ['M3 4.6h10', 'M3 8h10', 'M3 11.4h10', 'M6 3v3.2', 'M10.4 6.4v3.2', 'M7.4 9.6v3.2'] },
+  { name: 'admin-tenant-controls', label: '本租户', paths: ['M8 1.8 13.4 4v4L8 12.2 2.6 8V4z', 'M2.6 4 8 6.2 13.4 4', 'M8 6.2v6'] },
   { name: 'admin-quotas', label: '配额', paths: ['M3.2 3.6h9.6v8.8H3.2z', 'M3.2 6.6h9.6', 'M6.4 9.2h3.2'] },
   { name: 'admin-audit', label: '审计', paths: ['M4.2 2.8h7.6v10.4H4.2z', 'M6 6.4l1.4 1.4 2.6-2.6', 'M6 10.4h4'] },
   { name: 'admin-usage', label: '用量', paths: ['M3 12.8h10', 'M4.6 12.8V8.4', 'M8 12.8V4.6', 'M11.4 12.8V9.4'] },

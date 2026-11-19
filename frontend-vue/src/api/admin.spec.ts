@@ -4,10 +4,12 @@ import { createPinia, setActivePinia } from 'pinia';
 import {
   getAiControls,
   getAiUsage,
+  getTenantAiControls,
   listAiQuotas,
   listAuditEvents,
   updateAiControls,
   updateAiQuota,
+  updateTenantAiControls,
 } from './admin';
 import { ApiError } from './errors';
 import { bindSessionToAuthStore } from '../stores/sessionBridge';
@@ -110,6 +112,70 @@ describe('admin api', () => {
     expect(error.status).toBe(400);
     expect(error.code).toBe('COM-VALIDATION-001');
     expect(writes()[0]?.body).toEqual({ killSwitchActive: true, version: 3 });
+  });
+
+  describe('tenant-scoped kill switch (contract 2.6.0)', () => {
+    it('reads the effective state from the tenant path without carrying a tenant parameter', async () => {
+      const state = await getTenantAiControls();
+
+      // tenantId 只由服务端取自 JWT：这里既没有查询串也没有请求体，界面无法指定别的租户。
+      expect(callLog.adminOps).toEqual([
+        {
+          method: 'GET',
+          path: '/api/v1/admin/ai/controls/tenant',
+          search: '',
+          key: null,
+          body: null,
+        },
+      ]);
+      expect(state).toEqual({ active: false, updatedAt: null, updatedBy: null });
+    });
+
+    it('writes only killSwitchActive and adopts the echoed effective state', async () => {
+      const state = await updateTenantAiControls({ killSwitchActive: true });
+
+      expect(writes()[0]?.path).toBe('/api/v1/admin/ai/controls/tenant');
+      expect(writes()[0]?.body).toEqual({ killSwitchActive: true });
+      expect(state).toEqual({
+        active: true,
+        updatedAt: KILL_SWITCH_WRITE_AT,
+        updatedBy: DEMO_USER_ID,
+      });
+      expect(adminStubState.tenantKillSwitch.active).toBe(true);
+      // 平台级一键全停键完全不受这次写入影响。
+      expect(adminStubState.killSwitch.active).toBe(false);
+    });
+
+    it('keeps active=true after turning the tenant key off while the platform switch is on', async () => {
+      adminStubState.killSwitch = { active: true, updatedAt: KILL_SWITCH_WRITE_AT, updatedBy: DEMO_USER_ID };
+
+      const echoed = await updateTenantAiControls({ killSwitchActive: false });
+
+      // OR 叠加：本租户键确实关了，但回显的有效状态仍是 true，界面不能把它写成「已恢复服务」。
+      expect(adminStubState.tenantKillSwitch.active).toBe(false);
+      expect(echoed.active).toBe(true);
+      const reread = await getTenantAiControls();
+      expect(reread.active).toBe(true);
+    });
+
+    it('rejects an invented version field on the tenant path too', async () => {
+      const invented = { killSwitchActive: false, version: 1 } as unknown as UpdateAiControlsRequest;
+
+      const error = await expectApiError(updateTenantAiControls(invented));
+
+      expect(error.status).toBe(400);
+      expect(error.code).toBe('COM-VALIDATION-001');
+    });
+
+    it('surfaces the audit-failure 500 while the tenant key has already flipped', async () => {
+      adminStubState.tenantControlsAuditFails = true;
+
+      const error = await expectApiError(updateTenantAiControls({ killSwitchActive: true }));
+
+      expect(error.status).toBe(500);
+      expect(error.code).toBe('COM-INTERNAL-001');
+      expect(adminStubState.tenantKillSwitch.active).toBe(true);
+    });
   });
 
   it('mints a fresh inert key per write and consumes none of them', async () => {
