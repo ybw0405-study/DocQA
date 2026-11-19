@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/ybw0405-study/DocQA/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ybw0405-study/DocQA/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/badge/release-v1.0.1-blue?style=flat-square)](https://github.com/ybw0405-study/DocQA/releases)
+[![Release](https://img.shields.io/badge/release-v2.0.0-blue?style=flat-square)](https://github.com/ybw0405-study/DocQA/releases)
 [![Java](https://img.shields.io/badge/Java-17-orange?style=flat-square)](https://openjdk.org/projects/jdk/17/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Node](https://img.shields.io/badge/Node-22.22%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
