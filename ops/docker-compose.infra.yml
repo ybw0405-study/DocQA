@@ -1,0 +1,129 @@
+# DocQA 本地基础设施（Docker Desktop / bridge）
+#
+# 用法（必须经 scripts/start-dev.ps1 启动，它会从 ops/env/local.env 注入插值变量）：
+#   docker compose -f ops/docker-compose.infra.yml up -d
+# 停止：scripts/stop-dev.ps1 -Infra（down 保留卷）或 docker compose ... stop
+#
+# 设计约束：
+#  1. 全部端口映射到 127.0.0.1 且采用 DocQA 专属段，与 AgentFlow 及 Windows 原生服务
+#     完全错开 —— 两个项目可以同时启动，不再需要互斥切换。
+#  2. 端点固定为 127.0.0.1，不再依赖 WSL2 eth0 IP，因此不需要开机刷环境变量。
+#  3. RocketMQ broker 必须向 NameServer 注册「客户端可达」地址：bridge 模式下容器
+#     默认注册内网 IP，Windows 侧连不上。故 broker.conf 显式设 brokerIP1=127.0.0.1
+#     与 listenPort=20911，并把 listenPort / VIP(listenPort-2) 一并映射出去。
+#     NameServer 端口由 namesrv.properties 的 listenPort=19876 显式指定。
+#  4. MySQL 迁移仍由 document-service 启动时跑 Flyway（迁移单归主约定不变），
+#     此文件不引入 flyway 容器；账号授权由 start-dev.ps1 幂等重放。
+#  5. ${...} 变量来自 start-dev.ps1 注入的进程环境，compose 不读取凭据文件本身。
+
+name: docqa-infra
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: docqa-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DOCQA_DB_PASSWORD}
+      MYSQL_ROOT_HOST: "%"
+    ports:
+      - "127.0.0.1:${DOCQA_DB_PORT}:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --log-bin-trust-function-creators=1
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  postgres-vector:
+    image: pgvector/pgvector:pg16
+    container_name: docqa-pg
+    environment:
+      POSTGRES_USER: docqa
+      POSTGRES_DB: docqa_vec
+      POSTGRES_PASSWORD: ${DOCQA_PG_PASSWORD}
+      SYNCHRONOUS_COMMIT: "off"
+    ports:
+      - "127.0.0.1:${DOCQA_PG_PORT}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docqa -d docqa_vec"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: docqa-redis
+    ports:
+      - "127.0.0.1:${DOCQA_REDIS_PORT}:${DOCQA_REDIS_CONTAINER_PORT}"
+    command: redis-server --port ${DOCQA_REDIS_CONTAINER_PORT} --requirepass "${DOCQA_REDIS_PASSWORD}" --maxmemory 200mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -p ${DOCQA_REDIS_CONTAINER_PORT} -a \"${DOCQA_REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: milvusdb/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: docqa-minio
+    command: server /data --address ":${DOCQA_MINIO_CONTAINER_PORT}" --console-address ":${DOCQA_MINIO_CONTAINER_CONSOLE_PORT}"
+    environment:
+      MINIO_ROOT_USER: ${DOCQA_MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${DOCQA_MINIO_SECRET_KEY}
+    ports:
+      - "127.0.0.1:${DOCQA_MINIO_PORT}:${DOCQA_MINIO_CONTAINER_PORT}"
+      - "127.0.0.1:${DOCQA_MINIO_CONSOLE_PORT}:${DOCQA_MINIO_CONTAINER_CONSOLE_PORT}"
+    volumes:
+      - minio-data:/data
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.1
+    container_name: docqa-rmq-namesrv
+    ports:
+      - "127.0.0.1:${DOCQA_ROCKETMQ_NAMESRV_PORT}:${DOCQA_ROCKETMQ_NAMESRV_PORT}"
+    command: sh mqnamesrv -c /opt/rocketmq/conf/namesrv.properties
+    environment:
+      JAVA_OPT_EXT: "-Xms512m -Xmx512m -Xmn256m"
+    volumes:
+      - ./infra/namesrv.properties:/opt/rocketmq/conf/namesrv.properties:ro
+      - rmq-namesrv-logs:/home/rocketmq/logs
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '(echo > /dev/tcp/127.0.0.1/${DOCQA_ROCKETMQ_NAMESRV_PORT}) 2>/dev/null || exit 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.1
+    container_name: docqa-rmq-broker
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${DOCQA_ROCKETMQ_BROKER_PORT}:${DOCQA_ROCKETMQ_BROKER_PORT}"
+      - "127.0.0.1:${DOCQA_ROCKETMQ_VIP_PORT}:${DOCQA_ROCKETMQ_VIP_PORT}"
+    environment:
+      JAVA_OPT_EXT: "-Xms1g -Xmx1g -Xmn512m"
+      NAMESRV_ADDR: "rocketmq-namesrv:${DOCQA_ROCKETMQ_NAMESRV_PORT}"
+    command: sh mqbroker -c /opt/rocketmq/conf/broker.conf
+    # 不挂 /home/rocketmq/store 命名卷：镜像以非 root 的 rocketmq 用户运行，
+    # 而 Docker 新建的空卷属 root:root，写 /home/rocketmq/store/lock 会
+    # Permission denied 导致 BrokerController#initialize 失败（Exited 255）。
+    # 本地开发无需持久化 broker 数据，store 走容器可写层即可。
+    volumes:
+      - ./infra/broker.conf:/opt/rocketmq/conf/broker.conf:ro
+
+volumes:
+  mysql-data:
+  pg-data:
+  redis-data:
+  minio-data:
+  rmq-namesrv-logs:
