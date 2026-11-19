@@ -160,6 +160,7 @@ class AgentAskService:
                 return prepared
             graph = self._build_graph(request, deadline, prepared)
             with self._tracer.start_as_current_span("agent.graph") as span:
+                span.set_attribute("tenant.id", str(request.tenant_id))
                 span.set_attribute("agent.rounds_limit", request.max_rounds)
                 span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
                 span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)
@@ -385,6 +386,7 @@ class AgentAskService:
             async def runner() -> GraphResult:
                 try:
                     with self._tracer.start_as_current_span("agent.graph") as span:
+                        span.set_attribute("tenant.id", str(request.tenant_id))
                         span.set_attribute("agent.rounds_limit", request.max_rounds)
                         span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
                         span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)

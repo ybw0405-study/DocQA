@@ -211,6 +211,7 @@ class AskServiceTest {
         verify(pythonAgentClient).ask(captor.capture(), anyString());
         PythonAskRequest request = captor.getValue();
         assertThat(request.protocolVersion()).isEqualTo("1.0");
+        assertThat(request.tenantId()).isEqualTo(TENANT_ID);
         assertThat(request.question()).isEqualTo(QUESTION);
         assertThat(request.piiMaskedQuestion()).isEqualTo(QUESTION);
         assertThat(request.piiMaskingVersion()).isEqualTo("pii-v1");

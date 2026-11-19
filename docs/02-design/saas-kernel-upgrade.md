@@ -181,13 +181,13 @@ CREATE TABLE tenant (
 
 ### 5.2 P0 明确的临时口径（P1 必须替换）
 
-> 第 1～4 条已由 §5.9 / §5.10 / §5.11 / §5.12 替换；第 5～6 条仍待办。
+> 第 1～5 条已由 §5.9 / §5.10 / §5.11 / §5.12 / §5.13 替换；第 6 条仍待办。
 
 1. **只有一个租户生效**。V10 把全部存量数据回填到默认租户，登录/注册尚无租户解析入口，因此所有请求都拿到默认租户 ID。租户隔离的**结构与约束已就位，但隔离效果要到 P1 接入多租户解析后才可观测**。
 2. **登录/注册用 `DEFAULT_TENANT_ID`**：`AuthService`、`RefreshTokenService`、`DemoUserSeeder` 内有 `tenantId()` 帮助方法，P1 改为按邮箱域名路由解析。
 3. **管理面聚合只看默认租户**：`AdminQuotaService` / `AdminAiUsageService` / `AdminAiControlsService` / `AdminAuditQueryService` / `AdminUserService` 传默认租户，P1 改为按管理员可见租户集过滤。
 4. **MQ / 定时任务**：`AuditOutboxRelay`、`AuditEventService`、`ReminderDueService`、`ReminderTriggerIngestService`、`ParseResultHandler` 等传默认租户，P1 随消息体携带 `tenant_id` 或遍历所有 ACTIVE 租户。（已由 §5.11 / §5.12 全部收口）
-5. **Java↔Python 协议未加 tenant 字段**：Python `AgentAskRequest` 是 `extra="forbid"`，双向必须同批发布，因此放在 P1 与 OPA 一起做。P0 的租户过滤在 Java 侧生效后再把 `documentScopes` 传给 Python。
+5. **Java↔Python 协议未加 tenant 字段**：Python `AgentAskRequest` 是 `extra="forbid"`，双向必须同批发布，因此放在 P1 与 OPA 一起做。P0 的租户过滤在 Java 侧生效后再把 `documentScopes` 传给 Python。（已由 §5.13 替换）
 6. **pgvector / MinIO / Redis 键未动**：V10 只覆盖 MySQL 业务库。这三者加租户维度是 P1 范围（见 §1.1）。
 
 ### 5.3 实际落地的契约测试
@@ -438,7 +438,7 @@ reminder-service / document-service 的生产配置是 `true`，**本批改动�
 暂保留默认租户，待管理面暴露查询时一并收口。
 
 **尚未完成**：`ParseResultHandler`（Python 解析回写）由 §5.12 以「按 documentId 反查」收口，
-不走消息体携带；§5.2 第 5 条协议、第 6 条 pgvector/MinIO/Redis、域名路由、OPA ABAC 仍未开始。
+不走消息体携带；§5.2 第 5 条协议已由 §5.13 完成，第 6 条 pgvector/MinIO/Redis、域名路由、OPA ABAC 仍未开始。
 
 验证：`mvn -o test` → 全绿；`mvn -o checkstyle:check` → 0 违规。
 
@@ -465,9 +465,30 @@ documentId 的全局唯一性与写侧谓词共同保证。`TenantIsolationContr
 已在注释中记录这四个方法的有意跨租户性质，文件级判定因写侧仍含 tenant_id 而无需新增豁免。
 
 **尚未完成**：Python 侧的 pgvector 写入仍按 documentId 而非 tenant_id 分片（§5.2 第 6 条）；
-Java→Python 的 `AgentAskRequest.documentScopes` 仍未带租户上下文（第 5 条）；域名路由、OPA ABAC 未开始。
+Java→Python 的 `AgentAskRequest` 已由 §5.13 带上 `tenantId`（第 5 条完成）；第 6 条 pgvector/MinIO/Redis、域名路由、OPA ABAC 仍未开始。
 
 验证：`mvn -o test` → 全绿；`mvn -o checkstyle:check` → 0 违规。
+
+### 5.13 Java↔Python 协议租户上下文（2026-11-19，§5.2 第 5 条完成）
+
+`PythonAskRequest` 与 Python `AgentAskRequest` **同批**新增必填 `tenantId`（camelCase alias），
+值取自网关 `TenantContext.require()` 解析出的 `prepared.tenantId()`。协议边界不再只传 `userId`，
+Python 侧从此能直接以租户维度做可观测与后续 ABAC 判决。
+
+| 项 | 实现 |
+|---|---|
+| Java DTO | `PythonAskRequest` 增加 `UUID tenantId`；`AskService.pythonRequest()` 用 `prepared.tenantId()` 填充，同步与 SSE 两条路径共用同一构造函数 |
+| Python 协议 | `AgentAskRequest` 增加 `tenant_id: uuid.UUID = Field(alias="tenantId")`，必填；`StrictModel(extra="forbid")` 保证任一侧字段漂移直接 422 |
+| 契约测试 | 新增 `ProtocolTenantContractTest`：反射读 Java record 组件、按源码解析 Python `Field(alias=...)`，断言双端字段集合逐字一致（15 个）且 `tenantId` 必填；直接跑在 `mvn -o test` 内，不增加门禁步骤 |
+| 可观测 | Python `AgentAskService` 在 `agent.graph` span 写 `tenant.id`（同步/流式双路径）；`logging_setup.py` 日志白名单加入 `tenantId` |
+| 测试同步 | Python `conftest` 定义 `TENANT_ID` 并注入默认 payload；协议模型测试字段数 14→15，新增 `tenantId` 缺字段/非法 UUID 用例；Java 两个 `PythonAskRequest` 构造点同步更新 |
+
+**边界**：本批只把租户上下文送过协议边界并使之可观测；Python 侧检索仍以
+`documentScopes` 的全局唯一 `documentId` 为边界（Java 侧 `JdbcDocumentScopeRepository`
+已带 `tenant_id` 谓词）。pgvector 按租户分片仍属 §5.2 第 6 条，届时可直接使用
+`request.tenant_id` 作路由键，无需再改协议字段。
+
+验证：`mvn -o test` → 全绿；Python 全量测试 → 全绿；`mvn -o checkstyle:check` → 0 违规。
 
 ---
 

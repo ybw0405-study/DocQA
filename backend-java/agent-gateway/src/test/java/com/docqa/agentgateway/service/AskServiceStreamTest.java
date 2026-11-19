@@ -211,6 +211,7 @@ class AskServiceStreamTest {
         ArgumentCaptor<PythonAskRequest> captor = ArgumentCaptor.forClass(PythonAskRequest.class);
         verify(pythonAgentClient).openStream(captor.capture(), anyString());
         assertThat(captor.getValue().protocolVersion()).isEqualTo("1.1");
+        assertThat(captor.getValue().tenantId()).isEqualTo(TENANT_ID);
     }
 
     @Test

@@ -14,6 +14,7 @@ _ALLOWED_FIELDS = frozenset(
     {
         "traceId",
         "spanId",
+        "tenantId",
         "userId",
         "conversationId",
         "agentName",

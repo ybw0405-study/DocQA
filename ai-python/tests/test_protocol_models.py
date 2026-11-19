@@ -15,18 +15,19 @@ from docqa_ai.protocol.models import (
     DocumentScope,
     ProblemDetail,
 )
-from tests.conftest import CONVERSATION_ID, DOCUMENT_ID, TRACE_ID, USER_ID, request_payload
+from tests.conftest import CONVERSATION_ID, DOCUMENT_ID, TENANT_ID, TRACE_ID, USER_ID, request_payload
 
 
 def parse(payload: dict[str, object]) -> AgentAskRequest:
     return AgentAskRequest.model_validate_json(json.dumps(payload))
 
 
-def test_request_has_exactly_fourteen_contract_fields() -> None:
+def test_request_has_exactly_fifteen_contract_fields() -> None:
     request = parse(request_payload())
     dumped = request.model_dump(by_alias=True)
     assert set(dumped) == {
         "protocolVersion",
+        "tenantId",
         "userId",
         "traceId",
         "conversationId",
@@ -41,6 +42,7 @@ def test_request_has_exactly_fourteen_contract_fields() -> None:
         "documentScopes",
         "history",
     }
+    assert request.tenant_id == TENANT_ID
     assert request.user_id == USER_ID
     assert request.conversation_id == CONVERSATION_ID
     assert request.document_scopes == [DocumentScope(document_id=DOCUMENT_ID, index_version="v1")]
@@ -75,6 +77,8 @@ def test_mcp_tool_names_follow_the_protocol_pattern() -> None:
     [
         {"protocolVersion": "2.0"},
         {"protocolVersion": "1"},
+        {"tenantId": "not-a-uuid"},
+        {"tenantId": None},
         {"piiMaskingVersion": "pii-v2"},
         {"traceId": "A" * 32},
         {"traceId": "abc"},
@@ -102,6 +106,13 @@ def test_invalid_requests_are_rejected(overrides: dict[str, object]) -> None:
 def test_unknown_request_field_is_rejected() -> None:
     with pytest.raises(ValidationError):
         parse(request_payload(extraField="nope"))
+
+
+def test_tenant_id_is_required() -> None:
+    payload = request_payload()
+    payload.pop("tenantId")
+    with pytest.raises(ValidationError):
+        parse(payload)
 
 
 def test_strict_types_reject_numeric_strings() -> None:

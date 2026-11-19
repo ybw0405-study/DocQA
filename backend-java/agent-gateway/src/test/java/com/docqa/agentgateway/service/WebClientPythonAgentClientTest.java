@@ -35,6 +35,7 @@ import reactor.core.publisher.Mono;
 class WebClientPythonAgentClientTest {
 
     private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-00000000000a");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID CONVERSATION_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final String VALID_RESPONSE = """
@@ -334,6 +335,7 @@ class WebClientPythonAgentClientTest {
     private PythonAskRequest request() {
         return new PythonAskRequest(
                 "1.0",
+                TENANT_ID,
                 USER_ID,
                 TRACE_ID,
                 CONVERSATION_ID,

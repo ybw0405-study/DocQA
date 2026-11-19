@@ -689,6 +689,7 @@ public class AskService {
                 .toList();
         return new PythonAskRequest(
                 prepared.stream() ? PYTHON_PROTOCOL_STREAM : PYTHON_PROTOCOL_SYNC,
+                prepared.tenantId(),
                 prepared.userId(),
                 prepared.traceId(),
                 prepared.conversationId(),
