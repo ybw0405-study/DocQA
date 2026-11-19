@@ -18,7 +18,6 @@ import com.docqa.agentgateway.repository.AiQuotaRepository;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
-import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -39,6 +38,8 @@ class AdminQuotaServiceTest {
     private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
     private static final UUID TARGET_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
     private static final UUID OTHER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+    private static final UUID FOREIGN_TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d5");
     private static final Instant NOW = Instant.parse("2026-11-03T10:15:42.010Z");
     private static final Instant OLDER = Instant.parse("2026-11-02T16:41:55.271Z");
 
@@ -63,10 +64,10 @@ class AdminQuotaServiceTest {
 
     @Test
     void listsTheFirstPageWithoutACursor() {
-        when(quotaRepository.findPage(TenantContext.DEFAULT_TENANT_ID, null, null, 51))
+        when(quotaRepository.findPage(TENANT_ID, null, null, 51))
                 .thenReturn(List.of(quota(TARGET_ID, NOW), quota(OTHER_ID, OLDER)));
 
-        AiQuotaListData page = service.list(null, 50);
+        AiQuotaListData page = service.list(TENANT_ID, null, 50);
 
         assertThat(page.items()).hasSize(2);
         assertThat(page.nextCursor()).isNull();
@@ -75,10 +76,10 @@ class AdminQuotaServiceTest {
 
     @Test
     void returnsACursorWhenAnExtraRowComesBack() {
-        when(quotaRepository.findPage(TenantContext.DEFAULT_TENANT_ID, null, null, 3))
+        when(quotaRepository.findPage(TENANT_ID, null, null, 3))
                 .thenReturn(List.of(quota(TARGET_ID, NOW), quota(OTHER_ID, OLDER), quota(ADMIN_ID, OLDER)));
 
-        AiQuotaListData page = service.list(null, 2);
+        AiQuotaListData page = service.list(TENANT_ID, null, 2);
 
         assertThat(page.items()).hasSize(2);
         KeysetCursor cursor = KeysetCursor.decode(page.nextCursor()).orElseThrow();
@@ -89,20 +90,20 @@ class AdminQuotaServiceTest {
     @Test
     void resumesFromTheDecodedCursor() {
         String token = KeysetCursor.of(OLDER, OTHER_ID).encode();
-        when(quotaRepository.findPage(TenantContext.DEFAULT_TENANT_ID, OLDER, OTHER_ID, 2)).thenReturn(List.of(quota(TARGET_ID, NOW)));
+        when(quotaRepository.findPage(TENANT_ID, OLDER, OTHER_ID, 2)).thenReturn(List.of(quota(TARGET_ID, NOW)));
 
-        service.list(token, 1);
+        service.list(TENANT_ID, token, 1);
 
-        verify(quotaRepository).findPage(TenantContext.DEFAULT_TENANT_ID, OLDER, OTHER_ID, 2);
+        verify(quotaRepository).findPage(TENANT_ID, OLDER, OTHER_ID, 2);
     }
 
     @Test
     void rejectsLimitsOutsideTheQuotaRange() {
-        assertThatThrownBy(() -> service.list(null, 0))
+        assertThatThrownBy(() -> service.list(TENANT_ID, null, 0))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.COM_VALIDATION_001);
-        assertThatThrownBy(() -> service.list(null, 201))
+        assertThatThrownBy(() -> service.list(TENANT_ID, null, 201))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.COM_VALIDATION_001);
@@ -111,7 +112,7 @@ class AdminQuotaServiceTest {
 
     @Test
     void rejectsMalformedCursors() {
-        assertThatThrownBy(() -> service.list("not-a-cursor", 50))
+        assertThatThrownBy(() -> service.list(TENANT_ID, "not-a-cursor", 50))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.COM_VALIDATION_001);
@@ -119,11 +120,11 @@ class AdminQuotaServiceTest {
 
     @Test
     void replacesTheQuotaAndAuditsItInTheSameTransaction() {
-        when(quotaRepository.findUsername(TenantContext.DEFAULT_TENANT_ID, TARGET_ID)).thenReturn(Optional.of("zhang.wei"));
+        when(quotaRepository.findUsername(TENANT_ID, TARGET_ID)).thenReturn(Optional.of("zhang.wei"));
 
-        AiQuota result = service.update(ADMIN_ID, TARGET_ID, 30L, 60_000L);
+        AiQuota result = service.update(TENANT_ID, ADMIN_ID, TARGET_ID, 30L, 60_000L);
 
-        verify(quotaRepository).upsert(TenantContext.DEFAULT_TENANT_ID, TARGET_ID, 30L, 60_000L, ADMIN_ID, NOW);
+        verify(quotaRepository).upsert(TENANT_ID, TARGET_ID, 30L, 60_000L, ADMIN_ID, NOW);
         verify(quotaRepository, never()).delete(any(), any());
         AdminAuditEntry entry = captureAudit();
         assertThat(entry.userId()).isEqualTo(ADMIN_ID);
@@ -138,11 +139,11 @@ class AdminQuotaServiceTest {
 
     @Test
     void clearingBothLimitsDeletesTheRowAndAuditsTheClearedState() {
-        when(quotaRepository.findUsername(TenantContext.DEFAULT_TENANT_ID, TARGET_ID)).thenReturn(Optional.of("zhang.wei"));
+        when(quotaRepository.findUsername(TENANT_ID, TARGET_ID)).thenReturn(Optional.of("zhang.wei"));
 
-        AiQuota result = service.update(ADMIN_ID, TARGET_ID, null, null);
+        AiQuota result = service.update(TENANT_ID, ADMIN_ID, TARGET_ID, null, null);
 
-        verify(quotaRepository).delete(TenantContext.DEFAULT_TENANT_ID, TARGET_ID);
+        verify(quotaRepository).delete(TENANT_ID, TARGET_ID);
         verify(quotaRepository, never()).upsert(any(), any(), any(), any(), any(), any());
         assertThat(captureAudit().eventType()).isEqualTo(AdminQuotaService.EVENT_QUOTA_CLEARED);
         assertThat(result.dailyQuestionLimit()).isNull();
@@ -153,19 +154,19 @@ class AdminQuotaServiceTest {
 
     @Test
     void keepsAOneSidedLimitAsAnOverride() {
-        when(quotaRepository.findUsername(TenantContext.DEFAULT_TENANT_ID, TARGET_ID)).thenReturn(Optional.of("zhang.wei"));
+        when(quotaRepository.findUsername(TENANT_ID, TARGET_ID)).thenReturn(Optional.of("zhang.wei"));
 
-        service.update(ADMIN_ID, TARGET_ID, null, 60_000L);
+        service.update(TENANT_ID, ADMIN_ID, TARGET_ID, null, 60_000L);
 
-        verify(quotaRepository).upsert(TenantContext.DEFAULT_TENANT_ID, TARGET_ID, null, 60_000L, ADMIN_ID, NOW);
+        verify(quotaRepository).upsert(TENANT_ID, TARGET_ID, null, 60_000L, ADMIN_ID, NOW);
         verify(quotaRepository, never()).delete(any(), any());
     }
 
     @Test
     void rejectsUnknownTargetUsersBeforeTouchingTheQuotaTable() {
-        when(quotaRepository.findUsername(TenantContext.DEFAULT_TENANT_ID, TARGET_ID)).thenReturn(Optional.empty());
+        when(quotaRepository.findUsername(TENANT_ID, TARGET_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.update(ADMIN_ID, TARGET_ID, 30L, null))
+        assertThatThrownBy(() -> service.update(TENANT_ID, ADMIN_ID, TARGET_ID, 30L, null))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.USR_NOT_FOUND_001);
@@ -178,19 +179,32 @@ class AdminQuotaServiceTest {
 
     @Test
     void propagatesAuditFailuresSoTheWriteAndTheAuditRollBackTogether() {
-        when(quotaRepository.findUsername(TenantContext.DEFAULT_TENANT_ID, TARGET_ID)).thenReturn(Optional.of("zhang.wei"));
+        when(quotaRepository.findUsername(TENANT_ID, TARGET_ID)).thenReturn(Optional.of("zhang.wei"));
         org.mockito.Mockito.doThrow(new IllegalStateException("audit insert failed"))
                 .when(auditRepository).insert(any(), any(AdminAuditEntry.class));
 
-        assertThatThrownBy(() -> service.update(ADMIN_ID, TARGET_ID, 30L, null))
+        assertThatThrownBy(() -> service.update(TENANT_ID, ADMIN_ID, TARGET_ID, 30L, null))
                 .isInstanceOf(IllegalStateException.class);
 
-        verify(quotaRepository).upsert(TenantContext.DEFAULT_TENANT_ID, TARGET_ID, 30L, null, ADMIN_ID, NOW);
+        verify(quotaRepository).upsert(TENANT_ID, TARGET_ID, 30L, null, ADMIN_ID, NOW);
+    }
+
+    @Test
+    void refusesToChangeAUserThatOnlyExistsInAnotherTenant() {
+        when(quotaRepository.findUsername(FOREIGN_TENANT_ID, TARGET_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.update(
+                        FOREIGN_TENANT_ID, ADMIN_ID, TARGET_ID, 30L, 60_000L))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.USR_NOT_FOUND_001));
+        verify(quotaRepository, never()).upsert(any(), any(), any(), any(), any(), any());
+        verify(auditRepository, never()).insert(any(), any());
     }
 
     private AdminAuditEntry captureAudit() {
         ArgumentCaptor<AdminAuditEntry> captor = ArgumentCaptor.forClass(AdminAuditEntry.class);
-        verify(auditRepository).insert(org.mockito.ArgumentMatchers.eq(TenantContext.DEFAULT_TENANT_ID), captor.capture());
+        verify(auditRepository).insert(org.mockito.ArgumentMatchers.eq(TENANT_ID), captor.capture());
         return captor.getValue();
     }
 

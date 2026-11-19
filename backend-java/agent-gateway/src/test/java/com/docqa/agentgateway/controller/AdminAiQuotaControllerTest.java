@@ -23,6 +23,7 @@ import com.docqa.agentgateway.web.AgentExceptionHandler;
 import com.docqa.agentgateway.web.JwtAuthenticationFilter;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.common.web.GlobalExceptionHandler;
 import com.docqa.common.web.TraceIdFilter;
@@ -47,6 +48,7 @@ class AdminAiQuotaControllerTest {
 
     private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
     private static final UUID TARGET_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
     private static final Instant UPDATED_AT = Instant.parse("2026-11-03T09:20:03.004Z");
     private static final String PATH = "/api/v1/admin/ai/quotas";
 
@@ -80,9 +82,9 @@ class AdminAiQuotaControllerTest {
 
     @Test
     void listsOverridesWithTheContractDefaults() throws Exception {
-        when(quotaService.list(null, 50)).thenReturn(new AiQuotaListData(List.of(quota()), null, 50));
+        when(quotaService.list(TENANT_ID, null, 50)).thenReturn(new AiQuotaListData(List.of(quota()), null, 50));
 
-        mockMvc.perform(get(PATH))
+        mockMvc.perform(get(PATH).requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value("OK"))
@@ -98,21 +100,25 @@ class AdminAiQuotaControllerTest {
 
     @Test
     void forwardsTheCursorAndTheMaximumPageSize() throws Exception {
-        when(quotaService.list("cursor-1", 200))
+        when(quotaService.list(TENANT_ID, "cursor-1", 200))
                 .thenReturn(new AiQuotaListData(List.of(), null, 200));
 
-        mockMvc.perform(get(PATH).param("cursor", "cursor-1").param("limit", "200"))
+        mockMvc.perform(get(PATH)
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
+                        .param("cursor", "cursor-1")
+                        .param("limit", "200"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.limit").value(200));
 
-        verify(quotaService).list("cursor-1", 200);
+        verify(quotaService).list(TENANT_ID, "cursor-1", 200);
     }
 
     @Test
     void replacesBothLimitsForTheTargetUser() throws Exception {
-        when(quotaService.update(ADMIN_ID, TARGET_ID, 30L, 60_000L)).thenReturn(quota());
+        when(quotaService.update(TENANT_ID, ADMIN_ID, TARGET_ID, 30L, 60_000L)).thenReturn(quota());
 
         mockMvc.perform(put(PATH + "/" + TARGET_ID)
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"dailyQuestionLimit\":30,\"dailyTokenLimit\":60000}"))
@@ -121,15 +127,16 @@ class AdminAiQuotaControllerTest {
                 .andExpect(jsonPath("$.data.dailyQuestionLimit").value(30))
                 .andExpect(jsonPath("$.data.dailyTokenLimit").value(60000));
 
-        verify(quotaService).update(ADMIN_ID, TARGET_ID, 30L, 60_000L);
+        verify(quotaService).update(TENANT_ID, ADMIN_ID, TARGET_ID, 30L, 60_000L);
     }
 
     @Test
     void acceptsExplicitNullsAsAClearIntent() throws Exception {
-        when(quotaService.update(eq(ADMIN_ID), eq(TARGET_ID), isNull(), isNull()))
+        when(quotaService.update(eq(TENANT_ID), eq(ADMIN_ID), eq(TARGET_ID), isNull(), isNull()))
                 .thenReturn(new AiQuota(TARGET_ID, "zhang.wei", null, null, UPDATED_AT, ADMIN_ID));
 
         mockMvc.perform(put(PATH + "/" + TARGET_ID)
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"dailyQuestionLimit\":null,\"dailyTokenLimit\":null}"))
@@ -137,12 +144,13 @@ class AdminAiQuotaControllerTest {
                 .andExpect(jsonPath("$.data.dailyQuestionLimit").doesNotExist())
                 .andExpect(jsonPath("$.data.dailyTokenLimit").doesNotExist());
 
-        verify(quotaService).update(eq(ADMIN_ID), eq(TARGET_ID), isNull(), isNull());
+        verify(quotaService).update(eq(TENANT_ID), eq(ADMIN_ID), eq(TARGET_ID), isNull(), isNull());
     }
 
     @Test
     void rejectsBodiesThatOmitOneLimitInsteadOfClearingIt() throws Exception {
         mockMvc.perform(put(PATH + "/" + TARGET_ID)
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"dailyQuestionLimit\":30}"))
@@ -150,12 +158,13 @@ class AdminAiQuotaControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("AGT-VALIDATION-001"));
 
-        verify(quotaService, never()).update(any(), any(), any(), any());
+        verify(quotaService, never()).update(any(), any(), any(), any(), any());
     }
 
     @Test
     void rejectsOutOfRangeLimits() throws Exception {
         mockMvc.perform(put(PATH + "/" + TARGET_ID)
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"dailyQuestionLimit\":0,\"dailyTokenLimit\":60000}"))
@@ -163,27 +172,29 @@ class AdminAiQuotaControllerTest {
                 .andExpect(jsonPath("$.code").value("AGT-VALIDATION-001"))
                 .andExpect(jsonPath("$.errors[0].field").value("dailyQuestionLimit"));
 
-        verify(quotaService, never()).update(any(), any(), any(), any());
+        verify(quotaService, never()).update(any(), any(), any(), any(), any());
     }
 
     @Test
     void rejectsUnknownRequestProperties() throws Exception {
         mockMvc.perform(put(PATH + "/" + TARGET_ID)
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"dailyQuestionLimit\":30,\"dailyTokenLimit\":60000,\"extra\":1}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AGT-VALIDATION-001"));
 
-        verify(quotaService, never()).update(any(), any(), any(), any());
+        verify(quotaService, never()).update(any(), any(), any(), any(), any());
     }
 
     @Test
     void mapsUnknownTargetUsersToNotFound() throws Exception {
-        when(quotaService.update(eq(ADMIN_ID), eq(TARGET_ID), any(), any()))
+        when(quotaService.update(eq(TENANT_ID), eq(ADMIN_ID), eq(TARGET_ID), any(), any()))
                 .thenThrow(new BusinessException(ErrorCode.USR_NOT_FOUND_001));
 
         mockMvc.perform(put(PATH + "/" + TARGET_ID)
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"dailyQuestionLimit\":30,\"dailyTokenLimit\":60000}"))
@@ -194,21 +205,22 @@ class AdminAiQuotaControllerTest {
     @Test
     void rejectsMalformedUserIds() throws Exception {
         mockMvc.perform(put(PATH + "/not-a-uuid")
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"dailyQuestionLimit\":30,\"dailyTokenLimit\":60000}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AGT-VALIDATION-001"));
 
-        verify(quotaService, never()).update(any(), any(), any(), any());
+        verify(quotaService, never()).update(any(), any(), any(), any(), any());
     }
 
     @Test
     void rejectsOutOfRangePagesFromTheService() throws Exception {
-        when(quotaService.list(null, 201))
+        when(quotaService.list(TENANT_ID, null, 201))
                 .thenThrow(new BusinessException(ErrorCode.COM_VALIDATION_001, "limit out of range"));
 
-        mockMvc.perform(get(PATH).param("limit", "201"))
+        mockMvc.perform(get(PATH).requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID).param("limit", "201"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COM-VALIDATION-001"));
     }

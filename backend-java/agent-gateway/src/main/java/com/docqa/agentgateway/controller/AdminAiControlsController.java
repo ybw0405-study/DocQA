@@ -5,6 +5,7 @@ import com.docqa.agentgateway.dto.UpdateAiControlsRequest;
 import com.docqa.agentgateway.service.AdminAiControlsService;
 import com.docqa.agentgateway.web.JwtAuthenticationFilter;
 import com.docqa.common.api.ApiResponse;
+import com.docqa.common.tenant.TenantContext;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,8 +32,10 @@ public class AdminAiControlsController {
 
     @PutMapping
     public ApiResponse<AdminAiControls> update(
+            @RequestAttribute(TenantContext.REQUEST_ATTRIBUTE) UUID tenantId,
             @RequestAttribute(JwtAuthenticationFilter.USER_ID_ATTRIBUTE) UUID adminId,
             @Valid @RequestBody UpdateAiControlsRequest request) {
-        return ApiResponse.ok(controlsService.updateKillSwitch(adminId, request.killSwitchActive()));
+        return ApiResponse.ok(
+                controlsService.updateKillSwitch(tenantId, adminId, request.killSwitchActive()));
     }
 }

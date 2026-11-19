@@ -16,7 +16,6 @@ import com.docqa.agentgateway.repository.AiUsageRepository;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
-import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +35,8 @@ class AdminAiUsageServiceTest {
     private static final Instant FROM = Instant.parse("2026-11-02T09:00:00Z");
     private static final Instant TO = Instant.parse("2026-11-03T09:00:00Z");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+    private static final UUID FOREIGN_TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d5");
 
     @Mock
     private AiUsageRepository usageRepository;
@@ -51,35 +52,35 @@ class AdminAiUsageServiceTest {
     void defaultsToTheLastTwentyFourHoursAndTenTopUsers() {
         stubEmpty();
 
-        UsageSummary summary = service.summarize(null, null, null, 10);
+        UsageSummary summary = service.summarize(TENANT_ID, null, null, null, 10);
 
         assertThat(summary.from()).isEqualTo(NOW.minus(Duration.ofHours(24)));
         assertThat(summary.to()).isEqualTo(NOW);
         assertThat(summary.bucket()).isEqualTo("day");
-        verify(usageRepository).totals(TenantContext.DEFAULT_TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
-        verify(usageRepository).byDay(TenantContext.DEFAULT_TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
-        verify(usageRepository).byStatus(TenantContext.DEFAULT_TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
+        verify(usageRepository).totals(TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
+        verify(usageRepository).byDay(TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
+        verify(usageRepository).byStatus(TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
         verify(usageRepository)
-                .topUsers(TenantContext.DEFAULT_TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW, 10);
+                .topUsers(TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW, 10);
     }
 
     @Test
     void appliesAnExplicitWindowAndTopUserCount() {
         stubEmpty();
 
-        UsageSummary summary = service.summarize(
+        UsageSummary summary = service.summarize(TENANT_ID,
                 FROM.toString(), TO.toString(), "day", 25);
 
         assertThat(summary.from()).isEqualTo(FROM);
         assertThat(summary.to()).isEqualTo(TO);
-        verify(usageRepository).topUsers(TenantContext.DEFAULT_TENANT_ID, FROM, TO, 25);
+        verify(usageRepository).topUsers(TENANT_ID, FROM, TO, 25);
     }
 
     @Test
     void treatsABlankBucketAsTheDayBucket() {
         stubEmpty();
 
-        assertThat(service.summarize(null, null, " ", 10).bucket()).isEqualTo("day");
+        assertThat(service.summarize(TENANT_ID, null, null, " ", 10).bucket()).isEqualTo("day");
     }
 
     @Test
@@ -93,7 +94,7 @@ class AdminAiUsageServiceTest {
                 new UsageStatusCount("RUNNING", 1)));
         when(usageRepository.topUsers(any(), any(), any(), anyInt())).thenReturn(List.of());
 
-        UsageSummary summary = service.summarize(null, null, null, 10);
+        UsageSummary summary = service.summarize(TENANT_ID, null, null, null, 10);
 
         assertThat(summary.byStatus())
                 .extracting(UsageStatusCount::status)
@@ -109,7 +110,7 @@ class AdminAiUsageServiceTest {
                 new UsageStatusCount("SUCCESS", 2)));
         when(usageRepository.topUsers(any(), any(), any(), anyInt())).thenReturn(List.of());
 
-        assertThat(service.summarize(null, null, null, 10).byStatus())
+        assertThat(service.summarize(TENANT_ID, null, null, null, 10).byStatus())
                 .extracting(UsageStatusCount::status)
                 .containsExactly("SUCCESS", "ZZZ");
     }
@@ -122,7 +123,7 @@ class AdminAiUsageServiceTest {
         when(usageRepository.byStatus(any(), any(), any())).thenReturn(List.of());
         when(usageRepository.topUsers(any(), any(), any(), anyInt())).thenReturn(List.of());
 
-        UsageSummary summary = service.summarize(null, null, null, 10);
+        UsageSummary summary = service.summarize(TENANT_ID, null, null, null, 10);
 
         assertThat(summary.totals().avgLatencyMs()).isNull();
         assertThat(summary.byDay()).isEmpty();
@@ -138,7 +139,7 @@ class AdminAiUsageServiceTest {
         when(usageRepository.byStatus(any(), any(), any())).thenReturn(List.of(new UsageStatusCount("SUCCESS", 113)));
         when(usageRepository.topUsers(any(), any(), any(), anyInt())).thenReturn(List.of(user));
 
-        UsageSummary summary = service.summarize(null, null, null, 10);
+        UsageSummary summary = service.summarize(TENANT_ID, null, null, null, 10);
 
         assertThat(summary.byDay()).containsExactly(day);
         assertThat(summary.topUsers()).containsExactly(user);
@@ -147,24 +148,35 @@ class AdminAiUsageServiceTest {
 
     @Test
     void rejectsBucketsOtherThanDay() {
-        assertValidation("bucket", () -> service.summarize(null, null, "hour", 10));
+        assertValidation("bucket", () -> service.summarize(TENANT_ID, null, null, "hour", 10));
     }
 
     @Test
     void rejectsTopUserCountsOutsideOneToFifty() {
-        assertValidation("topUsers", () -> service.summarize(null, null, null, 0));
-        assertValidation("topUsers", () -> service.summarize(null, null, null, 51));
+        assertValidation("topUsers", () -> service.summarize(TENANT_ID, null, null, null, 0));
+        assertValidation("topUsers", () -> service.summarize(TENANT_ID, null, null, null, 51));
     }
 
     @Test
     void rejectsWindowsLongerThanThirtyOneDays() {
-        assertValidation("from", () -> service.summarize(
+        assertValidation("from", () -> service.summarize(TENANT_ID,
                 "2026-09-01T00:00:00Z", "2026-11-03T00:00:00Z", null, 10));
     }
 
     @Test
     void rejectsUnparsableTimestamps() {
-        assertValidation("to", () -> service.summarize(null, "not-a-time", null, 10));
+        assertValidation("to", () -> service.summarize(TENANT_ID, null, "not-a-time", null, 10));
+    }
+
+    @Test
+    void aggregatesOnlyTheTenantFromTheToken() {
+        stubEmpty();
+
+        service.summarize(FOREIGN_TENANT_ID, null, null, null, 10);
+
+        verify(usageRepository).totals(FOREIGN_TENANT_ID, NOW.minus(Duration.ofHours(24)), NOW);
+        verify(usageRepository, org.mockito.Mockito.never())
+                .totals(org.mockito.ArgumentMatchers.eq(TENANT_ID), any(), any());
     }
 
     private void stubEmpty() {

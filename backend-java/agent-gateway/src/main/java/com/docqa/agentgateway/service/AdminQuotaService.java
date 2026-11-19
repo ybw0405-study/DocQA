@@ -9,7 +9,6 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.time.Clock;
 import java.time.Instant;
@@ -46,7 +45,8 @@ public class AdminQuotaService {
         this.clock = clock;
     }
 
-    public AiQuotaListData list(String cursorToken, int limit) {
+    /** tenantId 必须来自已验签 JWT，不接受请求参数；配额只在租户内可见、可改。 */
+    public AiQuotaListData list(UUID tenantId, String cursorToken, int limit) {
         if (limit < MIN_PAGE_SIZE || limit > MAX_PAGE_SIZE) {
             throw new BusinessException(
                     ErrorCode.COM_VALIDATION_001,
@@ -54,8 +54,6 @@ public class AdminQuotaService {
                     List.of(FieldViolation.of("limit", "must be between 1 and 200")));
         }
         KeysetCursor cursor = parseCursor(cursorToken);
-        // P0: 管理面跨租户聚合暂用默认租户，P1 改为按管理员可见租户集过滤
-        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
         List<AiQuota> rows = quotaRepository.findPage(
                 tenantId,
                 cursor == null ? null : cursor.sortKey(),
@@ -69,9 +67,13 @@ public class AdminQuotaService {
         return new AiQuotaListData(page, nextCursor, limit);
     }
 
-    public AiQuota update(UUID adminId, UUID targetUserId, Long dailyQuestionLimit, Long dailyTokenLimit) {
-        // P0: 管理面跨租户聚合暂用默认租户，P1 改为按管理员可见租户集过滤
-        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
+    /** tenantId 必须来自已验签 JWT；审计条目也落在同一租户，避免管理操作跨租户留痕。 */
+    public AiQuota update(
+            UUID tenantId,
+            UUID adminId,
+            UUID targetUserId,
+            Long dailyQuestionLimit,
+            Long dailyTokenLimit) {
         String username = quotaRepository.findUsername(tenantId, targetUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USR_NOT_FOUND_001));
         Instant now = clock.instant();

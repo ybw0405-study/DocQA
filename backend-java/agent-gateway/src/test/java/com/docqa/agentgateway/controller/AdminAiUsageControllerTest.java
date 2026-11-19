@@ -20,6 +20,7 @@ import com.docqa.agentgateway.service.AdminAiUsageService;
 import com.docqa.agentgateway.web.AgentExceptionHandler;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.common.web.GlobalExceptionHandler;
 import com.docqa.common.web.TraceIdFilter;
@@ -45,6 +46,7 @@ class AdminAiUsageControllerTest {
     private static final Instant FROM = Instant.parse("2026-11-02T09:00:00Z");
     private static final Instant TO = Instant.parse("2026-11-03T09:00:00Z");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
     private static final String PATH = "/api/v1/admin/ai/usage";
 
     @Mock
@@ -77,9 +79,9 @@ class AdminAiUsageControllerTest {
 
     @Test
     void usesTheContractDefaultsAndRendersEverySection() throws Exception {
-        when(usageService.summarize(null, null, null, 10)).thenReturn(summary(2140.5));
+        when(usageService.summarize(TENANT_ID, null, null, null, 10)).thenReturn(summary(2140.5));
 
-        mockMvc.perform(get(PATH))
+        mockMvc.perform(get(PATH).requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value("OK"))
@@ -98,20 +100,21 @@ class AdminAiUsageControllerTest {
 
     @Test
     void rendersANullAverageAsAbsent() throws Exception {
-        when(usageService.summarize(null, null, null, 10)).thenReturn(summary(null));
+        when(usageService.summarize(TENANT_ID, null, null, null, 10)).thenReturn(summary(null));
 
-        mockMvc.perform(get(PATH))
+        mockMvc.perform(get(PATH).requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totals.avgLatencyMs").doesNotExist());
     }
 
     @Test
     void forwardsTheWindowBucketAndTopUserCount() throws Exception {
-        when(usageService.summarize(
+        when(usageService.summarize(TENANT_ID,
                 "2026-11-02T09:00:00Z", "2026-11-03T09:00:00Z", "day", 50))
                 .thenReturn(summary(1.0));
 
         mockMvc.perform(get(PATH)
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .param("from", "2026-11-02T09:00:00Z")
                         .param("to", "2026-11-03T09:00:00Z")
                         .param("bucket", "day")
@@ -121,17 +124,17 @@ class AdminAiUsageControllerTest {
 
     @Test
     void mapsServiceValidationFailuresToFourHundred() throws Exception {
-        when(usageService.summarize(any(), any(), eq("hour"), eq(10)))
+        when(usageService.summarize(eq(TENANT_ID), any(), any(), eq("hour"), eq(10)))
                 .thenThrow(new BusinessException(ErrorCode.COM_VALIDATION_001, "unsupported bucket"));
 
-        mockMvc.perform(get(PATH).param("bucket", "hour"))
+        mockMvc.perform(get(PATH).requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID).param("bucket", "hour"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COM-VALIDATION-001"));
     }
 
     @Test
     void mapsNonNumericTopUserCountsToGatewayValidation() throws Exception {
-        mockMvc.perform(get(PATH).param("topUsers", "many"))
+        mockMvc.perform(get(PATH).requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID).param("topUsers", "many"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AGT-VALIDATION-001"))
                 .andExpect(jsonPath("$.errors[0].field").value("topUsers"));

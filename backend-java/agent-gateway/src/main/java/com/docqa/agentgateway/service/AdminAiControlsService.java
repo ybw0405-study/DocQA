@@ -7,7 +7,6 @@ import com.docqa.agentgateway.repository.AdminAuditEntry;
 import com.docqa.agentgateway.repository.AdminAuditRepository;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.time.Clock;
 import java.time.Instant;
@@ -58,13 +57,15 @@ public class AdminAiControlsService {
                         limitsKnown));
     }
 
-    public AdminAiControls updateKillSwitch(UUID adminId, boolean active) {
+    /**
+     * Kill Switch 本身是全局运行时开关，但管理审计必须落在调用者 JWT 的租户里，
+     * 否则一条租户的管理操作会被记到默认租户账上。
+     */
+    public AdminAiControls updateKillSwitch(UUID tenantId, UUID adminId, boolean active) {
         Instant now = clock.instant();
         controlsStore.writeKillSwitch(active, adminId, now);
         killSwitch.refresh(active);
         try {
-            // P0: 管理面跨租户聚合暂用默认租户，P1 改为按管理员可见租户集过滤
-            UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
             auditRepository.insert(tenantId, new AdminAuditEntry(
                     UUID.randomUUID(),
                     TraceIdContext.currentOrCreate(),

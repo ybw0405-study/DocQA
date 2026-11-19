@@ -3,7 +3,6 @@ package com.docqa.user.service;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.config.AuthProperties;
 import com.docqa.user.domain.AppUserRow;
 import com.docqa.user.domain.IdempotencyOperation;
@@ -36,6 +35,12 @@ import org.springframework.stereotype.Service;
 /**
  * 身份用例。凭据判定只发生在这里：userId 只来自已验签令牌的 `sub`，
  * 角色只来自令牌的 `roles` 声明，请求体与 Header 传入的身份一律不参与。
+ *
+ * <p>租户边界（P1）：登录/注册时由 {@link TenantResolver} 从请求体的可选 tenantSlug
+ * 解析一次 tenantId，之后本类所有仓储调用、JWT 签发、刷新令牌家族都用它；
+ * 已验签请求的 tenantId 一律取自 {@link JwtIdentity#tenantId()}，不再信任请求体。
+ * 幂等键与登录限流键都带 tenantId 前缀——用户名只在租户内唯一，
+ * 不加前缀会让不同租户的同名账号互相重放令牌、互相耗尽失败次数。
  */
 @Service
 public class AuthService {
@@ -56,6 +61,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final AuthProperties properties;
+    private final TenantResolver tenantResolver;
     private final Clock clock;
 
     /**
@@ -76,6 +82,7 @@ public class AuthService {
             JwtService jwtService,
             PasswordEncoder passwordEncoder,
             AuthProperties properties,
+            TenantResolver tenantResolver,
             Clock clock) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -88,6 +95,7 @@ public class AuthService {
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.properties = properties;
+        this.tenantResolver = tenantResolver;
         this.clock = clock;
         this.unknownUserPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
@@ -96,25 +104,27 @@ public class AuthService {
         String username = normalizeUsername(request.username());
         String password = requirePassword(request.password(), "password");
         String remote = remote(remoteAddress);
+        UUID tenantId = tenantResolver.resolve(request.tenantSlug());
+        String principal = principal(tenantId, username);
 
-        RateLimitDecision decision = loginRateLimiter.check(username, remote);
+        RateLimitDecision decision = loginRateLimiter.check(principal, remote);
         if (!decision.allowed()) {
             throw new RateLimitedException(ErrorCode.USR_RATE_LIMIT_001, decision.retryAfterSeconds());
         }
 
-        UserCredentials credentials = userRepository.findCredentialsByUsername(tenantId(), username).orElse(null);
+        UserCredentials credentials = userRepository.findCredentialsByUsername(tenantId, username).orElse(null);
         String hash = credentials == null ? unknownUserPasswordHash : credentials.passwordHash();
         if (!passwordEncoder.matches(password, hash) || credentials == null) {
-            loginRateLimiter.recordFailure(username, remote);
+            loginRateLimiter.recordFailure(principal, remote);
             throw new BusinessException(ErrorCode.USR_AUTH_001);
         }
         if (credentials.status() != UserStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.USR_DISABLED_001);
         }
 
-        loginRateLimiter.reset(username, remote);
-        userRepository.touchLastLogin(tenantId(), credentials.id(), clock.instant());
-        return startSession(credentials.id());
+        loginRateLimiter.reset(principal, remote);
+        userRepository.touchLastLogin(tenantId, credentials.id(), clock.instant());
+        return startSession(tenantId, credentials.id());
     }
 
     public IssuedSession register(RegisterRequest request, String idempotencyKey, String remoteAddress) {
@@ -130,19 +140,24 @@ public class AuthService {
         String password = request.password();
         String key = requireIdempotencyKey(idempotencyKey);
         rejectWeakPassword("password", password);
+        UUID tenantId = tenantResolver.resolve(request.tenantSlug());
 
+        String scope = principal(tenantId, username);
         String fingerprint = Fingerprints.sha256(
-                IdempotencyOperation.REGISTER.name() + '\u0000' + username + '\u0000' + password);
+                IdempotencyOperation.REGISTER.name()
+                        + '\u0000' + tenantId
+                        + '\u0000' + username
+                        + '\u0000' + password);
         AtomicReference<IssuedSession> issued = new AtomicReference<>();
 
         IdempotencyGuard.Outcome<LoginResponse> outcome = idempotencyGuard.run(
-                username,
+                scope,
                 IdempotencyOperation.REGISTER,
                 key,
                 fingerprint,
                 LoginResponse.class,
                 () -> {
-                    IssuedSession session = createUser(username, password);
+                    IssuedSession session = createUser(tenantId, username, password);
                     issued.set(session);
                     return toResponse(session);
                 });
@@ -161,12 +176,14 @@ public class AuthService {
             throw new BusinessException(ErrorCode.USR_REFRESH_001);
         }
         RefreshTokenService.IssuedRefreshToken rotated = refreshTokenService.rotate(rawRefreshToken);
-        UserCredentials credentials = userRepository.findCredentialsById(tenantId(), rotated.userId()).orElse(null);
+        UUID tenantId = rotated.tenantId();
+        UserCredentials credentials = userRepository.findCredentialsById(tenantId, rotated.userId()).orElse(null);
         if (credentials == null || credentials.status() != UserStatus.ACTIVE) {
-            refreshTokenService.revokeFamily(rotated.familyId());
+            refreshTokenService.revokeFamily(tenantId, rotated.familyId());
             throw new BusinessException(ErrorCode.USR_REFRESH_001);
         }
-        String accessToken = jwtService.issue(credentials.id(), roleRepository.findRoles(tenantId(), credentials.id()));
+        String accessToken = jwtService.issue(
+                credentials.id(), tenantId, roleRepository.findRoles(tenantId, credentials.id()));
         return new IssuedSession(
                 new IssuedToken(accessToken, TOKEN_TYPE, jwtService.expiresInSeconds()),
                 rotated.value());
@@ -182,7 +199,7 @@ public class AuthService {
                 .ifPresent(identity -> accessTokenAuthenticator.revoke(identity, now));
         if (rawRefreshToken != null && !rawRefreshToken.isBlank()) {
             refreshTokenService.familyOf(rawRefreshToken)
-                    .ifPresent(refreshTokenService::revokeFamily);
+                    .ifPresent(family -> refreshTokenService.revokeFamily(family.tenantId(), family.familyId()));
         }
     }
 
@@ -194,6 +211,7 @@ public class AuthService {
         String key = requireIdempotencyKey(idempotencyKey);
         String fingerprint = Fingerprints.sha256(
                 IdempotencyOperation.CHANGE_PASSWORD.name()
+                        + '\u0000' + identity.tenantId()
                         + '\u0000' + request.currentPassword()
                         + '\u0000' + request.newPassword());
         idempotencyGuard.run(
@@ -203,13 +221,13 @@ public class AuthService {
                 fingerprint,
                 Void.class,
                 () -> {
-                    applyPasswordChange(identity.userId(), request, remote(remoteAddress));
+                    applyPasswordChange(identity.tenantId(), identity.userId(), request, remote(remoteAddress));
                     return null;
                 });
     }
 
     public CurrentUserData currentUser(JwtIdentity identity) {
-        AppUserRow row = userRepository.findById(tenantId(), identity.userId())
+        AppUserRow row = userRepository.findById(identity.tenantId(), identity.userId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USR_AUTH_001));
         if (row.status() != UserStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.USR_DISABLED_001);
@@ -218,8 +236,8 @@ public class AuthService {
         return new CurrentUserData(row.id(), row.username(), row.status(), identity.roles(), remainingSeconds);
     }
 
-    private IssuedSession createUser(String username, String password) {
-        if (userRepository.existsByUsername(tenantId(), username)) {
+    private IssuedSession createUser(UUID tenantId, String username, String password) {
+        if (userRepository.existsByUsername(tenantId, username)) {
             throw usernameTaken();
         }
         UUID userId = UUID.randomUUID();
@@ -231,30 +249,33 @@ public class AuthService {
                 UserStatus.ACTIVE,
                 now);
         try {
-            userRepository.insert(tenantId(), user, Set.of(UserRole.USER));
+            userRepository.insert(tenantId, user, Set.of(UserRole.USER));
         } catch (DuplicateKeyException ex) {
             // 预检查之后仍可能被并发注册抢先落库，唯一键是最后一道防线。
             throw usernameTaken();
         }
-        return startSession(userId);
+        return startSession(tenantId, userId);
     }
 
-    private IssuedSession startSession(UUID userId) {
-        String accessToken = jwtService.issue(userId, roleRepository.findRoles(tenantId(), userId));
-        RefreshTokenService.IssuedRefreshToken refreshToken = refreshTokenService.startFamily(userId);
+    private IssuedSession startSession(UUID tenantId, UUID userId) {
+        String accessToken = jwtService.issue(
+                userId, tenantId, roleRepository.findRoles(tenantId, userId));
+        RefreshTokenService.IssuedRefreshToken refreshToken = refreshTokenService.startFamily(tenantId, userId);
         return new IssuedSession(
                 new IssuedToken(accessToken, TOKEN_TYPE, jwtService.expiresInSeconds()),
                 refreshToken.value());
     }
 
-    private void applyPasswordChange(UUID userId, ChangePasswordRequest request, String remote) {
-        UserCredentials credentials = userRepository.findCredentialsById(tenantId(), userId)
+    private void applyPasswordChange(
+            UUID tenantId, UUID userId, ChangePasswordRequest request, String remote) {
+        UserCredentials credentials = userRepository.findCredentialsById(tenantId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USR_AUTH_001));
         if (credentials.status() != UserStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.USR_DISABLED_001);
         }
 
-        RateLimitDecision decision = loginRateLimiter.check(credentials.username(), remote);
+        String principal = principal(tenantId, credentials.username());
+        RateLimitDecision decision = loginRateLimiter.check(principal, remote);
         if (!decision.allowed()) {
             throw new RateLimitedException(ErrorCode.USR_RATE_LIMIT_001, decision.retryAfterSeconds());
         }
@@ -262,7 +283,7 @@ public class AuthService {
         if (currentPassword == null
                 || currentPassword.getBytes(StandardCharsets.UTF_8).length > PASSWORD_MAX_BYTES
                 || !passwordEncoder.matches(currentPassword, credentials.passwordHash())) {
-            loginRateLimiter.recordFailure(credentials.username(), remote);
+            loginRateLimiter.recordFailure(principal, remote);
             throw new BusinessException(ErrorCode.USR_AUTH_001);
         }
         rejectWeakPassword("newPassword", request.newPassword());
@@ -274,16 +295,21 @@ public class AuthService {
         }
 
         Instant now = clock.instant();
-        userRepository.updatePasswordHash(tenantId(), userId, passwordEncoder.encode(request.newPassword()), now);
+        userRepository.updatePasswordHash(tenantId, userId, passwordEncoder.encode(request.newPassword()), now);
         // 改密通常正因为怀疑凭据泄露：其他设备上的在途 access 与刷新令牌都必须一并作废。
-        refreshTokenService.revokeAllForUser(userId);
+        refreshTokenService.revokeAllForUser(tenantId, userId);
         accessTokenAuthenticator.revokeAllIssuedBefore(userId, now);
-        loginRateLimiter.reset(credentials.username(), remote);
+        loginRateLimiter.reset(principal, remote);
     }
 
     private LoginResponse toResponse(IssuedSession session) {
         IssuedToken access = session.access();
         return new LoginResponse(access.accessToken(), access.tokenType(), access.expiresIn());
+    }
+
+    /** 用户名只在 (tenant_id, username) 内唯一，所有按用户名索引的键都必须带租户前缀。 */
+    private String principal(UUID tenantId, String username) {
+        return tenantId + ":" + username;
     }
 
     private String normalizeUsername(String username) {
@@ -336,13 +362,5 @@ public class AuthService {
                 ErrorCode.COM_VALIDATION_001,
                 null,
                 List.of(FieldViolation.of(field, message)));
-    }
-
-    /**
-     * P0 阶段登录/注册尚未接入租户解析（无 JWT 可依据），全部归属 V10 回填的默认租户。
-     * P1 接入登录域名路由后改为从域名解析，调用点无需再改。
-     */
-    private UUID tenantId() {
-        return TenantContext.DEFAULT_TENANT_ID;
     }
 }

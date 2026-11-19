@@ -4,7 +4,6 @@ import com.docqa.common.api.FieldViolation;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.domain.AppUserRow;
 import com.docqa.user.domain.IdempotencyOperation;
 import com.docqa.user.domain.UserRole;
@@ -23,7 +22,13 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
-/** 管理面用户操作。每个写操作都是「读-判定-写」，调用者的身份只由 Controller 传入的令牌视图决定。 */
+/**
+ * 管理面用户操作。每个写操作都是「读-判定-写」，调用者的身份只由 Controller 传入的令牌视图决定。
+ *
+ * <p>租户边界（P1）：所有方法的首参 tenantId 必须来自已验签 JWT 的 tenant_id claim，
+ * 由 Controller 传入，不再回落到默认租户，也不接受请求体里的租户字段。
+ * 幂等 scope 与指纹同样带 tenantId，避免跨租户重放管理操作。
+ */
 @Service
 public class AdminUserService {
 
@@ -53,12 +58,12 @@ public class AdminUserService {
         this.clock = clock;
     }
 
-    public UserListData list(UserStatus status, UserRole role, String cursor, int limit) {
+    public UserListData list(UUID tenantId, UserStatus status, UserRole role, String cursor, int limit) {
         int pageSize = validatePageSize(limit);
         KeysetCursor keyset = parseCursor(cursor);
 
         List<AppUserRow> rows = userRepository.findPage(
-                tenantId(),
+                tenantId,
                 status,
                 role,
                 keyset == null ? null : keyset.sortKey(),
@@ -68,7 +73,7 @@ public class AdminUserService {
         List<AppUserRow> page = hasMore ? List.copyOf(rows.subList(0, pageSize)) : rows;
 
         Map<UUID, Set<UserRole>> rolesByUser = roleRepository.findRolesByUserIds(
-                tenantId(), page.stream().map(AppUserRow::id).toList());
+                tenantId, page.stream().map(AppUserRow::id).toList());
         List<UserSummaryData> items = page.stream()
                 .map(row -> toSummary(row, rolesByUser.getOrDefault(row.id(), Set.of())))
                 .toList();
@@ -81,41 +86,45 @@ public class AdminUserService {
         return new UserListData(items, nextCursor, pageSize);
     }
 
-    public UserSummaryData get(UUID userId) {
-        return toSummary(requireUser(userId), roleRepository.findRoles(tenantId(), userId));
+    public UserSummaryData get(UUID tenantId, UUID userId) {
+        return toSummary(requireUser(tenantId, userId), roleRepository.findRoles(tenantId, userId));
     }
 
     public UserSummaryData replaceRoles(
+            UUID tenantId,
             UUID callerId,
             UUID targetId,
             String idempotencyKey,
             Set<UserRole> roles) {
         String key = requireIdempotencyKey(idempotencyKey);
         return idempotencyGuard.run(
-                        callerId.toString(),
+                        tenantId + ":" + callerId,
                         IdempotencyOperation.USER_ROLE_UPDATE,
                         key,
-                        rolesFingerprint(roles),
+                        rolesFingerprint(tenantId, roles),
                         UserSummaryData.class,
                         () -> {
                             rejectSelfLockout(callerId, targetId, roles);
-                            requireUser(targetId);
-                            roleRepository.replaceRoles(tenantId(), targetId, roles, clock.instant());
-                            return get(targetId);
+                            requireUser(tenantId, targetId);
+                            roleRepository.replaceRoles(tenantId, targetId, roles, clock.instant());
+                            return get(tenantId, targetId);
                         })
                 .response();
     }
 
     public UserSummaryData updateStatus(
+            UUID tenantId,
             UUID callerId,
             UUID targetId,
             String idempotencyKey,
             UserStatus status) {
         String key = requireIdempotencyKey(idempotencyKey);
         String fingerprint = Fingerprints.sha256(
-                IdempotencyOperation.USER_STATUS_UPDATE.name() + '\u0000' + status);
+                IdempotencyOperation.USER_STATUS_UPDATE.name()
+                        + '\u0000' + tenantId
+                        + '\u0000' + status);
         return idempotencyGuard.run(
-                        callerId.toString(),
+                        tenantId + ":" + callerId,
                         IdempotencyOperation.USER_STATUS_UPDATE,
                         key,
                         fingerprint,
@@ -124,15 +133,15 @@ public class AdminUserService {
                             if (targetId.equals(callerId) && status == UserStatus.DISABLED) {
                                 throw policyError("status", "cannot disable the calling administrator");
                             }
-                            requireUser(targetId);
+                            requireUser(tenantId, targetId);
                             Instant now = clock.instant();
-                            userRepository.updateStatus(tenantId(), targetId, status, now);
+                            userRepository.updateStatus(tenantId, targetId, status, now);
                             if (status == UserStatus.DISABLED) {
                                 // 停用必须即时生效：只改状态列等于给被盗账号留 15 分钟可用窗口。
-                                refreshTokenService.revokeAllForUser(targetId);
+                                refreshTokenService.revokeAllForUser(tenantId, targetId);
                                 accessTokenAuthenticator.revokeAllIssuedBefore(targetId, now);
                             }
-                            return get(targetId);
+                            return get(tenantId, targetId);
                         })
                 .response();
     }
@@ -146,8 +155,8 @@ public class AdminUserService {
         }
     }
 
-    private AppUserRow requireUser(UUID userId) {
-        return userRepository.findById(tenantId(), userId)
+    private AppUserRow requireUser(UUID tenantId, UUID userId) {
+        return userRepository.findById(tenantId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USR_NOT_FOUND_001));
     }
 
@@ -182,11 +191,14 @@ public class AdminUserService {
                         List.of(FieldViolation.of("cursor", "cursor is malformed or belongs to another endpoint"))));
     }
 
-    private String rolesFingerprint(Set<UserRole> roles) {
+    private String rolesFingerprint(UUID tenantId, Set<UserRole> roles) {
         String normalized = roles == null
                 ? ""
                 : roles.stream().map(UserRole::name).sorted().collect(Collectors.joining(","));
-        return Fingerprints.sha256(IdempotencyOperation.USER_ROLE_UPDATE.name() + '\u0000' + normalized);
+        return Fingerprints.sha256(
+                IdempotencyOperation.USER_ROLE_UPDATE.name()
+                        + '\u0000' + tenantId
+                        + '\u0000' + normalized);
     }
 
     private String requireIdempotencyKey(String idempotencyKey) {
@@ -209,8 +221,4 @@ public class AdminUserService {
                 List.of(FieldViolation.of(field, message)));
     }
 
-    /** P0：管理面暂只看默认租户；P1 改为按管理员可见租户集过滤。 */
-    private UUID tenantId() {
-        return TenantContext.DEFAULT_TENANT_ID;
-    }
 }

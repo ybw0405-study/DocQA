@@ -72,6 +72,21 @@ class JdbcRefreshTokenRepositoryTest {
     }
 
     @Test
+    void findTenantIdByHashReadsOnlyTheTenantOfTheCredential() {
+        UUID tenantId = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+        when(jdbcTemplate.query(
+                anyString(), any(RowMapper.class), eq("hash-1"))).thenReturn(List.of(tenantId));
+
+        assertThat(repository.findTenantIdByHash("hash-1")).contains(tenantId);
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq("hash-1"));
+        assertThat(sqlCaptor.getValue())
+                .contains("SELECT tenant_id FROM refresh_token WHERE token_hash = ?")
+                .doesNotContain("hash-1");
+    }
+
+    @Test
     void consumeActiveIsAConditionalUpdate() {
         when(jdbcTemplate.update(anyString(), eq(Timestamp.from(NOW)),
                 eq(TenantContext.DEFAULT_TENANT_ID.toString()), eq(TOKEN_ID.toString()))).thenReturn(1);

@@ -9,7 +9,6 @@ import com.docqa.agentgateway.repository.AiUsageRepository;
 import com.docqa.common.api.FieldViolation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
-import com.docqa.common.tenant.TenantContext;
 import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
@@ -38,7 +37,8 @@ public class AdminAiUsageService {
         this.clock = clock;
     }
 
-    public UsageSummary summarize(String from, String to, String bucket, int topUsers) {
+    /** tenantId 必须来自已验签 JWT；四组聚合只统计该租户的用量。 */
+    public UsageSummary summarize(UUID tenantId, String from, String to, String bucket, int topUsers) {
         if (bucket != null && !bucket.isBlank() && !BUCKET_DAY.equals(bucket)) {
             throw new BusinessException(
                     ErrorCode.COM_VALIDATION_001,
@@ -52,8 +52,6 @@ public class AdminAiUsageService {
                     List.of(FieldViolation.of("topUsers", "must be between 1 and 50")));
         }
         AdminQueryWindow window = AdminQueryWindow.resolve(from, to, clock, true);
-        // P0: 管理面跨租户聚合暂用默认租户，P1 改为按管理员可见租户集过滤
-        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
         UsageTotals totals = usageRepository.totals(tenantId, window.from(), window.to());
         List<UsageDayPoint> byDay = usageRepository.byDay(tenantId, window.from(), window.to());
         List<UsageStatusCount> byStatus =

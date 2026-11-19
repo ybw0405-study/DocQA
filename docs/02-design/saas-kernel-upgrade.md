@@ -181,6 +181,8 @@ CREATE TABLE tenant (
 
 ### 5.2 P0 明确的临时口径（P1 必须替换）
 
+> 第 1、2 条与第 3 条已由 §5.9 / §5.10 替换；第 4～6 条仍待办。
+
 1. **只有一个租户生效**。V10 把全部存量数据回填到默认租户，登录/注册尚无租户解析入口，因此所有请求都拿到默认租户 ID。租户隔离的**结构与约束已就位，但隔离效果要到 P1 接入多租户解析后才可观测**。
 2. **登录/注册用 `DEFAULT_TENANT_ID`**：`AuthService`、`RefreshTokenService`、`DemoUserSeeder` 内有 `tenantId()` 帮助方法，P1 改为按邮箱域名路由解析。
 3. **管理面聚合只看默认租户**：`AdminQuotaService` / `AdminAiUsageService` / `AdminAiControlsService` / `AdminAuditQueryService` / `AdminUserService` 传默认租户，P1 改为按管理员可见租户集过滤。
@@ -355,6 +357,61 @@ DELETE FROM flyway_schema_history WHERE version = '10' AND success = 0;
    调用结束后被回收（此前已知），成功启动的 document-service 也一样。
    稳定做法：后台任务里 `source` 环境变量导出文件后直接 `java -jar` 前台跑，
    由后台任务本身锚定进程树。
+
+### 5.9 P1-B：租户解析入口与跨租户拒绝验收（2026-11-19）
+
+替换 §5.2 的第 1、2 条临时口径，并顺带收口第 3 条里的 `AdminUserService`。
+
+**入口口径（与 P0 草案的偏差）**：原计划按邮箱域名路由，但当前没有域名归属表、也没有 IdP，
+因此改为登录/注册请求体里**可选** `tenantSlug`：
+
+- 缺省 / 空白 / `default` → 默认租户，P0 存量客户端无需改动；
+- 显式 slug 经 `trim + lowercase` 后由 `TenantResolver` 查 `tenant` 表裁决；
+- 只允许 `ACTIVE` / `TRIAL`，`PAST_DUE` / `SUSPENDED` / `DELETED` 与未知 slug 一律返回
+  与口令错误相同的 `USR-AUTH-001`，避免租户清单被枚举；
+- 该字段**只在尚无 JWT 的登录/注册入口被信任**；此后一切 tenantId 取自已验签 JWT 的
+  `tenant_id` claim 或从刷新令牌摘要反查，请求体/Header 里的租户字段不参与授权。
+
+**代码落点**：
+
+| 组件 | 作用 |
+|---|---|
+| `TenantRepository` / `JdbcTenantRepository` | 按 slug 查控制面 `tenant` 表；刻意不带 `tenant_id` 谓词，契约测试显式豁免（扫描数 18→19） |
+| `TenantResolver` | slug 归一化、状态白名单、缺省回落，是「哪些租户可登录」的单一事实来源 |
+| `AuthService` | 登录/注册先解析租户；登录限流键、注册幂等 scope/指纹都带 tenantId；JWT 与刷新令牌家族绑定该租户 |
+| `RefreshTokenService` | refresh / logout 无 JWT，先用 `findTenantIdByHash` 从凭据摘要反查租户，后续所有读写仍带 `tenant_id` 谓词 |
+| `AdminUserService` + `UserController` | 管理面首参 tenantId 来自调用者 JWT，不再回落默认租户；幂等 scope 与指纹同样带租户 |
+
+**验收（行为级，不只看 SQL 文本）**：`AuthServiceTest` 钉住显式 slug、未知/停用租户拒绝、
+同名账号跨租户不共享失败预算、刷新令牌不出租户；`AuthControllerTest` 钉住 HTTP 层 slug
+进入 JWT claim；`UserControllerTest` 钉住别的租户的管理员令牌拿不到本租户用户（404）；
+`AdminUserServiceTest` 钉住跨租户目标不可见与幂等键按租户隔离；
+`TenantIsolationContractTest` 的仓库扫描数改为 19 且仅剩两个有据可查的豁免。
+
+验证：`mvn -o test` → 1240 tests / 0 failures / 0 errors；`mvn -o checkstyle:check` → 0 违规。
+
+**尚未完成（不要误读为 P1 整体交付）**：§5.2 第 3 条由 §5.10 继续收口；第 4 条 MQ/定时任务、
+第 5 条 Java↔Python 协议、第 6 条 pgvector/MinIO/Redis 仍在待办；没有创建真实第二租户的
+管理端点（HTTP 级跨租户验收目前靠带租户 JWT + 仓储打桩），域名路由、OPA ABAC 也未开始。
+§8 的 `tenant_id` 可观测标签尚未落到日志/指标，本阶段只是让隔离效果**在测试里可观测**。
+
+### 5.10 管理面租户收口（2026-11-19，§5.2 第 3 条完成）
+
+四个 agent-gateway 管理面服务不再回落到默认租户，tenantId 由控制器从
+`@RequestAttribute(TenantContext.REQUEST_ATTRIBUTE)` 取得——该属性由 `JwtAuthenticationFilter`
+从已验签 JWT 写入，请求参数无法伪造：
+
+| 服务 | 变化 |
+|---|---|
+| `AdminQuotaService` | 配额分页 / 改写 / 删除与审计条目都落在调用者租户；跨租户目标按 404 处理 |
+| `AdminAiUsageService` | `totals` / `byDay` / `byStatus` / `topUsers` 四组聚合只统计调用者租户 |
+| `AdminAiControlsService` | Kill Switch 仍是全局运行时开关，但管理审计写入调用者租户，避免串账 |
+| `AdminAuditQueryService` | 审计分页查询限定调用者租户，filter/cursor 参数不改变租户边界 |
+
+服务测试统一改用非默认租户常量，新增跨租户目标不可见、聚合只查本租户、审计限定租户等用例；
+控制器测试为每个请求显式注入租户属性并验证调用签名。
+
+验证：`mvn -o test` → 1243 tests / 0 failures / 0 errors；`mvn -o checkstyle:check` → 0 违规。
 
 ---
 

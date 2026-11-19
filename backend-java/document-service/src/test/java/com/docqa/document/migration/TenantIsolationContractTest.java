@@ -33,9 +33,13 @@ class TenantIsolationContractTest {
     /**
      * 不适用「必须含 tenant_id」判定的仓库：tenant 表本身就是租户清单，
      * 它的行没有「所属租户」这个属性。除此之外不接受任何豁免。
+     *
+     * <p>JdbcTenantRepository 是 user-service 在登录/注册时按 slug 解析租户的控制面查询，
+     * 发生在 JWT 存在之前，语义上就是「确定租户是谁」，同样没有 tenant_id 可用。
      */
-    private static final List<String> TENANT_AGNOSTIC_REPOSITORIES =
-            List.of("JdbcTenantBootstrapRepository.java");
+    private static final List<String> TENANT_AGNOSTIC_REPOSITORIES = List.of(
+            "JdbcTenantBootstrapRepository.java",
+            "JdbcTenantRepository.java");
 
     @Test
     void everyJdbcRepositoryDeclaresTenantPredicate() throws IOException {
@@ -64,8 +68,8 @@ class TenantIsolationContractTest {
             }
         }
         assertThat(checked)
-                .as("必须实际扫描到 18 个 Jdbc 仓库，扫描数为 0 说明测试路径写错了")
-                .isEqualTo(18);
+                .as("必须实际扫描到 19 个 Jdbc 仓库，扫描数为 0 说明测试路径写错了")
+                .isEqualTo(19);
         assertThat(offenders)
                 .as("每个业务仓库都必须出现 tenant_id 谓词/列；遗漏即跨租户数据泄漏")
                 .isEmpty();

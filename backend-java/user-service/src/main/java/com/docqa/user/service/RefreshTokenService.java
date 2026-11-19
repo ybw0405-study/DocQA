@@ -5,7 +5,6 @@ import com.docqa.common.error.ErrorCode;
 import com.docqa.user.config.AuthProperties;
 import com.docqa.user.domain.RefreshTokenRow;
 import com.docqa.user.domain.RefreshTokenStatus;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.repository.RefreshTokenRepository;
 import com.docqa.user.support.Fingerprints;
 import java.security.SecureRandom;
@@ -21,6 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 刷新令牌的一次使用即轮换。库里只存 SHA-256 摘要，明文只在 Set-Cookie 里出现一次。
+ *
+ * <p>租户边界（P1）：家族由登录时解析出的 tenantId 建立；refresh / logout 没有 JWT，
+ * 先从令牌摘要控制面反查 tenantId（凭据自带作用域），再用它给所有读写加 tenant_id 谓词。
+ * 这样第二租户的刷新令牌既不能续出默认租户的令牌，也不会吊销别的租户的家族。
  */
 @Service
 public class RefreshTokenService {
@@ -39,11 +42,10 @@ public class RefreshTokenService {
         this.clock = clock;
     }
 
-    /** 登录/注册成功后建立一个新的轮换家族。 */
+    /** 登录/注册成功后建立一个新的轮换家族，绑定该会话的租户。 */
     @Transactional
-    public IssuedRefreshToken startFamily(UUID userId) {
-        UUID familyId = UUID.randomUUID();
-        return insert(userId, familyId);
+    public IssuedRefreshToken startFamily(UUID tenantId, UUID userId) {
+        return insert(tenantId, userId, UUID.randomUUID());
     }
 
     /**
@@ -53,44 +55,49 @@ public class RefreshTokenService {
     @Transactional
     public IssuedRefreshToken rotate(String rawToken) {
         Instant now = clock.instant();
-        RefreshTokenRow row = repository.findByHash(tenantId(), Fingerprints.sha256(rawToken))
-                .orElseThrow(RefreshTokenService::rejected);
+        String hash = Fingerprints.sha256(rawToken);
+        UUID tenantId = repository.findTenantIdByHash(hash).orElseThrow(RefreshTokenService::rejected);
+        RefreshTokenRow row = repository.findByHash(tenantId, hash).orElseThrow(RefreshTokenService::rejected);
         if (row.status() != RefreshTokenStatus.ACTIVE) {
-            revokeFamilyAndReject(row);
+            revokeFamilyAndReject(tenantId, row);
         }
         if (!row.expiresAt().isAfter(now)) {
             throw rejected();
         }
-        if (repository.consumeActive(tenantId(), row.id(), now) != 1) {
-            revokeFamilyAndReject(row);
+        if (repository.consumeActive(tenantId, row.id(), now) != 1) {
+            revokeFamilyAndReject(tenantId, row);
         }
-        return insert(row.userId(), row.familyId());
+        return insert(tenantId, row.userId(), row.familyId());
     }
 
-    public void revokeFamily(UUID familyId) {
-        int revoked = repository.revokeFamily(tenantId(), familyId, clock.instant());
-        LOGGER.info("Revoked refresh token family: familyId={} count={}", familyId, revoked);
+    public void revokeFamily(UUID tenantId, UUID familyId) {
+        int revoked = repository.revokeFamily(tenantId, familyId, clock.instant());
+        LOGGER.info("Revoked refresh token family: tenantId={} familyId={} count={}", tenantId, familyId, revoked);
     }
 
-    public void revokeAllForUser(UUID userId) {
-        int revoked = repository.revokeAllActiveForUser(tenantId(), userId, clock.instant());
-        LOGGER.info("Revoked all refresh tokens for user: count={}", revoked);
+    public void revokeAllForUser(UUID tenantId, UUID userId) {
+        int revoked = repository.revokeAllActiveForUser(tenantId, userId, clock.instant());
+        LOGGER.info("Revoked all refresh tokens for user: tenantId={} count={}", tenantId, revoked);
     }
 
-    public Optional<UUID> familyOf(String rawToken) {
-        return repository.findByHash(tenantId(), Fingerprints.sha256(rawToken)).map(RefreshTokenRow::familyId);
+    /** 登出用：只凭 Cookie 解析出 (tenantId, familyId)，随后由调用方按租户吊销。 */
+    public Optional<TokenFamily> familyOf(String rawToken) {
+        String hash = Fingerprints.sha256(rawToken);
+        return repository.findTenantIdByHash(hash)
+                .flatMap(tenantId -> repository.findByHash(tenantId, hash)
+                        .map(row -> new TokenFamily(tenantId, row.familyId())));
     }
 
     public long cookieMaxAgeSeconds() {
         return properties.getRefreshTtl().toSeconds();
     }
 
-    private void revokeFamilyAndReject(RefreshTokenRow row) {
-        revokeFamily(row.familyId());
+    private void revokeFamilyAndReject(UUID tenantId, RefreshTokenRow row) {
+        revokeFamily(tenantId, row.familyId());
         throw rejected();
     }
 
-    private IssuedRefreshToken insert(UUID userId, UUID familyId) {
+    private IssuedRefreshToken insert(UUID tenantId, UUID userId, UUID familyId) {
         Instant now = clock.instant();
         String raw = nextRawToken();
         RefreshTokenRow row = new RefreshTokenRow(
@@ -101,8 +108,8 @@ public class RefreshTokenService {
                 RefreshTokenStatus.ACTIVE,
                 now.plus(properties.getRefreshTtl()),
                 now);
-        repository.insert(tenantId(), row);
-        return new IssuedRefreshToken(raw, row.userId(), familyId, row.expiresAt());
+        repository.insert(tenantId, row);
+        return new IssuedRefreshToken(raw, tenantId, row.userId(), familyId, row.expiresAt());
     }
 
     private String nextRawToken() {
@@ -115,11 +122,10 @@ public class RefreshTokenService {
         return new BusinessException(ErrorCode.USR_REFRESH_001);
     }
 
-    public record IssuedRefreshToken(String value, UUID userId, UUID familyId, Instant expiresAt) {
+    public record IssuedRefreshToken(
+            String value, UUID tenantId, UUID userId, UUID familyId, Instant expiresAt) {
     }
 
-    /** P0：刷新令牌路径尚无租户上下文，统一归属默认租户；P1 由登录域名解析后替换。 */
-    private UUID tenantId() {
-        return TenantContext.DEFAULT_TENANT_ID;
+    public record TokenFamily(UUID tenantId, UUID familyId) {
     }
 }

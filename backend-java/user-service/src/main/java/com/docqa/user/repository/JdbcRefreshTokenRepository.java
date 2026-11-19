@@ -54,6 +54,17 @@ public class JdbcRefreshTokenRepository implements RefreshTokenRepository {
     }
 
     @Override
+    public Optional<UUID> findTenantIdByHash(String tokenHash) {
+        // 控制面：凭据本身即作用域，见 RefreshTokenRepository#findTenantIdByHash 的约定。
+        return jdbcTemplate.query(
+                        "SELECT tenant_id FROM refresh_token WHERE token_hash = ?",
+                        (rs, rowNum) -> UUID.fromString(rs.getString("tenant_id")),
+                        tokenHash)
+                .stream()
+                .findFirst();
+    }
+
+    @Override
     public int consumeActive(UUID tenantId, UUID id, Instant now) {
         return jdbcTemplate.update("""
                         UPDATE refresh_token

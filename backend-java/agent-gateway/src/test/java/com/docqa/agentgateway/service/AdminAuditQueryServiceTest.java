@@ -36,6 +36,7 @@ class AdminAuditQueryServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-11-03T12:00:00Z");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
     private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
     @Mock
@@ -52,7 +53,7 @@ class AdminAuditQueryServiceTest {
     void usesTheDefaultTwentyFourHourWindowWhenNoFilterIsGiven() {
         when(auditRepository.findPage(any(), any(), isNull(), isNull(), anyInt())).thenReturn(List.of());
 
-        service.list(null, null, null, null, null, 100, null);
+        service.list(TENANT_ID, null, null, null, null, null, 100, null);
 
         AuditQueryFilter filter = capturedFilter();
         assertThat(filter.from()).isEqualTo(NOW.minus(Duration.ofHours(24)));
@@ -64,7 +65,7 @@ class AdminAuditQueryServiceTest {
     void leavesTheWindowOpenWhenAFilterIsGiven() {
         when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
 
-        service.list(TRACE_ID, null, null, null, null, 100, null);
+        service.list(TENANT_ID, TRACE_ID, null, null, null, null, 100, null);
 
         AuditQueryFilter filter = capturedFilter();
         assertThat(filter.traceId()).isEqualTo(TRACE_ID);
@@ -76,7 +77,7 @@ class AdminAuditQueryServiceTest {
     void appliesAnExplicitWindowToFilteredQueries() {
         when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
 
-        service.list(
+        service.list(TENANT_ID,
                 null,
                 USER_ID.toString(),
                 "RAG_RETRIEVED",
@@ -97,7 +98,7 @@ class AdminAuditQueryServiceTest {
         when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
         String cursor = KeysetCursor.of(NOW.minusSeconds(30), USER_ID).encode();
 
-        service.list(TRACE_ID, null, null, null, null, 100, cursor);
+        service.list(TENANT_ID, TRACE_ID, null, null, null, null, 100, cursor);
 
         verify(auditRepository).findPage(
                 any(),
@@ -112,7 +113,7 @@ class AdminAuditQueryServiceTest {
         when(auditRepository.findPage(any(), any(), any(), any(), anyInt()))
                 .thenReturn(items(101));
 
-        AuditEventListData page = service.list(TRACE_ID, null, null, null, null, 100, null);
+        AuditEventListData page = service.list(TENANT_ID, TRACE_ID, null, null, null, null, 100, null);
 
         assertThat(page.items()).hasSize(100);
         assertThat(page.limit()).isEqualTo(100);
@@ -127,7 +128,7 @@ class AdminAuditQueryServiceTest {
         when(auditRepository.findPage(any(), any(), any(), any(), anyInt()))
                 .thenReturn(items(100));
 
-        AuditEventListData page = service.list(TRACE_ID, null, null, null, null, 100, null);
+        AuditEventListData page = service.list(TENANT_ID, TRACE_ID, null, null, null, null, 100, null);
 
         assertThat(page.items()).hasSize(100);
         assertThat(page.nextCursor()).isNull();
@@ -135,48 +136,48 @@ class AdminAuditQueryServiceTest {
 
     @Test
     void rejectsPagesOverFiveHundred() {
-        assertValidation("limit", () -> service.list(null, null, null, null, null, 501, null));
+        assertValidation("limit", () -> service.list(TENANT_ID, null, null, null, null, null, 501, null));
     }
 
     @Test
     void rejectsWindowsLongerThanThirtyOneDays() {
-        assertValidation("from", () -> service.list(
+        assertValidation("from", () -> service.list(TENANT_ID,
                 null, null, null, "2026-09-01T00:00:00Z", "2026-11-03T00:00:00Z", 100, null));
     }
 
     @Test
     void rejectsInvertedWindows() {
-        assertValidation("from", () -> service.list(
+        assertValidation("from", () -> service.list(TENANT_ID,
                 null, null, null, "2026-11-03T00:00:00Z", "2026-11-02T00:00:00Z", 100, null));
     }
 
     @Test
     void rejectsAnUnparsableTimestamp() {
-        assertValidation("from", () -> service.list(
+        assertValidation("from", () -> service.list(TENANT_ID,
                 null, null, null, "yesterday", null, 100, null));
     }
 
     @Test
     void rejectsTraceIdsThatAreNotLowercaseHex() {
-        assertValidation("traceId", () -> service.list(
+        assertValidation("traceId", () -> service.list(TENANT_ID,
                 "4BF92F3577B34DA6A3CE929D0E0E4736", null, null, null, null, 100, null));
     }
 
     @Test
     void rejectsEventTypesOutsideTheContractPattern() {
-        assertValidation("eventType", () -> service.list(
+        assertValidation("eventType", () -> service.list(TENANT_ID,
                 null, null, "rag_retrieved", null, null, 100, null));
     }
 
     @Test
     void rejectsUserIdsThatAreNotUuids() {
-        assertValidation("userId", () -> service.list(
+        assertValidation("userId", () -> service.list(TENANT_ID,
                 null, "not-a-uuid", null, null, null, 100, null));
     }
 
     @Test
     void rejectsCursorsThatWereNotIssuedByThisApi() {
-        assertValidation("cursor", () -> service.list(
+        assertValidation("cursor", () -> service.list(TENANT_ID,
                 null, null, null, null, null, 100, "not-a-cursor"));
     }
 
@@ -184,13 +185,27 @@ class AdminAuditQueryServiceTest {
     void treatsBlankFiltersAsAbsent() {
         when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
 
-        service.list("", "  ", "", " ", null, 100, " ");
+        service.list(TENANT_ID, "", "  ", "", " ", null, 100, " ");
 
         AuditQueryFilter filter = capturedFilter();
         assertThat(filter.traceId()).isNull();
         assertThat(filter.userId()).isNull();
         assertThat(filter.eventType()).isNull();
         assertThat(filter.from()).isEqualTo(NOW.minus(Duration.ofHours(24)));
+    }
+
+    @Test
+    void queriesOnlyTheTenantFromTheToken() {
+        when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
+
+        service.list(TENANT_ID, null, null, null, null, null, 100, null);
+
+        verify(auditRepository).findPage(
+                org.mockito.ArgumentMatchers.eq(TENANT_ID),
+                any(AuditQueryFilter.class),
+                isNull(),
+                isNull(),
+                org.mockito.ArgumentMatchers.eq(101));
     }
 
     private AuditQueryFilter capturedFilter() {

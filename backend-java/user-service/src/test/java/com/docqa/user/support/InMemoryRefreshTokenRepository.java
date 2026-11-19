@@ -16,23 +16,35 @@ import java.util.function.Predicate;
 public class InMemoryRefreshTokenRepository implements RefreshTokenRepository {
 
     private final Map<UUID, RefreshTokenRow> rows = new LinkedHashMap<>();
+    /** 行的租户归属：让测试里的 findByHash / revoke 也按租户过滤，不能一根筋全局匹配。 */
+    private final Map<UUID, UUID> tenantById = new LinkedHashMap<>();
 
     @Override
     public void insert(UUID tenantId, RefreshTokenRow token) {
         rows.put(token.id(), token);
+        tenantById.put(token.id(), tenantId);
     }
 
     @Override
     public Optional<RefreshTokenRow> findByHash(UUID tenantId, String tokenHash) {
         return rows.values().stream()
                 .filter(row -> row.tokenHash().equals(tokenHash))
+                .filter(row -> tenantId.equals(tenantById.get(row.id())))
+                .findFirst();
+    }
+
+    @Override
+    public Optional<UUID> findTenantIdByHash(String tokenHash) {
+        return rows.values().stream()
+                .filter(row -> row.tokenHash().equals(tokenHash))
+                .map(row -> tenantById.get(row.id()))
                 .findFirst();
     }
 
     @Override
     public int consumeActive(UUID tenantId, UUID id, Instant now) {
         RefreshTokenRow row = rows.get(id);
-        if (row == null || row.status() != RefreshTokenStatus.ACTIVE) {
+        if (row == null || !tenantId.equals(tenantById.get(id)) || row.status() != RefreshTokenStatus.ACTIVE) {
             return 0;
         }
         rows.put(id, copyWithStatus(row, RefreshTokenStatus.USED));
@@ -41,12 +53,14 @@ public class InMemoryRefreshTokenRepository implements RefreshTokenRepository {
 
     @Override
     public int revokeFamily(UUID tenantId, UUID familyId, Instant now) {
-        return revokeActive(row -> row.familyId().equals(familyId));
+        return revokeActive(row -> row.familyId().equals(familyId)
+                && tenantId.equals(tenantById.get(row.id())));
     }
 
     @Override
     public int revokeAllActiveForUser(UUID tenantId, UUID userId, Instant now) {
-        return revokeActive(row -> row.userId().equals(userId));
+        return revokeActive(row -> row.userId().equals(userId)
+                && tenantId.equals(tenantById.get(row.id())));
     }
 
     @Override
@@ -57,7 +71,10 @@ public class InMemoryRefreshTokenRepository implements RefreshTokenRepository {
                 .limit(limit)
                 .map(RefreshTokenRow::id)
                 .toList();
-        removable.forEach(rows::remove);
+        removable.forEach(id -> {
+            rows.remove(id);
+            tenantById.remove(id);
+        });
         return removable.size();
     }
 

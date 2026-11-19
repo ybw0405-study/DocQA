@@ -14,7 +14,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.common.api.KeysetCursor;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.domain.AppUserRow;
 import com.docqa.user.domain.UserRole;
 import com.docqa.user.domain.UserStatus;
@@ -38,6 +37,8 @@ class AdminUserServiceTest {
     private static final UUID CALLER = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
     private static final UUID TARGET = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
     private static final UUID OTHER = UUID.fromString("00000000-0000-0000-0000-0000000000c3");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+    private static final UUID FOREIGN_TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d5");
     private static final String IDEMPOTENCY_KEY = "idem-key-0001";
 
     private MutableClock clock;
@@ -69,12 +70,12 @@ class AdminUserServiceTest {
         AppUserRow first = row(OTHER, NOW);
         AppUserRow second = row(TARGET, NOW.minusSeconds(1));
         AppUserRow third = row(CALLER, NOW.minusSeconds(2));
-        when(userRepository.findPage(TenantContext.DEFAULT_TENANT_ID, null, null, null, null, 3))
+        when(userRepository.findPage(TENANT_ID, null, null, null, null, 3))
                 .thenReturn(List.of(first, second, third));
-        when(roleRepository.findRolesByUserIds(TenantContext.DEFAULT_TENANT_ID, List.of(OTHER, TARGET)))
+        when(roleRepository.findRolesByUserIds(TENANT_ID, List.of(OTHER, TARGET)))
                 .thenReturn(Map.of(OTHER, Set.of(UserRole.USER)));
 
-        UserListData page = service.list(null, null, null, 2);
+        UserListData page = service.list(TENANT_ID, null, null, null, 2);
 
         assertThat(page.items()).extracting(UserSummaryData::userId).containsExactly(OTHER, TARGET);
         assertThat(page.items().get(0).roles()).containsExactly(UserRole.USER);
@@ -90,11 +91,11 @@ class AdminUserServiceTest {
 
     @Test
     void listOmitsTheCursorWhenThePageIsExactlyFull() {
-        when(userRepository.findPage(TenantContext.DEFAULT_TENANT_ID,
+        when(userRepository.findPage(TENANT_ID,
                 UserStatus.ACTIVE, UserRole.ADMIN, null, null, 3))
                 .thenReturn(List.of(row(TARGET, NOW), row(OTHER, NOW.minusSeconds(1))));
 
-        UserListData page = service.list(UserStatus.ACTIVE, UserRole.ADMIN, null, 2);
+        UserListData page = service.list(TENANT_ID, UserStatus.ACTIVE, UserRole.ADMIN, null, 2);
 
         assertThat(page.nextCursor()).isNull();
         assertThat(page.items()).hasSize(2);
@@ -103,24 +104,24 @@ class AdminUserServiceTest {
     @Test
     void listPassesTheDecodedCursorToTheRepository() {
         String cursor = KeysetCursor.of(NOW, TARGET).encode();
-        when(userRepository.findPage(TenantContext.DEFAULT_TENANT_ID, UserStatus.ACTIVE, null, NOW, TARGET, 21))
+        when(userRepository.findPage(TENANT_ID, UserStatus.ACTIVE, null, NOW, TARGET, 21))
                 .thenReturn(List.of());
 
-        service.list(UserStatus.ACTIVE, null, cursor, 20);
+        service.list(TENANT_ID, UserStatus.ACTIVE, null, cursor, 20);
 
         verify(userRepository).findPage(
-                TenantContext.DEFAULT_TENANT_ID, UserStatus.ACTIVE, null, NOW, TARGET, 21);
+                TENANT_ID, UserStatus.ACTIVE, null, NOW, TARGET, 21);
     }
 
     @Test
     void listRejectsOutOfRangePageSize() {
-        assertThatThrownBy(() -> service.list(null, null, null, 0))
+        assertThatThrownBy(() -> service.list(TENANT_ID, null, null, null, 0))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COM_VALIDATION_001);
                     assertThat(exception.getFieldViolations()).singleElement()
                             .satisfies(violation -> assertThat(violation.field()).isEqualTo("limit"));
                 });
-        assertThatThrownBy(() -> service.list(null, null, null, 101))
+        assertThatThrownBy(() -> service.list(TENANT_ID, null, null, null, 101))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COM_VALIDATION_001));
         verify(userRepository, never()).findPage(any(), any(), any(), any(), any(), anyInt());
@@ -128,7 +129,7 @@ class AdminUserServiceTest {
 
     @Test
     void listRejectsMalformedCursor() {
-        assertThatThrownBy(() -> service.list(null, null, "not-a-cursor", 20))
+        assertThatThrownBy(() -> service.list(TENANT_ID, null, null, "not-a-cursor", 20))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COM_VALIDATION_001);
                     assertThat(exception.getFieldViolations()).singleElement()
@@ -139,10 +140,10 @@ class AdminUserServiceTest {
 
     @Test
     void getReturnsRolesOfTheTargetUser() {
-        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW.minusSeconds(30))));
-        when(roleRepository.findRoles(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.USER, UserRole.ADMIN));
+        when(userRepository.findById(TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW.minusSeconds(30))));
+        when(roleRepository.findRoles(TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.USER, UserRole.ADMIN));
 
-        UserSummaryData summary = service.get(TARGET);
+        UserSummaryData summary = service.get(TENANT_ID, TARGET);
 
         assertThat(summary.userId()).isEqualTo(TARGET);
         assertThat(summary.status()).isEqualTo(UserStatus.ACTIVE);
@@ -151,14 +152,14 @@ class AdminUserServiceTest {
 
     @Test
     void getRejectsUnknownUser() {
-        assertThatThrownBy(() -> service.get(TARGET))
+        assertThatThrownBy(() -> service.get(TENANT_ID, TARGET))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_NOT_FOUND_001));
     }
 
     @Test
     void replaceRolesRejectsAnEmptyRoleSet() {
-        assertThatThrownBy(() -> service.replaceRoles(CALLER, TARGET, IDEMPOTENCY_KEY, Set.of()))
+        assertThatThrownBy(() -> service.replaceRoles(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, Set.of()))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_VALIDATION_001);
                     assertThat(exception.getFieldViolations()).singleElement()
@@ -169,7 +170,7 @@ class AdminUserServiceTest {
 
     @Test
     void replaceRolesRejectsRemovingAdminFromTheCaller() {
-        assertThatThrownBy(() -> service.replaceRoles(CALLER, CALLER, IDEMPOTENCY_KEY, Set.of(UserRole.USER)))
+        assertThatThrownBy(() -> service.replaceRoles(TENANT_ID, CALLER, CALLER, IDEMPOTENCY_KEY, Set.of(UserRole.USER)))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_VALIDATION_001);
                     assertThat(exception.getFieldViolations()).singleElement()
@@ -180,9 +181,9 @@ class AdminUserServiceTest {
 
     @Test
     void replaceRolesRejectsUnknownTarget() {
-        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Optional.empty());
+        when(userRepository.findById(TENANT_ID, TARGET)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.replaceRoles(CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN)))
+        assertThatThrownBy(() -> service.replaceRoles(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN)))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_NOT_FOUND_001));
         verify(roleRepository, never()).replaceRoles(any(), any(), any(), any());
@@ -190,49 +191,49 @@ class AdminUserServiceTest {
 
     @Test
     void replaceRolesWritesOnceAndReturnsTheFreshRoles() {
-        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
-        when(roleRepository.findRoles(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.ADMIN));
+        when(userRepository.findById(TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
+        when(roleRepository.findRoles(TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.ADMIN));
 
         UserSummaryData summary =
-                service.replaceRoles(CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN));
+                service.replaceRoles(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN));
 
         assertThat(summary.roles()).containsExactly(UserRole.ADMIN);
         verify(roleRepository).replaceRoles(
-                TenantContext.DEFAULT_TENANT_ID, TARGET, Set.of(UserRole.ADMIN), NOW);
+                TENANT_ID, TARGET, Set.of(UserRole.ADMIN), NOW);
     }
 
     @Test
     void replaceRolesReplayDoesNotWriteAgain() {
-        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
-        when(roleRepository.findRoles(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.ADMIN));
+        when(userRepository.findById(TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
+        when(roleRepository.findRoles(TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.ADMIN));
 
         UserSummaryData first =
-                service.replaceRoles(CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN));
+                service.replaceRoles(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN));
         UserSummaryData replay =
-                service.replaceRoles(CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN));
+                service.replaceRoles(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN));
 
         assertThat(replay.userId()).isEqualTo(first.userId());
         assertThat(replay.roles()).containsExactly(UserRole.ADMIN);
         verify(roleRepository, times(1)).replaceRoles(any(), any(), any(), any());
         // 第一次调用会读两次（先校验目标存在，再读回最新角色），重放不得再读。
-        verify(userRepository, times(2)).findById(TenantContext.DEFAULT_TENANT_ID, TARGET);
+        verify(userRepository, times(2)).findById(TENANT_ID, TARGET);
     }
 
     @Test
     void replaceRolesRejectsTheSameKeyWithDifferentRoles() {
-        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
-        when(roleRepository.findRoles(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.USER));
+        when(userRepository.findById(TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
+        when(roleRepository.findRoles(TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.USER));
 
-        service.replaceRoles(CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.USER));
+        service.replaceRoles(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.USER));
 
-        assertThatThrownBy(() -> service.replaceRoles(CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN)))
+        assertThatThrownBy(() -> service.replaceRoles(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN)))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_IDEMPOTENCY_001));
     }
 
     @Test
     void replaceRolesRejectsAShortIdempotencyKey() {
-        assertThatThrownBy(() -> service.replaceRoles(CALLER, TARGET, "short", Set.of(UserRole.USER)))
+        assertThatThrownBy(() -> service.replaceRoles(TENANT_ID, CALLER, TARGET, "short", Set.of(UserRole.USER)))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COM_VALIDATION_001);
                     assertThat(exception.getFieldViolations()).singleElement()
@@ -242,32 +243,32 @@ class AdminUserServiceTest {
 
     @Test
     void disablingAnotherUserRevokesSessionsAndAdvancesTheWatermark() {
-        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, TARGET))
+        when(userRepository.findById(TENANT_ID, TARGET))
                 .thenReturn(Optional.of(new AppUserRow(TARGET, "target", UserStatus.DISABLED, null, NOW)));
 
         UserSummaryData summary =
-                service.updateStatus(CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.DISABLED);
+                service.updateStatus(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.DISABLED);
 
         assertThat(summary.status()).isEqualTo(UserStatus.DISABLED);
         verify(userRepository).updateStatus(
-                TenantContext.DEFAULT_TENANT_ID, TARGET, UserStatus.DISABLED, NOW);
-        verify(refreshTokenService).revokeAllForUser(TARGET);
+                TENANT_ID, TARGET, UserStatus.DISABLED, NOW);
+        verify(refreshTokenService).revokeAllForUser(TENANT_ID, TARGET);
         verify(accessTokenAuthenticator).revokeAllIssuedBefore(TARGET, NOW);
     }
 
     @Test
     void enablingAnotherUserKeepsTheExistingSessions() {
-        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
+        when(userRepository.findById(TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
 
-        service.updateStatus(CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.ACTIVE);
+        service.updateStatus(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.ACTIVE);
 
-        verify(refreshTokenService, never()).revokeAllForUser(any());
+        verify(refreshTokenService, never()).revokeAllForUser(any(), any());
         verify(accessTokenAuthenticator, never()).revokeAllIssuedBefore(any(), any());
     }
 
     @Test
     void updateStatusRejectsDisablingTheCaller() {
-        assertThatThrownBy(() -> service.updateStatus(CALLER, CALLER, IDEMPOTENCY_KEY, UserStatus.DISABLED))
+        assertThatThrownBy(() -> service.updateStatus(TENANT_ID, CALLER, CALLER, IDEMPOTENCY_KEY, UserStatus.DISABLED))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_VALIDATION_001);
                     assertThat(exception.getFieldViolations()).singleElement()
@@ -278,25 +279,49 @@ class AdminUserServiceTest {
 
     @Test
     void updateStatusRejectsUnknownTarget() {
-        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, TARGET)).thenReturn(Optional.empty());
+        when(userRepository.findById(TENANT_ID, TARGET)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.updateStatus(CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.DISABLED))
+        assertThatThrownBy(() -> service.updateStatus(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.DISABLED))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_NOT_FOUND_001));
     }
 
     @Test
     void updateStatusReplayDoesNotRevokeTwice() {
-        when(userRepository.findById(TenantContext.DEFAULT_TENANT_ID, TARGET))
+        when(userRepository.findById(TENANT_ID, TARGET))
                 .thenReturn(Optional.of(new AppUserRow(TARGET, "target", UserStatus.DISABLED, null, NOW)));
 
-        service.updateStatus(CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.DISABLED);
-        service.updateStatus(CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.DISABLED);
+        service.updateStatus(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.DISABLED);
+        service.updateStatus(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, UserStatus.DISABLED);
 
         verify(userRepository, times(1)).updateStatus(
-                TenantContext.DEFAULT_TENANT_ID, TARGET, UserStatus.DISABLED, NOW);
-        verify(refreshTokenService, times(1)).revokeAllForUser(TARGET);
+                TENANT_ID, TARGET, UserStatus.DISABLED, NOW);
+        verify(refreshTokenService, times(1)).revokeAllForUser(TENANT_ID, TARGET);
         verify(accessTokenAuthenticator, times(1)).revokeAllIssuedBefore(TARGET, NOW);
+    }
+
+    @Test
+    void adminCannotReadAUserThatOnlyExistsInAnotherTenant() {
+        when(userRepository.findById(FOREIGN_TENANT_ID, TARGET)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.get(FOREIGN_TENANT_ID, TARGET))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_NOT_FOUND_001));
+        verify(userRepository, never()).findById(TENANT_ID, TARGET);
+    }
+
+    @Test
+    void theSameIdempotencyKeyIsScopedToOneTenant() {
+        when(userRepository.findById(TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
+        when(userRepository.findById(FOREIGN_TENANT_ID, TARGET)).thenReturn(Optional.of(row(TARGET, NOW)));
+        when(roleRepository.findRoles(TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.ADMIN));
+        when(roleRepository.findRoles(FOREIGN_TENANT_ID, TARGET)).thenReturn(Set.of(UserRole.USER));
+
+        service.replaceRoles(TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.ADMIN));
+        service.replaceRoles(FOREIGN_TENANT_ID, CALLER, TARGET, IDEMPOTENCY_KEY, Set.of(UserRole.USER));
+
+        verify(roleRepository).replaceRoles(TENANT_ID, TARGET, Set.of(UserRole.ADMIN), NOW);
+        verify(roleRepository).replaceRoles(FOREIGN_TENANT_ID, TARGET, Set.of(UserRole.USER), NOW);
     }
 
     private AppUserRow row(UUID id, Instant createdAt) {

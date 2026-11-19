@@ -18,6 +18,7 @@ import com.docqa.common.tenant.TenantContext;
 import com.docqa.user.config.AuthProperties;
 import com.docqa.user.config.JwtProperties;
 import com.docqa.user.domain.RefreshTokenStatus;
+import com.docqa.user.domain.TenantRecord;
 import com.docqa.user.domain.UserCredentials;
 import com.docqa.user.domain.UserRole;
 import com.docqa.user.domain.UserStatus;
@@ -27,6 +28,7 @@ import com.docqa.user.dto.LoginRequest;
 import com.docqa.user.dto.RegisterRequest;
 import com.docqa.user.error.RateLimitedException;
 import com.docqa.user.repository.RoleRepository;
+import com.docqa.user.repository.TenantRepository;
 import com.docqa.user.repository.UserRepository;
 import com.docqa.user.support.InMemoryIdempotencyStore;
 import com.docqa.user.support.InMemoryRefreshTokenRepository;
@@ -51,12 +53,16 @@ class AuthServiceTest {
     private static final String NEW_PASSWORD = "new-battery-11";
     private static final String IP = "127.0.0.1";
     private static final String IDEMPOTENCY_KEY = "idem-key-0001";
+    private static final UUID SECOND_TENANT = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final String SECOND_SLUG = "acme";
+    private static final String SECOND_PASSWORD = "acme-password-456";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private MutableClock clock;
     private UserRepository userRepository;
     private RoleRepository roleRepository;
+    private TenantRepository tenantRepository;
     private InMemoryRefreshTokenRepository refreshTokenRepository;
     private RecordingRevocationStore revocationStore;
     private RegistrationRateLimiter registrationRateLimiter;
@@ -70,6 +76,7 @@ class AuthServiceTest {
         clock = new MutableClock(NOW);
         userRepository = mock(UserRepository.class);
         roleRepository = mock(RoleRepository.class);
+        tenantRepository = mock(TenantRepository.class);
         refreshTokenRepository = new InMemoryRefreshTokenRepository();
         revocationStore = new RecordingRevocationStore();
         registrationRateLimiter = mock(RegistrationRateLimiter.class);
@@ -101,6 +108,7 @@ class AuthServiceTest {
                 jwtService,
                 passwordEncoder,
                 properties,
+                new TenantResolver(tenantRepository),
                 clock);
     }
 
@@ -440,6 +448,82 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.currentUser(identity))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_DISABLED_001));
+    }
+
+    @Test
+    void loginWithExplicitSlugUsesTheResolvedTenantForCredentialsAndJwt() {
+        givenTenant(SECOND_SLUG, SECOND_TENANT, "ACTIVE");
+        UserCredentials credentials = new UserCredentials(
+                USER_ID, USERNAME, passwordEncoder.encode(SECOND_PASSWORD), UserStatus.ACTIVE);
+        when(userRepository.findCredentialsByUsername(SECOND_TENANT, USERNAME))
+                .thenReturn(Optional.of(credentials));
+
+        IssuedSession session =
+                authService.login(new LoginRequest(USERNAME, SECOND_PASSWORD, "  ACME  "), IP);
+
+        JwtIdentity identity = jwtService.verify(session.access().accessToken());
+        assertThat(identity.tenantId()).isEqualTo(SECOND_TENANT);
+        verify(userRepository).touchLastLogin(eq(SECOND_TENANT), eq(USER_ID), eq(NOW));
+        verify(userRepository, never())
+                .findCredentialsByUsername(eq(TenantContext.DEFAULT_TENANT_ID), anyString());
+    }
+
+    @Test
+    void loginRejectsUnknownOrNonLoginTenantWithTheGenericCredentialError() {
+        when(tenantRepository.findBySlug("ghost")).thenReturn(Optional.empty());
+        when(tenantRepository.findBySlug("suspended"))
+                .thenReturn(Optional.of(new TenantRecord(SECOND_TENANT, "suspended", "SUSPENDED")));
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest(USERNAME, PASSWORD, "ghost"), IP))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_AUTH_001));
+        assertThatThrownBy(() -> authService.login(new LoginRequest(USERNAME, PASSWORD, "suspended"), IP))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_AUTH_001));
+        verify(userRepository, never()).findCredentialsByUsername(any(), anyString());
+    }
+
+    @Test
+    void sameUsernameInTwoTenantsDoesNotShareTheLoginFailureBudget() {
+        givenUser(UserStatus.ACTIVE);
+        givenTenant(SECOND_SLUG, SECOND_TENANT, "TRIAL");
+        when(userRepository.findCredentialsByUsername(SECOND_TENANT, USERNAME))
+                .thenReturn(Optional.of(new UserCredentials(
+                        USER_ID, USERNAME, passwordEncoder.encode(SECOND_PASSWORD), UserStatus.ACTIVE)));
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThatThrownBy(() -> authService.login(
+                    new LoginRequest(USERNAME, "wrong-password", SECOND_SLUG), IP))
+                    .isInstanceOf(BusinessException.class);
+        }
+
+        IssuedSession session = authService.login(new LoginRequest(USERNAME, PASSWORD), IP);
+        assertThat(jwtService.verify(session.access().accessToken()).tenantId())
+                .isEqualTo(TenantContext.DEFAULT_TENANT_ID);
+    }
+
+    @Test
+    void refreshStaysInsideTheTenantThatOwnsTheCookie() {
+        givenTenant(SECOND_SLUG, SECOND_TENANT, "ACTIVE");
+        UserCredentials credentials = new UserCredentials(
+                USER_ID, USERNAME, passwordEncoder.encode(SECOND_PASSWORD), UserStatus.ACTIVE);
+        when(userRepository.findCredentialsByUsername(SECOND_TENANT, USERNAME))
+                .thenReturn(Optional.of(credentials));
+        when(userRepository.findCredentialsById(SECOND_TENANT, USER_ID))
+                .thenReturn(Optional.of(credentials));
+
+        IssuedSession session =
+                authService.login(new LoginRequest(USERNAME, SECOND_PASSWORD, SECOND_SLUG), IP);
+        IssuedSession rotated = authService.refresh(session.refreshToken());
+
+        assertThat(jwtService.verify(rotated.access().accessToken()).tenantId())
+                .isEqualTo(SECOND_TENANT);
+        verify(userRepository, never()).findCredentialsById(TenantContext.DEFAULT_TENANT_ID, USER_ID);
+    }
+
+    private void givenTenant(String slug, UUID tenantId, String status) {
+        when(tenantRepository.findBySlug(slug))
+                .thenReturn(Optional.of(new TenantRecord(tenantId, slug, status)));
     }
 
     private void givenUser(UserStatus status) {

@@ -17,6 +17,7 @@ import com.docqa.agentgateway.service.AdminAuditQueryService;
 import com.docqa.agentgateway.web.AgentExceptionHandler;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
+import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.common.web.GlobalExceptionHandler;
 import com.docqa.common.web.TraceIdFilter;
@@ -42,6 +43,7 @@ class AdminAuditControllerTest {
 
     private static final UUID EVENT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000e1");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
     private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
     private static final Instant OCCURRED_AT = Instant.parse("2026-11-03T10:00:01.120Z");
     private static final String PATH = "/api/v1/admin/audit/events";
@@ -76,10 +78,10 @@ class AdminAuditControllerTest {
 
     @Test
     void usesTheContractDefaultPageSize() throws Exception {
-        when(auditQueryService.list(null, null, null, null, null, 100, null))
+        when(auditQueryService.list(TENANT_ID, null, null, null, null, null, 100, null))
                 .thenReturn(new AuditEventListData(List.of(item()), null, 100));
 
-        mockMvc.perform(get(PATH))
+        mockMvc.perform(get(PATH).requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value("OK"))
@@ -98,12 +100,13 @@ class AdminAuditControllerTest {
 
     @Test
     void forwardsEveryFilterAndTheCursor() throws Exception {
-        when(auditQueryService.list(
+        when(auditQueryService.list(TENANT_ID,
                 TRACE_ID, USER_ID.toString(), "RAG_RETRIEVED", "2026-11-02T09:00:00Z",
                 "2026-11-03T09:00:00Z", 500, "cursor-1"))
                 .thenReturn(new AuditEventListData(List.of(), null, 500));
 
         mockMvc.perform(get(PATH)
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .param("traceId", TRACE_ID)
                         .param("userId", USER_ID.toString())
                         .param("eventType", "RAG_RETRIEVED")
@@ -117,17 +120,17 @@ class AdminAuditControllerTest {
 
     @Test
     void mapsServiceValidationFailuresToFourHundred() throws Exception {
-        when(auditQueryService.list(any(), any(), any(), any(), any(), eq(501), any()))
+        when(auditQueryService.list(eq(TENANT_ID), any(), any(), any(), any(), any(), eq(501), any()))
                 .thenThrow(new BusinessException(ErrorCode.COM_VALIDATION_001, "limit out of range"));
 
-        mockMvc.perform(get(PATH).param("limit", "501"))
+        mockMvc.perform(get(PATH).requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID).param("limit", "501"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COM-VALIDATION-001"));
     }
 
     @Test
     void mapsNonNumericLimitsToGatewayValidation() throws Exception {
-        mockMvc.perform(get(PATH).param("limit", "many"))
+        mockMvc.perform(get(PATH).requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID).param("limit", "many"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AGT-VALIDATION-001"))
                 .andExpect(jsonPath("$.errors[0].field").value("limit"));

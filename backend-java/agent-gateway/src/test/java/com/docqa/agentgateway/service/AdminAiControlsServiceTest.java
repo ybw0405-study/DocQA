@@ -15,7 +15,6 @@ import com.docqa.agentgateway.repository.AdminAuditEntry;
 import com.docqa.agentgateway.repository.AdminAuditRepository;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.common.trace.TraceIdContext;
 import java.time.Clock;
 import java.time.Instant;
@@ -36,6 +35,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AdminAiControlsServiceTest {
 
     private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
 
     @Mock
@@ -93,13 +93,13 @@ class AdminAiControlsServiceTest {
     void enablingWritesRefreshesThenAuditsWithWarn() {
         stubAppliedState(true);
 
-        service.updateKillSwitch(ADMIN_ID, true);
+        service.updateKillSwitch(TENANT_ID, ADMIN_ID, true);
 
         InOrder order = inOrder(controlsStore, killSwitch, auditRepository);
         order.verify(controlsStore).writeKillSwitch(true, ADMIN_ID, NOW);
         order.verify(killSwitch).refresh(true);
         ArgumentCaptor<AdminAuditEntry> captor = ArgumentCaptor.forClass(AdminAuditEntry.class);
-        order.verify(auditRepository).insert(org.mockito.ArgumentMatchers.eq(TenantContext.DEFAULT_TENANT_ID), captor.capture());
+        order.verify(auditRepository).insert(org.mockito.ArgumentMatchers.eq(TENANT_ID), captor.capture());
 
         AdminAuditEntry entry = captor.getValue();
         assertThat(entry.id()).isNotNull();
@@ -116,12 +116,12 @@ class AdminAiControlsServiceTest {
     void disablingWritesRefreshesThenAuditsWithInfo() {
         stubAppliedState(false);
 
-        service.updateKillSwitch(ADMIN_ID, false);
+        service.updateKillSwitch(TENANT_ID, ADMIN_ID, false);
 
         verify(controlsStore).writeKillSwitch(false, ADMIN_ID, NOW);
         verify(killSwitch).refresh(false);
         ArgumentCaptor<AdminAuditEntry> captor = ArgumentCaptor.forClass(AdminAuditEntry.class);
-        verify(auditRepository).insert(org.mockito.ArgumentMatchers.eq(TenantContext.DEFAULT_TENANT_ID), captor.capture());
+        verify(auditRepository).insert(org.mockito.ArgumentMatchers.eq(TENANT_ID), captor.capture());
         assertThat(captor.getValue().eventType())
                 .isEqualTo(AdminAiControlsService.EVENT_KILL_SWITCH_DISABLED);
         assertThat(captor.getValue().severity()).isEqualTo("INFO");
@@ -133,7 +133,7 @@ class AdminAiControlsServiceTest {
                 .when(auditRepository).insert(any(), any());
 
         BusinessException failure = catchThrowableOfType(
-                () -> service.updateKillSwitch(ADMIN_ID, true),
+                () -> service.updateKillSwitch(TENANT_ID, ADMIN_ID, true),
                 BusinessException.class);
 
         assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.COM_INTERNAL_001);
