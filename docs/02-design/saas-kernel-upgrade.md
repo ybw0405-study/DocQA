@@ -512,7 +512,11 @@ Python 侧从此能直接以租户维度做可观测与后续 ABAC 判决。
 （D-87 红线 + 授权 scope 已隔离，加列反而触发 HNSW 后置过滤）；Redis 键**不盲目加段**：
 `userId` / `traceId` 是全局唯一 UUID 天然不串租户；
 `agent:kill-switch` 是平台级全局熔断（见 `AdminAiControlsService` 注释），改成按租户会破坏
-「一键全停」语义，属于产品决策，留待确认。
+「一键全停」语义，当时属于产品决策、留待确认。
+> 状态更新（2026-11-19）：该决策已由 **D3** 拍板落地，见 §5.20 —— 平台级全局键
+> **保留不变**，另新增 `agent:kill-switch:tenant:{tenantId}`，两者 OR 叠加：既守住
+> 「一键全停」，又支持只停单个租户。本节「不盲目给所有 Redis 键加租户段」的结论仍成立
+> （`userId` / `traceId` 依旧不加段），只是 kill switch 从「单一全局键」扩为「全局 + 租户两级」。
 
 验证：`mvn -o test -pl document-service -am` → 131 + 214 tests 全绿；全量门禁见本批提交。
 
