@@ -109,10 +109,19 @@ Refs: REQ-103
 - 要求 conversation resolved 后才可合并。
 - 要求线性历史或 squash 历史，避免无意义的 merge commit 噪声。
 
-> 现状说明：本仓库目前是私有仓库，GitHub 免费套餐对私有仓库不开放 Branch Protection
-> （API 返回 `Upgrade to GitHub Pro or make this repository public`）。在上面的规则真正生效前，
-> 合并纪律只能靠人工遵守；仓库转为 public 或升级 Pro 后应立即按本节的 required checks 配置保护，
-> 并把 required checks 设为 `.github/workflows/ci.yml` 里的三个作业名（名字改了要同步本节）。
+> 现状（2026-11-19 更新）：仓库已转为 **public** 并在 `main` 上启用 Branch Protection，
+> 本节四条由平台强制，不再依赖人工纪律。实际配置：
+>
+> - required status checks（`strict: true`）：`Java 17 / mvn verify`、
+>   `Node 22 / typecheck + lint + test + build`、`Python 3.12 / pytest + ruff`
+>   —— 与 `.github/workflows/ci.yml` 三个 job 的 `name` 逐字一致，改名须同步本节与保护规则；
+> - `enforce_admins: true`（管理员同样受约束）、`allow_force_pushes: false`、
+>   `allow_deletions: false`、`required_linear_history: true`、
+>   `required_conversation_resolution: true`、dismiss stale reviews；
+> - `required_approving_review_count: 0`：单人维护项目若设为 1，会因「不能 approve 自己的 PR」
+>   把合并锁死；强制走 PR 由保护规则本身保证，不需要审批票。
+>
+> 注：公开仓库可免费启用 Code Scanning，目前尚未配置。
 
 ## 4. Flyway 迁移脚本必须随分支提交
 

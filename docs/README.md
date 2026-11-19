@@ -11,6 +11,7 @@
 | [archunit-rules.md](00-infra/archunit-rules.md) | 架构约束与 ArchUnit 规则 |
 | [api-doc-convention.md](00-infra/api-doc-convention.md) | 接口文档与错误码约定 |
 | [git-workflow.md](00-infra/git-workflow.md) | 分支模型、提交规范、PR 检查项 |
+| [dual-tenant-e2e-drill.md](00-infra/dual-tenant-e2e-drill.md) | 本地双租户 HTTP 演练报告、证据矩阵与界面截图 |
 | [naming.md](00-infra/naming.md) | 命名与改名边界（哪些能改、哪些是契约） |
 | [ci-pipeline.yml](00-infra/ci-pipeline.yml) | CI 门禁清单与本地等价命令 |
 

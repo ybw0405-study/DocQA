@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- **本地双租户 HTTP 演练**：新增 `scripts/e2e-dual-tenant-drill.sh`（22 步硬断言、时间戳后缀可重复运行）
+  与 `docs/00-infra/dual-tenant-e2e-drill.md` 报告。在真实启动的全套服务上验证 bootstrap 供给防护与幂等、
+  JWT `tenant_id` 归属、跨租户文档 404、租户级熔断隔离、用户列表隔离、跨语言契约 `extra="forbid"`；
+  附 5 张真实登录态界面截图于 `docs/00-infra/demo/`。演练**不进 CI、不改产品版本**；
+  RAG 解析链路受 Windows 无 `librocketmq.so` 限制未覆盖，边界在报告中如实标注。
+
+### Changed
+
+- 仓库转为 **public**，`main` 启用 Branch Protection（必须走 PR、required status checks 指向三端 CI、
+  `enforce_admins`、禁 force push / 删除、线性历史）。`SECURITY.md` 与 `git-workflow.md` 中
+  「私有仓库免费套餐 403 无法启用」的过时表述已同步更正。
+
 ## [2.1.0] - 2026-11-19
 
 > 2.0.0 之后的工程闭环批次（分支 `feature/REQ-2.1.0-tenant-controls-ui`）。
