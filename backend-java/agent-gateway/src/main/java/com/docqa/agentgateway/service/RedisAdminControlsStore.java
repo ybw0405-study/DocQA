@@ -32,9 +32,23 @@ public class RedisAdminControlsStore implements AdminControlsStore {
 
     @Override
     public Optional<KillSwitchMeta> killSwitchMeta() {
+        return readMeta(properties.getKillSwitchMetaKey());
+    }
+
+    @Override
+    public void writeKillSwitch(boolean active, UUID updatedBy, Instant now) {
+        if (active) {
+            redisTemplate.opsForValue().set(KillSwitch.KEY, "1");
+        } else {
+            redisTemplate.delete(KillSwitch.KEY);
+        }
+        writeMeta(properties.getKillSwitchMetaKey(), updatedBy, now);
+    }
+
+    private Optional<KillSwitchMeta> readMeta(String key) {
         Map<Object, Object> entries;
         try {
-            entries = redisTemplate.opsForHash().entries(properties.getKillSwitchMetaKey());
+            entries = redisTemplate.opsForHash().entries(key);
         } catch (RuntimeException ex) {
             LOGGER.warn("Kill switch metadata lookup failed; reporting it as absent");
             return Optional.empty();
@@ -54,21 +68,31 @@ public class RedisAdminControlsStore implements AdminControlsStore {
         }
     }
 
-    @Override
-    public void writeKillSwitch(boolean active, UUID updatedBy, Instant now) {
-        if (active) {
-            redisTemplate.opsForValue().set(KillSwitch.KEY, "1");
-        } else {
-            redisTemplate.delete(KillSwitch.KEY);
-        }
+    private void writeMeta(String key, UUID updatedBy, Instant now) {
         try {
-            redisTemplate.opsForHash().putAll(properties.getKillSwitchMetaKey(), Map.of(
+            redisTemplate.opsForHash().putAll(key, Map.of(
                     FIELD_UPDATED_AT, String.valueOf(now.toEpochMilli()),
                     FIELD_UPDATED_BY, updatedBy.toString()));
         } catch (RuntimeException ex) {
             // 主键才是状态事实；元数据写失败只影响展示，不回滚已生效的开关。
             LOGGER.warn("Kill switch metadata write failed; state is already applied");
         }
+    }
+
+    @Override
+    public Optional<KillSwitchMeta> tenantKillSwitchMeta(UUID tenantId) {
+        return readMeta(KillSwitch.tenantMetaKey(tenantId));
+    }
+
+    @Override
+    public void writeTenantKillSwitch(UUID tenantId, boolean active, UUID updatedBy, Instant now) {
+        String key = KillSwitch.tenantKey(tenantId);
+        if (active) {
+            redisTemplate.opsForValue().set(key, "1");
+        } else {
+            redisTemplate.delete(key);
+        }
+        writeMeta(KillSwitch.tenantMetaKey(tenantId), updatedBy, now);
     }
 
     @Override

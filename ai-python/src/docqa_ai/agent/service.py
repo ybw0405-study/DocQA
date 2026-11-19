@@ -238,7 +238,7 @@ class AgentAskService:
         直接返回软降级响应（与同步路径同一 _build_response，零外呼零 delta）。"""
         with self._tracer.start_as_current_span("agent.validate"):
             question = self._validate_request_pii(request, collector)
-        if await self._kill_switch.is_active():
+        if await self._kill_switch.is_active(request.tenant_id):
             collector.add(
                 "AGENT_KILL_SWITCH",
                 "agent_service",

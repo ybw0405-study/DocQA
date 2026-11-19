@@ -1,25 +1,39 @@
 # SaaS 多租户改造：待拍板决策清单
 
-> 状态：待用户拍板（2026-11-19）
+> 状态：**已拍板并按推荐执行（2026-11-19）**——D1 / D3 已落地，D2 / D4 / D5 / D6 按推荐维持或暂缓。
 > 适用分支：`feat/saas-tenant-foundation`
-> 背景设计：`saas-kernel-upgrade.md`（§5.9～§5.18 为已落地记录，§6 为原始待确认事项）
+> 背景设计：`saas-kernel-upgrade.md`（§5.9～§5.20 为已落地记录，§6 为原始待确认事项）
 
 本清单只收录**需要产品/语义取舍**的遗留项。纯技术边界内可自主推进的部分已完成（见
 `saas-kernel-upgrade.md` §5.13～§5.18：协议租户上下文、MinIO 对象键、MDC 日志标签、
-pgvector 评估、跨语言契约、真库仓储验收）。每一项都给出**明确推荐**，如无异议按推荐执行。
+pgvector 评估、跨语言契约、真库仓储验收）。拍板结论与落地记录如下。
 
 ## 决策项一览
 
-| 编号 | 决策项 | 推荐 | 依赖 | 推荐优先级 |
-| --- | --- | --- | --- | --- |
-| D1 | 租户供给入口与权限模型 | 配置保护的 bootstrap 端点，暂不引入平台管理员角色 | 无（其余多项的前置） | 1 |
-| D2 | 租户解析入口（域名路由） | 短期维持请求体 slug；品牌化时走边缘网关 Header 注入 | D1 | 3 |
-| D3 | Redis kill switch 语义 | 保留全局熔断 + 新增租户级开关（OR 叠加） | 无 | 2 |
-| D4 | HTTP 级端到端验收 | 暂不引入全链 e2e；需要时做单服务 e2e | D1 | 4 |
-| D5 | Prometheus tenant 标签 | 不加，租户级统计走已有计量→账单链路 | 无 | 5 |
-| D6 | OPA ABAC | 暂缓，待角色模型复杂化再评估 | 无 | 6 |
+| 编号 | 决策项 | 推荐 | 依赖 | 推荐优先级 | 拍板结论 |
+| --- | --- | --- | --- | --- | --- |
+| D1 | 租户供给入口与权限模型 | 配置保护的 bootstrap 端点，暂不引入平台管理员角色 | 无（其余多项的前置） | 1 | **已落地**，见 §5.19 |
+| D2 | 租户解析入口（域名路由） | 短期维持请求体 slug；品牌化时走边缘网关 Header 注入 | D1 | 3 | 维持请求体 slug，暂不改动 |
+| D3 | Redis kill switch 语义 | 保留全局熔断 + 新增租户级开关（OR 叠加） | 无 | 2 | **已落地**，见 §5.20 |
+| D4 | HTTP 级端到端验收 | 暂不引入全链 e2e；需要时做单服务 e2e | D1 | 4 | 暂不引入 |
+| D5 | Prometheus tenant 标签 | 不加，租户级统计走已有计量→账单链路 | 无 | 5 | 不加 |
+| D6 | OPA ABAC | 暂缓，待角色模型复杂化再评估 | 无 | 6 | 暂缓 |
 
 D1 是 D2 / D4 的前置；D3 / D5 / D6 相互独立，可任意顺序插入。
+
+### 本批落地与维持记录（2026-11-19）
+
+- **D1-B 已实现**：`TenantBootstrapProperties` + `TenantAdminController` +
+  `TenantProvisioningService` + `TenantRepository.insert`，共享令牌默认空即禁用、
+  `MessageDigest.isEqual` 常量时间比较、`INSERT IGNORE` 幂等。刻意不引入平台管理员角色，
+  不定义首管理员运营模型。端点为 out-of-band 运维入口，不经网关、不进对外契约（详见 §5.19）。
+- **D3-B 已实现**：Java `KillSwitch.tenantKey` / `isActiveForTenant` /
+  `AdminControlsStore` 租户级读写 / `AdminAiControlsController` 的 `/tenant` GET-PUT，
+  Python `RedisKillSwitch.is_active(tenant_id)` 与 `AgentAskService._prepare` 唯一执行点；
+  全局与租户键 OR 叠加、按完整 Redis 键独立缓存。`openapi-java.yaml` 升 2.6.0 登记新路径
+  与 `KillSwitchStateEnvelope`，Java + Python **同批发布**（详见 §5.20）。
+- **D2 / D4 / D5 / D6 维持推荐结论**：不加域名路由、不引入全链 e2e、不加指标 tenant 标签、
+  不引入 OPA。这四项是「明确不做」的决策，不是遗漏；触发条件与影响仍以各自小节所述为准。
 
 ---
 
@@ -164,13 +178,14 @@ D1 是 D2 / D4 的前置；D3 / D5 / D6 相互独立，可任意顺序插入。
 
 ---
 
-## 拍板后我可立即执行的批次
+## 执行结论
 
-- 选 **D1-B** → 实现 bootstrap 租户供给端点 + 真实第二租户 HTTP 验收（复用现有真库基建）。
-- 选 **D3-B** → 实现租户级 kill switch，Java + Python 同批发布，补跨端键契约测试。
-- 选 **D2-D** → 加域名→slug 映射与网关注入（需明确网关由谁管理）。
-- 选 **D4-B** → user-service 单服务 HTTP e2e。
-- 选 **D5-B** → 白名单租户指标标签（需先定白名单来源）。
-- 选 **D6-B** → OPA 引入方案设计（先出设计，再实现）。
+按表中"推荐"执行，优先顺序 D1 → D3 → D2 → D4 → D5 → D6：
 
-如无逐项异议，默认按表中"推荐"执行，优先顺序 D1 → D3 → D2 → D4 → D5 → D6。
+- **D1-B / D3-B 已完成并提交**（§5.19 / §5.20），全量门禁全绿（Java test + checkstyle、
+  Python pytest / ruff、前端 typecheck / lint / test / build）。
+- **D2 / D4 / D5 / D6 按推荐维持或暂缓**，未产生代码改动。
+
+若后续要重新打开 D2 / D4 / D5 / D6，各小节的"影响 / 前置"与触发条件即为启动依据；
+其中 D4-B（user-service 单服务 HTTP e2e）与 D2 的域名映射均已在 D1 提供租户供给能力后
+具备前置条件，可随时按产品优先级插入。

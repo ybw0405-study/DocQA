@@ -11,5 +11,10 @@ public interface AdminControlsStore {
 
     void writeKillSwitch(boolean active, UUID updatedBy, Instant now);
 
+    /** 租户级 kill switch 的写入与元数据；键按 tenantId 隔离，不影响全局一键全停。 */
+    Optional<KillSwitchMeta> tenantKillSwitchMeta(UUID tenantId);
+
+    void writeTenantKillSwitch(UUID tenantId, boolean active, UUID updatedBy, Instant now);
+
     ExperimentBudgetView experimentBudget();
 }

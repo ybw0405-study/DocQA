@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: DocQA Java API
-  version: 2.5.0
+  version: 2.6.0
   description: |
     本文件是 Java 对外核心业务接口契约，覆盖 5 个核心业务接口，
     并在实现时补充 Auth 支撑接口与会话创建接口；1.2.0 与 1.3.0 为 `frontend-vue` 补充四个只读列表接口。
@@ -28,6 +28,12 @@ info:
     治理拒绝（校验 / 429 / Kill Switch / 幂等冲突等）发生在首个事件帧**之前**时，响应仍是
     普通 JSON ProblemDetail 而非 SSE 流；`error` 帧只在 `meta` 帧已经下发之后才可能到达。
     不新增错误码、不动既有路径与 schema。
+    2.6.0 是**租户级 AI 治理开关**（向后兼容的次版本）：新增
+    `GET/PUT /api/v1/admin/ai/controls/tenant` 一条路径 / 两个操作，落在既有 `/api/v1/admin/**`
+    面下。全局一键全停 `agent:kill-switch` 语义不变，新增按租户隔离的
+    `agent:kill-switch:tenant:{tenantId}` 键，两者在 Python agent 执行点按 OR 判读；
+    `tenantId` 一律取自已验签 JWT，不接受请求体或 Header 传参。既有路径、schema 与错误码
+    一律不删不改，新增一个 `KillSwitchStateEnvelope` 响应信封。
 
     - 2.1.0 新增的五个写操作全部要求 `Idempotency-Key`，`operation` 取值分别为
       `DOCUMENT_RENAME`、`DOCUMENT_TAG_UPDATE`、`DOCUMENT_DELETE`、`DOCUMENT_RETRY`、`DOCUMENT_REINDEX`；
@@ -2638,6 +2644,96 @@ paths:
                         callLimit: 200
                         tokenLimit: 200000
                         limitsKnown: true
+                    traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/ai/controls/tenant:
+    get:
+      tags:
+        - Admin
+      operationId: getTenantAiControls
+      summary: 读取当前租户的 AI Kill Switch 有效状态
+      description: |
+        需要 `ADMIN` 角色。返回**调用者 JWT 所属租户**视角的有效状态：全局键
+        `agent:kill-switch` 与租户键 `agent:kill-switch:tenant:{tenantId}` 按 OR 叠加，
+        任一开启即为 `active=true`。`tenantId` 只取自已验签 JWT，不接受请求体或 Header 传参。
+
+        与 `GET /api/v1/admin/ai/controls` 的区别：后者是平台级全局快照（含实验账本），
+        本端点只读当前租户自己的开关，不返回实验账本。管理面写入后立即回显——租户键不走
+        网关本地缓存，全局键仍受 30 秒缓存影响。元数据缺失时 `updatedAt` / `updatedBy` 为 `null`。
+      responses:
+        '200':
+          description: 当前租户的有效开关状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KillSwitchStateEnvelope'
+              examples:
+                tenantOnly:
+                  value:
+                    code: OK
+                    msg: success
+                    data:
+                      active: true
+                      updatedAt: '2026-11-19T09:12:44.120Z'
+                      updatedBy: 00000000-0000-0000-0000-000000000001
+                    traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags:
+        - Admin
+      operationId: updateTenantAiControls
+      summary: 开启或关闭当前租户的 AI Kill Switch
+      description: |
+        需要 `ADMIN` 角色。对**调用者 JWT 所属租户**的租户级开关做全量赋值：
+        `killSwitchActive=true` 写入 Redis 键 `agent:kill-switch:tenant:{tenantId}`（值固定 `"1"`），
+        `false` 删除该键；同时写入该租户的 `:meta` 元数据键记录 `updatedAt` / `updatedBy`。
+        **不影响全局一键全停键** `agent:kill-switch`，后者仍由 `PUT /api/v1/admin/ai/controls` 控制。
+
+        Python agent 在每次问答前按请求 `tenant_id` 对「全局 OR 租户」做判读，任一开启即返回
+        503 `AGT-UPSTREAM-003`；因此本端点与 Python 消费端必须**同批发布**。顺序与全局端点一致：
+        先写 Redis 再插审计事件（事件类型 `ADMIN_AI_TENANT_KILL_SWITCH_ENABLED` /
+        `ADMIN_AI_TENANT_KILL_SWITCH_DISABLED`，落在调用者租户内），审计写入失败返回 500 且在
+        `detail` 中说明状态已变更，由调用方重新读取。不使用 `Idempotency-Key`，理由见文首 2.4.0 条目。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAiControlsRequest'
+            examples:
+              enable:
+                value:
+                  killSwitchActive: true
+      responses:
+        '200':
+          description: 开关已写入
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KillSwitchStateEnvelope'
+              examples:
+                enabled:
+                  value:
+                    code: OK
+                    msg: success
+                    data:
+                      active: true
+                      updatedAt: '2026-11-19T10:04:11.508Z'
+                      updatedBy: 00000000-0000-0000-0000-000000000001
                     traceId: 4bf92f3577b34da6a3ce929d0e0e4736
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -5372,8 +5468,10 @@ components:
         killSwitchActive:
           type: boolean
           description: |
-            `true` 写入 Redis 键 `agent:kill-switch`（值固定为 `"1"`）；`false` 删除该键。
-            生效窗口为网关 30 秒、Python 5 秒。
+            `true` 写入当前端点对应的 Redis 键（值固定为 `"1"`）；`false` 删除该键。
+            全局端点 `PUT /api/v1/admin/ai/controls` 对应 `agent:kill-switch`；
+            租户端点 `PUT /api/v1/admin/ai/controls/tenant` 对应
+            `agent:kill-switch:tenant:{tenantId}`。两处生效窗口均为网关 30 秒、Python 5 秒。
           example: true
 
     AiQuota:
@@ -5688,6 +5786,16 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/AdminAiControls'
+
+    KillSwitchStateEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/KillSwitchState'
 
     AiQuotaEnvelope:
       allOf:

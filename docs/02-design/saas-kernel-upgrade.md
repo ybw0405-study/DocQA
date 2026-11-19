@@ -606,16 +606,102 @@ vs 租户内 ADMIN）仍未定义，租户供给端点因此未动，见 §6。
 验证：`mvn -o test -pl document-service -am -Dtest=MigrationOnRealMysqlTest` → 7 tests 全绿
 （含 Docker 真跑）；全量门禁见本批提交。
 
+**后续**：§5.18 记的「租户供给端点未动」由 §5.19 收口；HTTP 级全链验收按 D4 结论暂不引入。
+
+---
+
+### 5.19 D1：配置保护的 bootstrap 租户供给（2026-11-19，决策清单 D1-B 落地）
+
+`tenant` 表、`TenantResolver.resolve(slug)` 与 17 个仓库的 `tenant_id` 谓词都已就绪，但此前
+**没有任何创建租户的入口**——这是 §5.18 无法做真实第二租户 HTTP 验收的根因。本批按决策清单
+D1-B 补上，仍不引入平台管理员角色。
+
+| 新增 | 作用 |
+|---|---|
+| `TenantBootstrapProperties` | `docqa.tenant-bootstrap.token`，默认空串；`isEnabled()` 为 false 时端点整体禁用 |
+| `TenantAdminController` | `POST /api/v1/admin/tenants`，鉴权头 `X-Bootstrap-Token` |
+| `CreateTenantRequest` / `TenantCreatedData` | 请求 `slug/name/tier/isolation`；响应只回 `id/slug/status` |
+| `TenantProvisioningService` | 常量时间令牌比较、slug 归一化、`INSERT IGNORE` 幂等 |
+| `TenantRepository.insert` / `JdbcTenantRepository` | 写通道，依赖 V10 的 `uk_tenant_slug` 唯一键 |
+
+几处刻意的取舍：
+
+- **共享令牌而非 JWT**：引导期还没有任何租户/管理员，用 JWT 守卫会先要求一个不存在的身份；
+  引入 `PLATFORM_ADMIN` 又要改角色枚举、claim 与三服务守卫，超出引导入口的必要范围。
+  比较用 `MessageDigest.isEqual` 而非 `String.equals`，避免按响应耗时逐字符猜解令牌。
+- **默认安全**：`application.yml` 里 token 默认空，未注入时端点返回 403，不存在「部署即开放」窗口。
+- **幂等**：`INSERT IGNORE` 返回 0 时按 slug 回读既有租户返回 201 语义（不泄露 slug/id/status
+  之外的目录信息），运维重试不会撞唯一键拿 500。
+- **白名单在 DTO 层**：`tier` / `isolation` 用 `@Pattern` 锁死 V10 CHECK 约束的枚举全集，
+  非法值在 400 阶段被挡下，不打到数据库触发 500。
+- **只创建 tenant 行**：不定义平台管理员、首管理员绑定、`owner_user_id` 归属等运营模型；
+  那些是后续产品决策，不是引导第一个租户的必要条件。
+
+**边界（重要）**：该端点是 **out-of-band 运维入口，不经网关、不进 `openapi-java.yaml`**。
+网关把 `/api/v1/admin/**` 视作本地控制面前缀（`GatewayRouteContractTest.LOCAL_PREFIXES`），
+且免 Bearer 端点被 `PublicPathsContractTest` 限定在 `/api/v1/auth/` 前缀内；把它登记进对外
+契约会同时踩中这两条守护。运维直连 user-service 端口调用，令牌由部署侧注入。因此
+`PublicPaths` 与网关路由均未改动。
+
+验证：`TenantProvisioningServiceTest`（禁用/错令牌/幂等/归一化）、`TenantAdminControllerTest`
+（201/403/校验）、`JdbcTenantRepositoryTest`（真库 `INSERT IGNORE` 返回 1/0）；全量门禁见本批提交。
+
+---
+
+### 5.20 D3：租户级 AI Kill Switch（2026-11-19，决策清单 D3-B 落地）
+
+决策清单 D3 指出：管理面已按 `tenantId` 调用，但底层 Redis 键仍是全局，租户隔离在该处
+是假的。本批按 D3-B 保留全局一键全停，新增按租户隔离的键，两者 **OR 叠加**。
+
+**跨语言键约定**（Java 写、Python 读，必须同批发布）：
+
+| 键 | 语义 |
+|---|---|
+| `agent:kill-switch` | 平台级全局熔断，原样保留 |
+| `agent:kill-switch:tenant:{tenantId}` | 单租户开关 |
+| `agent:kill-switch:tenant:{tenantId}:meta` | 该租户开关的 `updatedAt` / `updatedBy` |
+
+Java 侧：`KillSwitch` 增 `TENANT_KEY_PREFIX` / `tenantKey` / `tenantMetaKey` /
+`isActiveForTenant`（全局 OR 租户，租户键直读以便写入后立即回显）；`AdminControlsStore` 与
+`RedisAdminControlsStore` 抽 `readMeta` / `writeMeta` 复用并补租户级读写；
+`AdminAiControlsService` 补 `getTenantKillSwitch` / `updateTenantKillSwitch` 与两条租户级审计
+事件；`AdminAiControlsController` 增 `GET/PUT /api/v1/admin/ai/controls/tenant`，
+`tenantId` 一律取自 `TenantContext.REQUEST_ATTRIBUTE`（已验签 JWT），**不接受请求体传参**。
+
+Python 侧：`RedisKillSwitch.is_active(tenant_id)` 加可选参数，全局键优先、命中即返回，
+否则读租户键；缓存改为按**完整 Redis 键**分别存放，全局与租户开关互不污染；
+`KillSwitch` Protocol 与 `StaticKillSwitch` 同步签名；唯一执行点
+`AgentAskService._prepare` 传入 `request.tenant_id`（`ask` / `ask_stream` 共享该前段，
+因此流式路径一并生效）。`is_active()` 无参调用仍表示「只看全局」，向后兼容。
+
+**契约同步**：`openapi-java.yaml` 升 2.6.0，登记 `/api/v1/admin/ai/controls/tenant` 的
+GET/PUT、新增 `KillSwitchStateEnvelope`、`UpdateAiControlsRequest` 描述泛化为覆盖两类端点；
+`frontend-vue/tests/contract-drift.spec.ts` 同步裁决（schema 计数 98→99、envelope 名单、
+admin 参数表加两个新操作）。这一步是 S9-6 对账守护的预期行为：**网关本地新增映射必须
+同时登记契约**，否则 `GatewayRouteContractTest` 判为「契约写 200、线上 404」。
+
+验证：Java `KillSwitchTest` / `RedisAdminControlsStoreTest` / `AdminAiControlsServiceTest` /
+`AdminAiControlsControllerTest`（4 个租户级用例组），Python `test_kill_switch.py`
+（键命名空间、只停自己租户、全局停所有、两端键独立缓存）；全量门禁见本批提交。
+
+**边界**：`isActiveForTenant` 是管理面展示用的 Java 侧视图，真正的拦截执行点在 Python agent；
+双端真值集合沿用既有全局键约定（Java 写 `"1"`、Python 认 `1/true/on/yes`），本批未扩展。
+D2 / D4 / D5 / D6 按决策清单维持现状或暂缓，未改动。
+
 ---
 
 ## 6. 待确认事项
 
-> 技术/语义层面的遗留决策（租户供给入口、域名路由、Redis kill switch、HTTP e2e、
-> Prometheus 标签、OPA ABAC）已整理为可逐项拍板的清单，见 `saas-tenant-decisions.md`，
-> 每项含现状事实、选项与推荐、影响与依赖。以下保留原始商业/合同层事项。
+> 技术/语义层面的遗留决策已逐项拍板，见 `saas-tenant-decisions.md`：**D1（租户供给）与
+> D3（租户级 kill switch）已按推荐落地**，记录见 §5.19 / §5.20；D2 短期维持请求体 slug、
+> D4 暂不引入全链 HTTP e2e、D5 不加 Prometheus tenant 标签、D6 暂缓 OPA ABAC。
+> 以下保留原始商业/合同层事项。
 
 1. 租户规模与数据量：决定是否真的需要 L2/L3，还是 L1 + 大客户独立库即可。
 2. 30 秒删除是合同硬承诺还是内部目标？若硬承诺，第三方 LLM 厂商的 DPA 需重新谈。
 3. 计费模型：按席位、按用量，还是混合？
 4. 是否已有 IdP（企业微信/飞书/Okta/Azure AD）？
 5. P1 何时开始：需要确认租户解析入口（域名路由 / 子域名 / 邀请码）与首个真实租户。
+   > 状态更新（2026-11-19）：解析入口已按 D2 定为「短期维持请求体 slug」；首个真实租户
+   > 已可由 §5.19 的 bootstrap 端点引导创建。本条剩余待确认的是品牌化域名路由的时点，
+   > 不再是 P1 的启动前置。

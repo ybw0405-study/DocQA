@@ -3,6 +3,7 @@ package com.docqa.agentgateway.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
@@ -141,6 +142,33 @@ class AdminAiControlsServiceTest {
         verify(controlsStore).writeKillSwitch(true, ADMIN_ID, NOW);
         verify(killSwitch).refresh(true);
         verify(auditRepository).insert(any(), any());
+    }
+
+    @Test
+    void readsTenantKillSwitchEffectiveStateAndMetadata() {
+        when(killSwitch.isActiveForTenant(TENANT_ID)).thenReturn(true);
+        when(controlsStore.tenantKillSwitchMeta(TENANT_ID))
+                .thenReturn(Optional.of(new KillSwitchMeta(NOW, ADMIN_ID)));
+
+        KillSwitchState state = service.getTenantKillSwitch(TENANT_ID);
+
+        assertThat(state).isEqualTo(new KillSwitchState(true, NOW, ADMIN_ID));
+    }
+
+    @Test
+    void updatingTenantSwitchWritesOnlyTenantKeyAndAuditsWithTenantScope() {
+        when(killSwitch.isActiveForTenant(TENANT_ID)).thenReturn(true);
+
+        KillSwitchState state = service.updateTenantKillSwitch(TENANT_ID, ADMIN_ID, true);
+
+        verify(controlsStore).writeTenantKillSwitch(TENANT_ID, true, ADMIN_ID, NOW);
+        verify(controlsStore, org.mockito.Mockito.never()).writeKillSwitch(anyBoolean(), any(), any());
+        ArgumentCaptor<AdminAuditEntry> captor = ArgumentCaptor.forClass(AdminAuditEntry.class);
+        verify(auditRepository).insert(org.mockito.ArgumentMatchers.eq(TENANT_ID), captor.capture());
+        assertThat(captor.getValue().eventType())
+                .isEqualTo(AdminAiControlsService.EVENT_TENANT_KILL_SWITCH_ENABLED);
+        assertThat(captor.getValue().payload()).containsEntry("tenantId", TENANT_ID.toString());
+        assertThat(state.active()).isTrue();
     }
 
     private void stubAppliedState(boolean active) {

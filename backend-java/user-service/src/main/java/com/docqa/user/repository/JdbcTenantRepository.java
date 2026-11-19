@@ -22,6 +22,11 @@ public class JdbcTenantRepository implements TenantRepository {
 
     private static final String FIND_BY_SLUG = "SELECT id, slug, status FROM tenant WHERE slug = ?";
 
+    private static final String INSERT_TENANT = """
+            INSERT IGNORE INTO tenant (id, slug, name, tier, isolation, status, owner_user_id)
+            VALUES (?, ?, ?, ?, ?, 'ACTIVE', NULL)
+            """;
+
     private static final RowMapper<TenantRecord> ROW_MAPPER = (rs, rowNum) -> new TenantRecord(
             UUID.fromString(rs.getString("id")),
             rs.getString("slug"),
@@ -36,5 +41,11 @@ public class JdbcTenantRepository implements TenantRepository {
     @Override
     public Optional<TenantRecord> findBySlug(String slug) {
         return jdbcTemplate.query(FIND_BY_SLUG, ROW_MAPPER, slug).stream().findFirst();
+    }
+
+    @Override
+    public int insert(UUID id, String slug, String name, String tier, String isolation) {
+        return jdbcTemplate.update(
+                INSERT_TENANT, id.toString(), slug, name, tier, isolation);
     }
 }

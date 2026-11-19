@@ -49,6 +49,9 @@ docqa:
     refresh-cookie-path: /api/v1/auth
     cookie-secure: ${DOCQA_COOKIE_SECURE:true}
     cookie-same-site: Lax
+  tenant-bootstrap:
+    # 租户供给端点的共享令牌；留空即禁用。引导第一个真实租户时由运维注入高熵值。
+    token: ${DOCQA_TENANT_BOOTSTRAP_TOKEN:}
 
 management:
   endpoints:

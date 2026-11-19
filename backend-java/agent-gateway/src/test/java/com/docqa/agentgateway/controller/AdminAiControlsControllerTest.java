@@ -141,6 +141,36 @@ class AdminAiControlsControllerTest {
         verify(controlsService, never()).updateKillSwitch(any(), any(), anyBoolean());
     }
 
+    @Test
+    void readsTenantScopedKillSwitch() throws Exception {
+        when(controlsService.getTenantKillSwitch(TENANT_ID))
+                .thenReturn(new KillSwitchState(true, UPDATED_AT, ADMIN_ID));
+
+        mockMvc.perform(get(PATH + "/tenant")
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
+                        .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.active").value(true))
+                .andExpect(jsonPath("$.data.updatedBy").value(ADMIN_ID.toString()));
+    }
+
+    @Test
+    void updatesTenantScopedKillSwitchForCallingTenant() throws Exception {
+        when(controlsService.updateTenantKillSwitch(eq(TENANT_ID), eq(ADMIN_ID), eq(true)))
+                .thenReturn(new KillSwitchState(true, UPDATED_AT, ADMIN_ID));
+
+        mockMvc.perform(put(PATH + "/tenant")
+                        .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
+                        .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"killSwitchActive\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.active").value(true));
+
+        verify(controlsService).updateTenantKillSwitch(TENANT_ID, ADMIN_ID, true);
+        verify(controlsService, never()).updateKillSwitch(any(), any(), anyBoolean());
+    }
+
     private static AdminAiControls controls() {
         return new AdminAiControls(
                 new KillSwitchState(true, UPDATED_AT, ADMIN_ID),
