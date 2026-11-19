@@ -181,7 +181,8 @@ CREATE TABLE tenant (
 
 ### 5.2 P0 明确的临时口径（P1 必须替换）
 
-> 第 1～5 条已由 §5.9 / §5.10 / §5.11 / §5.12 / §5.13 替换；第 6 条仍待办。
+> 第 1～5 条已由 §5.9 / §5.10 / §5.11 / §5.12 / §5.13 替换；第 6 条部分由 §5.14 收口（MinIO），
+> pgvector 与 Redis 键仍待办。
 
 1. **只有一个租户生效**。V10 把全部存量数据回填到默认租户，登录/注册尚无租户解析入口，因此所有请求都拿到默认租户 ID。租户隔离的**结构与约束已就位，但隔离效果要到 P1 接入多租户解析后才可观测**。
 2. **登录/注册用 `DEFAULT_TENANT_ID`**：`AuthService`、`RefreshTokenService`、`DemoUserSeeder` 内有 `tenantId()` 帮助方法，P1 改为按邮箱域名路由解析。
@@ -489,6 +490,24 @@ Python 侧从此能直接以租户维度做可观测与后续 ABAC 判决。
 `request.tenant_id` 作路由键，无需再改协议字段。
 
 验证：`mvn -o test` → 全绿；Python 全量测试 → 全绿；`mvn -o checkstyle:check` → 0 违规。
+
+### 5.14 MinIO 对象键租户化（2026-11-19，§5.2 第 6 条部分完成）
+
+唯一构造点 `DocumentService.createNewDocument()` 原为 `documents/{userId}/{documentId}/source`，
+改为 `documents/{tenantId}/{userId}/{documentId}/source`，收敛到 `ObjectKeys.source()`。
+新增 `ObjectKeysTest` 锁定「租户为首段、不同租户不共用键」。
+
+**为何不做存量迁移**：`object_key` 逐行落在 `document` 表，整条上传续传 / 完成 / 解析回写 /
+删除链路都从 `document.objectKey()` 读取，从不重新构造。因此历史对象继续读旧键、新对象写新键，
+两种格式共存，符合 §3 第 6 条「保留旧路径兼容读取」，无需搬对象。Python parse worker 对
+`objectKey` 只校验「相对路径 + 无空段/穿越」，多一段 UUID 不影响校验，故 Java↔Python 消息契约零改动。
+
+**§5.2 第 6 条剩余**：pgvector 按 tenant 分片（写入 + 检索，注意 HNSW 后置过滤）、Redis 键。
+Redis 键**不盲目加段**：`userId` / `traceId` 是全局唯一 UUID 天然不串租户；
+`agent:kill-switch` 是平台级全局熔断（见 `AdminAiControlsService` 注释），改成按租户会破坏
+「一键全停」语义，属于产品决策，留待确认。
+
+验证：`mvn -o test -pl document-service -am` → 131 + 214 tests 全绿；全量门禁见本批提交。
 
 ---
 

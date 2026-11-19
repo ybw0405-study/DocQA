@@ -37,6 +37,7 @@ import com.docqa.document.storage.ObjectStorage;
 import com.docqa.document.storage.ObjectStorageException;
 import com.docqa.document.storage.UploadPart;
 import com.docqa.document.support.Fingerprints;
+import com.docqa.document.support.ObjectKeys;
 import com.docqa.document.support.TagNormalizer;
 import com.docqa.document.support.UploadPlan;
 import com.docqa.document.transaction.TransactionRunner;
@@ -565,7 +566,7 @@ public class DocumentService {
     private UploadInitResult createNewDocument(UUID userId, UploadInitRequest request) {
         Instant now = clock.instant();
         UUID documentId = UUID.randomUUID();
-        String objectKey = "documents/" + userId + "/" + documentId + "/source";
+        String objectKey = ObjectKeys.source(TenantContext.require(), userId, documentId);
         UploadPlan plan = UploadPlan.of(request.sizeBytes(), minioProperties.getPartSize(), UploadPlan.MAX_PARTS);
         DocumentRow document = new DocumentRow(
                 documentId,

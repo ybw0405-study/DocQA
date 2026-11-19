@@ -160,7 +160,7 @@ class DocumentServiceTest {
         DocumentRow inserted = documentCaptor.getValue();
         assertThat(data.documentId()).isEqualTo(inserted.id());
         assertThat(inserted.objectKey())
-                .isEqualTo("documents/" + USER_ID + "/" + inserted.id() + "/source");
+                .isEqualTo("documents/" + TENANT_ID + "/" + USER_ID + "/" + inserted.id() + "/source");
         assertThat(inserted.status()).isEqualTo(DocumentStatus.UPLOADED);
         assertThat(inserted.title()).isNull();
         verify(uploadSessionStore).save(any(UploadSession.class));
