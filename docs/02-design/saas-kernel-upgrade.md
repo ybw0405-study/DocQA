@@ -775,6 +775,11 @@ e2e 不属 CI」，但 `mvn verify` 实际会跑 `MigrationOnRealMysqlTest`：Gi
 D4 全链 HTTP e2e 不引入；P2 / P3 / P4 与 §6 商业层 4 条仍属路线图与业务拍板。
 Branch Protection 因私有仓库免费套餐 403 无法启用，非代码缺口。
 
+> **状态更新（2026-11-19 后续批次）**：仓库已转 **public** 并启用 Branch Protection
+> （PR + 三端 CI required checks + `enforce_admins`），上述 403 限制已消解；另补做了
+> 本地全套双租户 HTTP 演练（不进 CI、不改产品版本），报告见
+> `docs/00-infra/dual-tenant-e2e-drill.md`。本节保留 2.1.0 当时的原始判断，不改写历史叙述。
+
 验证：前端 typecheck / lint / 全量 vitest（新增 24 个用例，含 a11y 播报区对账）、
 真库 `MigrationOnRealMysqlTest` 8 tests 全绿（MySQL 8.4 容器真跑）；
 最终以 `scripts/verify-all.sh --offline` 全量门禁为准（见本批提交）。
@@ -785,9 +790,10 @@ Branch Protection 因私有仓库免费套餐 403 无法启用，非代码缺口
 
 > 技术/语义层面的遗留决策已逐项拍板，见 `saas-tenant-decisions.md`：**D1（租户供给）与
 > D3（租户级 kill switch）已按推荐落地**，记录见 §5.19 / §5.20；D2 短期维持请求体 slug、
-> D4 暂不引入全链 HTTP e2e、D5 不加 Prometheus tenant 标签、D6 暂缓 OPA ABAC。
-> 技术侧已由 §5.21 收官、§5.22 补齐 2.1.0 工程闭环，无剩余待办；以下保留原始商业 /
-> 合同层事项，需业务侧拍板，不阻塞本次改造交付。
+> D4 暂不引入 CI 内全链 HTTP e2e（另以一次性本地演练补证据，见
+> `docs/00-infra/dual-tenant-e2e-drill.md`）、D5 不加 Prometheus tenant 标签、D6 暂缓 OPA ABAC。
+> 技术侧已由 §5.21 收官、§5.22 补齐 2.1.0 工程闭环，无剩余待办；仓库亦已转 public 并启用
+> Branch Protection。以下保留原始商业 / 合同层事项，需业务侧拍板，不阻塞本次改造交付。
 
 1. 租户规模与数据量：决定是否真的需要 L2/L3，还是 L1 + 大客户独立库即可。
 2. 30 秒删除是合同硬承诺还是内部目标？若硬承诺，第三方 LLM 厂商的 DPA 需重新谈。

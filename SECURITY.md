@@ -66,4 +66,5 @@
 ## 已知限制
 
 - 本地开发默认使用 HTTP 回环地址，生产部署必须启用 TLS
-- 私有仓库在免费套餐下无法启用分支保护与 Code Scanning，合并纪律依赖维护者执行
+- `main` 已启用 GitHub Branch Protection（必须走 PR、三端 CI 全绿、管理员同受约束），
+  见 [git-workflow.md](docs/00-infra/git-workflow.md)；公开仓库可免费启用 Code Scanning，目前尚未配置
