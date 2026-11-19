@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.docqa.common.tenant.TenantContext;
+import com.docqa.document.domain.DocumentRow;
+import com.docqa.document.domain.TenantDocument;
+import com.docqa.document.repository.JdbcDocumentRepository;
 import com.docqa.document.repository.JdbcTenantBootstrapRepository;
 import com.docqa.document.service.DefaultTenantInitializer;
 import java.sql.Connection;
@@ -13,6 +16,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.output.MigrateResult;
 import org.junit.jupiter.api.AfterAll;
@@ -317,6 +321,41 @@ class MigrationOnRealMysqlTest {
                 .hasMessageContaining("uk_app_user_tenant_username");
     }
 
+    @Test
+    @DisplayName("真实仓储在 MySQL 上按 tenant_id 隔离读：租户 B 拿不到租户 A 的文档")
+    void documentRepositoryIsolatesReadsByTenantOnRealMysql() throws SQLException {
+        // 独立的租户/用户/文档 ID，避免与 rejectsCrossTenantReferences 的构造互相撞唯一键。
+        String tenantB = "33333333-3333-3333-3333-333333333333";
+        String userA = "eeeeeeee-0000-0000-0000-000000000001";
+        String userB = "eeeeeeee-0000-0000-0000-000000000002";
+        String docA = "dddddddd-0000-0000-0000-000000000001";
+
+        insertTenant(tenantB, "tenant-b");
+        insertUser(userA, DEFAULT_TENANT, "isolation-alice");
+        insertUser(userB, tenantB, "isolation-bob");
+        insertDocument(docA, DEFAULT_TENANT, userA);
+
+        JdbcDocumentRepository repository = new JdbcDocumentRepository(appJdbcTemplate());
+
+        // 正确的租户读得到自己的文档。
+        DocumentRow visible = repository.findById(UUID.fromString(DEFAULT_TENANT), UUID.fromString(docA))
+                .orElseThrow();
+        assertThat(visible.id()).isEqualTo(UUID.fromString(docA));
+
+        // 同一个 documentId，换成租户 B 的 tenant_id 就查不到——这是 Java 仓储层
+        // 的 tenant_id 谓词在真库上的真实效果，而不是 mock 打桩的结果。
+        assertThat(repository.findById(UUID.fromString(tenantB), UUID.fromString(docA))).isEmpty();
+        assertThat(repository.findByIdAndUser(
+                UUID.fromString(tenantB), UUID.fromString(docA), UUID.fromString(userB))).isEmpty();
+        assertThat(repository.findByIdAndUser(
+                UUID.fromString(DEFAULT_TENANT), UUID.fromString(docA), UUID.fromString(userB))).isEmpty();
+
+        // 有意跨租户的反查路径必须仍能带出归属租户，供 MQ/定时任务按 documentId 定租户。
+        TenantDocument owned = repository.findTenantDocumentById(UUID.fromString(docA)).orElseThrow();
+        assertThat(owned.tenantId()).isEqualTo(UUID.fromString(DEFAULT_TENANT));
+        assertThat(owned.document().id()).isEqualTo(UUID.fromString(docA));
+    }
+
     // ---------------------------------------------------------------- 账号与权限
 
     /**
@@ -411,6 +450,16 @@ class MigrationOnRealMysqlTest {
         return "jdbc:mysql://" + mysql.getHost() + ":" + mysql.getMappedPort(MYSQL_PORT)
                 + "/" + DATABASE
                 + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
+    }
+
+    /** 用最小权限的 app 账号建 JdbcTemplate，让仓储在真库上跑真实 SQL 谓词。 */
+    private static JdbcTemplate appJdbcTemplate() {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+        dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        dataSource.setUrl(jdbcUrl());
+        dataSource.setUsername(APP_USER);
+        dataSource.setPassword(APP_PASSWORD);
+        return new JdbcTemplate(dataSource);
     }
 
     private static Connection connect(String user, String password) throws SQLException {

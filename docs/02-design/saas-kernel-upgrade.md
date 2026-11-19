@@ -579,6 +579,33 @@ document-service，复用源码解析范式）一次性钉死双端字段集合�
 
 验证：`mvn -o test -pl document-service -am -Dtest=ParseWorkerProtocolContractTest` → 2 tests 全绿。
 
+### 5.18 真实第二租户仓储级验收（2026-11-19，收官批次）
+
+此前所有隔离测试都是单服务 mock：仓库契约测试只比对 SQL **文本**，
+`TenantIsolationContractTest` 也只检查「源码里出现 tenant_id 字符串」。文本对了不代表 MySQL
+真的按谓词拒绝跨租户读——这正是 `MigrationOnRealMysqlTest` 类注释里记录过的教训（V10 初版
+五个契约测试全绿却在真库连续失败两次）。本批把验收推进到**真实 MySQL + 真实仓储代码**这一层。
+
+复用已有的 Testcontainers MySQL 8.4 基建（起容器 → V1→V10 迁移 → app 最小权限账号），
+在 `MigrationOnRealMysqlTest` 中新增一例 `documentRepositoryIsolatesReadsByTenantOnRealMysql`：
+
+| 断言 | 意义 |
+|---|---|
+| 租户 A 按 `findById(tenantA, docA)` 命中自己的文档 | 同租户正常路径没被写宽 |
+| `findById(tenantB, docA)` / `findByIdAndUser(...)` 均空 | Java 仓储的 `tenant_id` 谓词在真库上真实拒绝跨租户读，不是 mock |
+| `findTenantDocumentById(docA)` 带出 `tenantId = tenantA` | §5.12 有意跨租户反查路径可用，MQ/定时任务能按全局唯一 documentId 定归属租户 |
+
+用独立 UUID / slug 构造数据，与既有 `rejectsCrossTenantReferences` 的构造解耦，测试顺序无关。
+Docker 不可用时整类仍由 `Assumptions` 优雅跳过，不污染无容器环境。
+
+**边界**：这是**仓储级**真库验收，不是跨进程 HTTP 端到端。当前三个服务各自验签、无统一
+e2e 编排，HTTP 级全链验收仍需产品侧确认是否引入 e2e 测试服务；本批以零生产改动的增量
+把最容易静默失效的「谓词文本对但语义错」补上真库证据。管理员谁能创建租户（平台管理员
+vs 租户内 ADMIN）仍未定义，租户供给端点因此未动，见 §6。
+
+验证：`mvn -o test -pl document-service -am -Dtest=MigrationOnRealMysqlTest` → 7 tests 全绿
+（含 Docker 真跑）；全量门禁见本批提交。
+
 ---
 
 ## 6. 待确认事项
