@@ -4,7 +4,7 @@
 #       → 幂等重放最小权限授权 → mvn package → 起 5 个 Java 服务
 # 停止：scripts/stop-dev.ps1（-Infra 连容器一起 down，卷保留）
 #
-# 与 AgentFlow 的 scripts/start-dev.ps1 同构：配置只在进程作用域，不写 Windows 全局；
+# 配置只在进程作用域，不写 Windows 全局；
 # 中间件全在 Docker Desktop bridge，端点固定 127.0.0.1，因此不需要开机自启、不需要刷 IP。
 # 旧路径 docs/00-infra/{start-local,run-local,prepare-local-stack}.ps1 保留作 legacy 回滚。
 [CmdletBinding()]
@@ -112,7 +112,7 @@ if (-not $SkipGrants) {
 
 if ($InfraOnly) {
     Write-Host ''
-    Write-Host 'DocQA 基础设施已启动（127.0.0.1 专属端口段，可与 AgentFlow 同时运行）：'
+    Write-Host 'DocQA 基础设施已启动（127.0.0.1 专属端口段，可与其他本地项目并行）：'
     Write-Host ("  MySQL {0} / PG {1} / Redis {2} / MinIO {3} / RMQ {4},{5}" -f `
         (Get-Conf 'DOCQA_DB_PORT'), (Get-Conf 'DOCQA_PG_PORT'), (Get-Conf 'DOCQA_REDIS_PORT'), `
         (Get-Conf 'DOCQA_MINIO_PORT'), (Get-Conf 'DOCQA_ROCKETMQ_NAMESRV_PORT'), (Get-Conf 'DOCQA_ROCKETMQ_BROKER_PORT'))
@@ -138,7 +138,7 @@ if (-not $NoBuild) {
 }
 
 # -----------------------------------------------------------------------------
-# 6. 起 Java 服务（保持 Windows 原生，与 AgentFlow 一致）
+# 6. 起 Java 服务（保持 Windows 原生进程）
 # -----------------------------------------------------------------------------
 $javaServices = @(
     @{ Name = 'user-service';     Port = 18081 },

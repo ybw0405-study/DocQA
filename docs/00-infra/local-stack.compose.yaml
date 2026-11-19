@@ -8,7 +8,7 @@
 #     若改用 bridge + 端口映射，broker 会注册容器内网 IP，Windows 侧客户端拿到地址后连不上。
 #   - 端口避让：Milvus standalone 的 compose 已占用宿主机 9000/9001（它自带的 MinIO），
 #     因此本文件的 MinIO 使用 9100/9101。Redis 使用 16379：默认 6379 会被
-#     Docker Desktop 侧其它项目（agentflow）发布的 redis 抢占——WSL2 NAT 模式下
+#     Docker Desktop 侧其它项目发布的 redis 抢占——WSL2 NAT 模式下
 #     Docker Desktop 与本发行版共享内核端口面，实测 6379 谁先起谁占用，
 #     docqa 专属 Redis 改绑 16379 从根上切断两个项目的端口纠缠。
 #
@@ -83,7 +83,7 @@ services:
     image: redis:7-alpine
     container_name: docqa-redis
     network_mode: host
-    # 16379 避让 Docker Desktop 侧 agentflow-redis 的 6379（见文件头注释）
+    # 16379 避让 Docker Desktop 侧其它项目已占用的 6379（见文件头注释）
     command: redis-server --port 16379 --requirepass "${DOCQA_REDIS_PASSWORD}" --maxmemory 200mb --maxmemory-policy allkeys-lru
     volumes:
       - redis-data:/data
