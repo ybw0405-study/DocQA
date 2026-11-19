@@ -225,7 +225,7 @@ onMounted(() => {
             <tr>
               <td>{{ formatDateTime(event.occurredAt) }}</td>
               <td>
-                {{ event.eventType }}
+                <span class="audit-table__event">{{ event.eventType }}</span>
                 <span class="muted">{{ event.agentName ?? '无执行体' }}</span>
               </td>
               <td>{{ event.source }}</td>

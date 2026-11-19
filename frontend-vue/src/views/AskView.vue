@@ -105,128 +105,130 @@ onBeforeUnmount(() => {
     </BaseButton>
   </BaseCard>
 
-  <BaseCard title="对话记录">
-    <BaseButton
-      v-if="conversations.canLoadHistoryMore"
-      @click="conversations.loadHistoryMore()"
-    >
-      加载更早的消息
-    </BaseButton>
-
-    <ol class="ask__messages">
-      <li
-        v-for="row in conversations.messages"
-        :key="row.key"
-        class="ask__message"
-      >
-        <p class="ask__message-head">
-          <span class="ask__role">{{ ROLE_LABELS[row.role] }}</span>
-          <span class="muted">{{ formatDateTime(row.createdAt) }}</span>
-        </p>
-        <!-- 消息正文按 pii-v1 脱敏后仍是不可信文本，只做文本插值。 -->
-        <p class="ask__content">
-          {{ row.content }}<span
-            v-if="row.key === conversations.streamKey"
-            class="ask__cursor"
-            data-testid="stream-cursor"
-            aria-hidden="true"
-          />
-        </p>
-        <!-- 生成中的行还没有治理结论：此时按「历史消息」渲染会把尚未定稿的半行说成已落库的记录。 -->
-        <GovernanceBadge
-          v-if="row.role === 'assistant' && row.key !== conversations.streamKey"
-          :governance="row.governance"
-          :token-count="row.tokenCount"
-          :trace-id="row.traceId"
-        />
-        <CitationList
-          v-if="row.governance !== null"
-          :citations="row.governance.citations"
-          :known-file-names="conversations.fileNames"
-        />
-      </li>
-    </ol>
-    <EmptyState
-      v-if="conversations.currentId === null"
-      :text="EMPTY_STATE_TEXT.askNoCurrent"
-    />
-    <EmptyState
-      v-else-if="conversations.historyLoaded && conversations.messages.length === 0"
-      :text="EMPTY_STATE_TEXT.askNoMessages"
-    />
-  </BaseCard>
-
-  <BaseCard title="提问">
-    <BaseField label="问题">
-      <textarea
-        data-testid="question"
-        :value="conversations.question"
-        :maxlength="QUESTION_MAX_LENGTH"
-        rows="4"
-        :disabled="conversations.submitting"
-        @input="onQuestion"
-      />
-    </BaseField>
-
-    <div class="ask__docs">
-      <p class="muted">
-        已选 {{ conversations.selected.length }}/{{ DOCUMENT_IDS_MAX }}，检索范围只来自已可检索的文档。
-      </p>
-      <ul>
-        <li
-          v-for="doc in conversations.pickerItems"
-          :key="doc.documentId"
-        >
-          <label>
-            <input
-              type="checkbox"
-              :checked="conversations.selected.includes(doc.documentId)"
-              :disabled="conversations.submitting"
-              @change="conversations.toggleDocument(doc.documentId)"
-            >
-            {{ doc.fileName }}
-          </label>
-        </li>
-      </ul>
-      <EmptyState
-        v-if="conversations.pickerLoaded && conversations.pickerItems.length === 0"
-        :text="EMPTY_STATE_TEXT.askNoIndexedDocs"
-      />
+  <div class="ask__stream">
+    <BaseCard title="对话记录">
       <BaseButton
-        v-if="conversations.canLoadPickerMore"
-        @click="conversations.loadPickerMore()"
+        v-if="conversations.canLoadHistoryMore"
+        @click="conversations.loadHistoryMore()"
       >
-        加载更多文档
+        加载更早的消息
       </BaseButton>
-    </div>
 
-    <BaseButton
-      class="ask__submit"
-      data-testid="submit"
-      :disabled="conversations.submitting || waiting"
-      @click="conversations.submitQuestion()"
-    >
-      {{ submitLabel }}
-    </BaseButton>
-    <!-- 提问按钮在生成期间禁用，断开只能由这个入口发起；切换会话同样会断开。 -->
-    <BaseButton
-      v-if="conversations.streaming"
-      data-testid="stop"
-      @click="conversations.abortStream()"
-    >
-      停止生成
-    </BaseButton>
-    <p
-      v-if="waiting"
-      class="muted"
-    >
-      限流等待 {{ secondsLeft }} 秒。
-    </p>
+      <ol class="ask__messages">
+        <li
+          v-for="row in conversations.messages"
+          :key="row.key"
+          class="ask__message"
+        >
+          <p class="ask__message-head">
+            <span class="ask__role">{{ ROLE_LABELS[row.role] }}</span>
+            <span class="muted">{{ formatDateTime(row.createdAt) }}</span>
+          </p>
+          <!-- 消息正文按 pii-v1 脱敏后仍是不可信文本，只做文本插值。 -->
+          <p class="ask__content">
+            {{ row.content }}<span
+              v-if="row.key === conversations.streamKey"
+              class="ask__cursor"
+              data-testid="stream-cursor"
+              aria-hidden="true"
+            />
+          </p>
+          <!-- 生成中的行还没有治理结论：此时按「历史消息」渲染会把尚未定稿的半行说成已落库的记录。 -->
+          <GovernanceBadge
+            v-if="row.role === 'assistant' && row.key !== conversations.streamKey"
+            :governance="row.governance"
+            :token-count="row.tokenCount"
+            :trace-id="row.traceId"
+          />
+          <CitationList
+            v-if="row.governance !== null"
+            :citations="row.governance.citations"
+            :known-file-names="conversations.fileNames"
+          />
+        </li>
+      </ol>
+      <EmptyState
+        v-if="conversations.currentId === null"
+        :text="EMPTY_STATE_TEXT.askNoCurrent"
+      />
+      <EmptyState
+        v-else-if="conversations.historyLoaded && conversations.messages.length === 0"
+        :text="EMPTY_STATE_TEXT.askNoMessages"
+      />
+    </BaseCard>
 
-    <AppAlert
-      :detail="conversations.detail"
-      :code="conversations.code"
-      :trace-id="conversations.traceId"
-    />
-  </BaseCard>
+    <BaseCard title="提问">
+      <BaseField label="问题">
+        <textarea
+          data-testid="question"
+          :value="conversations.question"
+          :maxlength="QUESTION_MAX_LENGTH"
+          rows="4"
+          :disabled="conversations.submitting"
+          @input="onQuestion"
+        />
+      </BaseField>
+
+      <div class="ask__docs">
+        <p class="muted">
+          已选 {{ conversations.selected.length }}/{{ DOCUMENT_IDS_MAX }}，检索范围只来自已可检索的文档。
+        </p>
+        <ul>
+          <li
+            v-for="doc in conversations.pickerItems"
+            :key="doc.documentId"
+          >
+            <label>
+              <input
+                type="checkbox"
+                :checked="conversations.selected.includes(doc.documentId)"
+                :disabled="conversations.submitting"
+                @change="conversations.toggleDocument(doc.documentId)"
+              >
+              {{ doc.fileName }}
+            </label>
+          </li>
+        </ul>
+        <EmptyState
+          v-if="conversations.pickerLoaded && conversations.pickerItems.length === 0"
+          :text="EMPTY_STATE_TEXT.askNoIndexedDocs"
+        />
+        <BaseButton
+          v-if="conversations.canLoadPickerMore"
+          @click="conversations.loadPickerMore()"
+        >
+          加载更多文档
+        </BaseButton>
+      </div>
+
+      <BaseButton
+        class="ask__submit"
+        data-testid="submit"
+        :disabled="conversations.submitting || waiting"
+        @click="conversations.submitQuestion()"
+      >
+        {{ submitLabel }}
+      </BaseButton>
+      <!-- 提问按钮在生成期间禁用，断开只能由这个入口发起；切换会话同样会断开。 -->
+      <BaseButton
+        v-if="conversations.streaming"
+        data-testid="stop"
+        @click="conversations.abortStream()"
+      >
+        停止生成
+      </BaseButton>
+      <p
+        v-if="waiting"
+        class="muted"
+      >
+        限流等待 {{ secondsLeft }} 秒。
+      </p>
+
+      <AppAlert
+        :detail="conversations.detail"
+        :code="conversations.code"
+        :trace-id="conversations.traceId"
+      />
+    </BaseCard>
+  </div>
 </template>
