@@ -64,28 +64,25 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
     }
 
     @Override
-    public List<OutboxExecution> findOutboxBatch(UUID tenantId, Instant afterRecordedAt, UUID afterId, int limit) {
+    public List<OutboxExecution> findOutboxBatch(Instant afterRecordedAt, UUID afterId, int limit) {
         if (afterRecordedAt == null || afterId == null) {
             return jdbcTemplate.query("""
-                            SELECT id, recorded_at, audit_outbox
+                            SELECT id, tenant_id, recorded_at, audit_outbox
                             FROM agent_execution
-                            WHERE tenant_id = ?
                             ORDER BY recorded_at, id
                             LIMIT ?
                             """,
                     rowMapper(),
-                    tenantId.toString(),
                     limit);
         }
         return jdbcTemplate.query("""
-                        SELECT id, recorded_at, audit_outbox
+                        SELECT id, tenant_id, recorded_at, audit_outbox
                         FROM agent_execution
-                        WHERE tenant_id = ? AND (recorded_at > ? OR (recorded_at = ? AND id > ?))
+                        WHERE recorded_at > ? OR (recorded_at = ? AND id > ?)
                         ORDER BY recorded_at, id
                         LIMIT ?
                         """,
                 rowMapper(),
-                tenantId.toString(),
                 Timestamp.from(afterRecordedAt),
                 Timestamp.from(afterRecordedAt),
                 afterId.toString(),
@@ -97,23 +94,20 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
     }
 
     @Override
-    public OutboxBacklog outboxBacklog(UUID tenantId, Instant afterRecordedAt, UUID afterId) {
+    public OutboxBacklog outboxBacklog(Instant afterRecordedAt, UUID afterId) {
         if (afterRecordedAt == null || afterId == null) {
             return jdbcTemplate.queryForObject("""
                             SELECT COUNT(*) AS pending, MIN(recorded_at) AS oldest_recorded_at
                             FROM agent_execution
-                            WHERE tenant_id = ?
                             """,
-                    backlogMapper(),
-                    tenantId.toString());
+                    backlogMapper());
         }
         return jdbcTemplate.queryForObject("""
                         SELECT COUNT(*) AS pending, MIN(recorded_at) AS oldest_recorded_at
                         FROM agent_execution
-                        WHERE tenant_id = ? AND (recorded_at > ? OR (recorded_at = ? AND id > ?))
+                        WHERE recorded_at > ? OR (recorded_at = ? AND id > ?)
                         """,
                 backlogMapper(),
-                tenantId.toString(),
                 Timestamp.from(afterRecordedAt),
                 Timestamp.from(afterRecordedAt),
                 afterId.toString());
@@ -129,6 +123,7 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
     private OutboxExecution mapRow(ResultSet rs) throws SQLException {
         return new OutboxExecution(
                 UUID.fromString(rs.getString("id")),
+                UUID.fromString(rs.getString("tenant_id")),
                 rs.getTimestamp("recorded_at").toInstant(),
                 deserialize(rs.getString("audit_outbox")));
     }

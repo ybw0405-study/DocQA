@@ -2,8 +2,8 @@ package com.docqa.reminder.service;
 
 import com.docqa.common.trace.TraceIdContext;
 import com.docqa.common.metrics.BusinessMetrics;
-import com.docqa.common.tenant.TenantContext;
 import com.docqa.reminder.config.ReminderProperties;
+import com.docqa.reminder.domain.DueReminder;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.messaging.ReminderDueEvent;
 import com.docqa.reminder.messaging.ReminderDuePublisher;
@@ -63,15 +63,16 @@ public class ReminderDueService {
             TraceIdContext.set(traceId);
         }
         try {
-            // P0: 定时任务没有 HTTP 租户上下文，存量数据全在默认租户；P1 改为遍历所有 ACTIVE 租户。
-            UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
+            // 定时任务跨租户扫描；每行自带 tenant_id，用于消息 stamp 与后续 CAS 写入。
             Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
-            List<ReminderRow> due = reminderRepository.findDue(tenantId, now, properties.getScanBatchSize());
+            List<DueReminder> due = reminderRepository.findDue(now, properties.getScanBatchSize());
             int published = 0;
             int duplicates = 0;
             int skipped = 0;
             int failed = 0;
-            for (ReminderRow row : due) {
+            for (DueReminder dueReminder : due) {
+                UUID tenantId = dueReminder.tenantId();
+                ReminderRow row = dueReminder.reminder();
                 try {
                     Outcome outcome = dispatch(tenantId, row, now, traceId);
                     // §4.2：按终态计数。OUTCOME 枚举本身就是标签域，直接 name() 落标签，
@@ -154,7 +155,8 @@ public class ReminderDueService {
                 row.timezone(),
                 occurrence,
                 next.orElse(null),
-                now);
+                now,
+                tenantId);
         try {
             reminderDuePublisher.publish(event);
         } catch (RuntimeException ex) {

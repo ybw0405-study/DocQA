@@ -53,8 +53,14 @@ public class AuditEventService {
             LOGGER.debug("Duplicate audit event ignored from Redis: eventId={}", event.id());
             return IngestOutcome.DUPLICATE;
         }
-        // P0: MQ 消息尚未携带 tenant_id，P1 随消息传递；当前全部审计事件归属默认租户。
-        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
+        UUID tenantId = message.tenantId();
+        if (tenantId == null) {
+            // 部署窗口内可能还有不带 tenantId 的在途旧消息；P0 存量数据全在默认租户，
+            // 按默认租户收敛并告警，新消息必须携带 tenantId。
+            LOGGER.warn(
+                    "Audit event missing tenantId, falling back to default tenant: eventId={}", event.id());
+            tenantId = TenantContext.DEFAULT_TENANT_ID;
+        }
         try {
             repository.insert(tenantId, event);
         } catch (DuplicateKeyException ex) {

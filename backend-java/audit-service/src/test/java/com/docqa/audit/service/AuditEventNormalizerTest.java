@@ -34,7 +34,7 @@ class AuditEventNormalizerTest {
                 OTHER_TRACE_ID,
                 USER_ID,
                 CONVERSATION_ID,
-                Map.of("chunkCount", 6));
+                Map.of("chunkCount", 6), null);
 
         AuditEventNormalizer.NormalizedAuditEvent result = normalizer.normalize(message, TRACE_ID, NOW);
 
@@ -64,7 +64,7 @@ class AuditEventNormalizerTest {
     void rejectsEventsWithoutAnAuthoritativeTraceId() {
         AuditEventMessage message = new AuditEventMessage(
                 EVENT_ID, "RAG_RETRIEVED", "rag_retriever", "PYTHON", "INFO",
-                NOW, "00000000000000000000000000000000", USER_ID, CONVERSATION_ID, Map.of());
+                NOW, "00000000000000000000000000000000", USER_ID, CONVERSATION_ID, Map.of(), null);
 
         assertThatThrownBy(() -> normalizer.normalize(message, null, NOW))
                 .isInstanceOf(AuditEventRejectedException.class)
@@ -75,15 +75,15 @@ class AuditEventNormalizerTest {
     void rejectsEventsWithoutRequiredCoreFields() {
         assertThatThrownBy(() -> normalizer.normalize(
                 new AuditEventMessage(null, "RAG_RETRIEVED", "rag", "PYTHON", "INFO",
-                        NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of()), null, NOW))
+                        NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of(), null), null, NOW))
                 .hasMessage("missing eventId");
         assertThatThrownBy(() -> normalizer.normalize(
                 new AuditEventMessage(EVENT_ID, "RAG_RETRIEVED", "rag", "PYTHON", "INFO",
-                        NOW, TRACE_ID, null, CONVERSATION_ID, Map.of()), null, NOW))
+                        NOW, TRACE_ID, null, CONVERSATION_ID, Map.of(), null), null, NOW))
                 .hasMessage("missing userId");
         assertThatThrownBy(() -> normalizer.normalize(
                 new AuditEventMessage(EVENT_ID, "RAG_RETRIEVED", "rag", "PYTHON", "INFO",
-                        null, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of()), null, NOW))
+                        null, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of(), null), null, NOW))
                 .hasMessage("missing occurredAt");
         assertThatThrownBy(() -> normalizer.normalize(null, TRACE_ID, NOW))
                 .hasMessage("missing audit event");
@@ -93,15 +93,15 @@ class AuditEventNormalizerTest {
     void rejectsInvalidEventTypeAndSource() {
         assertThatThrownBy(() -> normalizer.normalize(
                 new AuditEventMessage(EVENT_ID, "rag retrieved", "rag", "PYTHON", "INFO",
-                        NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of()), null, NOW))
+                        NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of(), null), null, NOW))
                 .hasMessage("invalid eventType");
         assertThatThrownBy(() -> normalizer.normalize(
                 new AuditEventMessage(EVENT_ID, "RAG_RETRIEVED", "rag", "RUST", "INFO",
-                        NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of()), null, NOW))
+                        NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of(), null), null, NOW))
                 .hasMessage("invalid source");
         assertThatThrownBy(() -> normalizer.normalize(
                 new AuditEventMessage(EVENT_ID, "RAG_RETRIEVED", "rag", null, "INFO",
-                        NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of()), null, NOW))
+                        NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of(), null), null, NOW))
                 .hasMessage("missing source");
     }
 
@@ -109,7 +109,7 @@ class AuditEventNormalizerTest {
     void defaultsMissingSeverityAndDropsOverlongAgentNames() {
         AuditEventMessage message = new AuditEventMessage(
                 EVENT_ID, "RAG_RETRIEVED", "a".repeat(65), "PYTHON", "UNKNOWN",
-                NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of());
+                NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of(), null);
 
         AuditEventNormalizer.NormalizedAuditEvent result = normalizer.normalize(message, null, NOW);
 
@@ -122,7 +122,7 @@ class AuditEventNormalizerTest {
     void dropsPiiLikeAgentNames() {
         AuditEventMessage message = new AuditEventMessage(
                 EVENT_ID, "RAG_RETRIEVED", "student@example.com", "PYTHON", "INFO",
-                NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of());
+                NOW, TRACE_ID, USER_ID, CONVERSATION_ID, Map.of(), null);
 
         AuditEventNormalizer.NormalizedAuditEvent result = normalizer.normalize(message, null, NOW);
 
@@ -134,10 +134,10 @@ class AuditEventNormalizerTest {
     void clampsOccurredAtFromTheFutureAndPreservesPastTimestamps() {
         AuditEventMessage future = new AuditEventMessage(
                 EVENT_ID, "RAG_RETRIEVED", "rag", "PYTHON", "INFO",
-                NOW.plusSeconds(3600), TRACE_ID, USER_ID, CONVERSATION_ID, Map.of());
+                NOW.plusSeconds(3600), TRACE_ID, USER_ID, CONVERSATION_ID, Map.of(), null);
         AuditEventMessage past = new AuditEventMessage(
                 EVENT_ID, "RAG_RETRIEVED", "rag", "PYTHON", "INFO",
-                NOW.minusSeconds(86400), TRACE_ID, USER_ID, CONVERSATION_ID, Map.of());
+                NOW.minusSeconds(86400), TRACE_ID, USER_ID, CONVERSATION_ID, Map.of(), null);
 
         AuditEventNormalizer.NormalizedAuditEvent clamped = normalizer.normalize(future, null, NOW);
         AuditEventNormalizer.NormalizedAuditEvent preserved = normalizer.normalize(past, null, NOW);
@@ -171,6 +171,6 @@ class AuditEventNormalizerTest {
                 OTHER_TRACE_ID,
                 USER_ID,
                 CONVERSATION_ID,
-                payload);
+                payload, null);
     }
 }

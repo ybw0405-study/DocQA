@@ -1,5 +1,6 @@
 package com.docqa.reminder.repository;
 
+import com.docqa.reminder.domain.DueReminder;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.domain.ReminderStatus;
 import java.time.Instant;
@@ -23,7 +24,11 @@ public interface ReminderRepository {
     int updateStatus(UUID tenantId, UUID id, UUID userId, long expectedVersion, ReminderStatus target,
             Instant nextTriggerAt, Instant updatedAt);
 
-    List<ReminderRow> findDue(UUID tenantId, Instant now, int limit);
+    /**
+     * 跨租户扫描到期行。定时任务无 HTTP 行上下文，租户边界由每行自带的 tenant_id 随消息下发；
+     * 调用方必须用返回的 {@link DueReminder#tenantId()} 做后续写入与消息 stamp。
+     */
+    List<DueReminder> findDue(Instant now, int limit);
 
     int advance(UUID tenantId, UUID id, long expectedVersion, Instant nextTriggerAt, Instant lastTriggeredAt);
 

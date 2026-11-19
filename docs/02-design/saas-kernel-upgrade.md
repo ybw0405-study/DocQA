@@ -181,12 +181,12 @@ CREATE TABLE tenant (
 
 ### 5.2 P0 明确的临时口径（P1 必须替换）
 
-> 第 1、2 条与第 3 条已由 §5.9 / §5.10 替换；第 4～6 条仍待办。
+> 第 1～4 条已由 §5.9 / §5.10 / §5.11 替换；第 5～6 条仍待办。
 
 1. **只有一个租户生效**。V10 把全部存量数据回填到默认租户，登录/注册尚无租户解析入口，因此所有请求都拿到默认租户 ID。租户隔离的**结构与约束已就位，但隔离效果要到 P1 接入多租户解析后才可观测**。
 2. **登录/注册用 `DEFAULT_TENANT_ID`**：`AuthService`、`RefreshTokenService`、`DemoUserSeeder` 内有 `tenantId()` 帮助方法，P1 改为按邮箱域名路由解析。
 3. **管理面聚合只看默认租户**：`AdminQuotaService` / `AdminAiUsageService` / `AdminAiControlsService` / `AdminAuditQueryService` / `AdminUserService` 传默认租户，P1 改为按管理员可见租户集过滤。
-4. **MQ / 定时任务**：`AuditOutboxRelay`、`AuditEventService`、`ReminderDueService`、`ReminderTriggerIngestService`、`ParseResultHandler` 等传默认租户，P1 随消息体携带 `tenant_id` 或遍历所有 ACTIVE 租户。
+4. **MQ / 定时任务**：`AuditOutboxRelay`、`AuditEventService`、`ReminderDueService`、`ReminderTriggerIngestService`、`ParseResultHandler` 等传默认租户，P1 随消息体携带 `tenant_id` 或遍历所有 ACTIVE 租户。（已由 §5.11 收口除 `ParseResultHandler` 外的四点）
 5. **Java↔Python 协议未加 tenant 字段**：Python `AgentAskRequest` 是 `extra="forbid"`，双向必须同批发布，因此放在 P1 与 OPA 一起做。P0 的租户过滤在 Java 侧生效后再把 `documentScopes` 传给 Python。
 6. **pgvector / MinIO / Redis 键未动**：V10 只覆盖 MySQL 业务库。这三者加租户维度是 P1 范围（见 §1.1）。
 
@@ -412,6 +412,35 @@ DELETE FROM flyway_schema_history WHERE version = '10' AND success = 0;
 控制器测试为每个请求显式注入租户属性并验证调用签名。
 
 验证：`mvn -o test` → 1243 tests / 0 failures / 0 errors；`mvn -o checkstyle:check` → 0 违规。
+
+### 5.11 MQ / 定时任务的租户传播（2026-11-19，§5.2 第 4 条主体完成）
+
+把「无 HTTP 行上下文」的两条链路从固定默认租户改为**租户随行、随消息传播**，
+选择消息体携带 `tenant_id` + 定时任务跨租户扫描，而不是遍历 ACTIVE 租户清单：
+后者需要引入跨服务租户目录与每租户游标，改动面与失败模式都更大；审计事件不允许丢失，
+租户状态治理放在登录/网关入口，而不是靠定时任务丢弃事件来实现。
+
+| 链路 | 生产侧 | 扫描侧 | 消费侧 |
+|---|---|---|---|
+| 审计 | `AuditEvent` 加 `tenantId`；工厂生成时为 null，不读 HTTP 上下文 | `AuditOutboxRelay` 用单一全局游标跨租户扫 outbox，`findOutboxBatch`/`outboxBacklog` 去 tenantId 参数；`OutboxExecution` 带回行的 `tenant_id` | relay 投递前用 `event.withTenant(row.tenantId)` stamp；`AuditMessageHandler` 反序列化后 `AuditEventService.ingest` 按消息 tenantId 落库 |
+| 提醒 | `ReminderDueEvent` 加 `tenantId` | `findDue` 跨租户扫描，返回 `DueReminder(tenantId, row)` 而非 `List<ReminderRow>`；`ReminderDueService` 用每行 tenantId 做 stamp 与 CAS 写入 | `ReminderDueMessageHandler` 反序列化后 `ReminderTriggerIngestService.ingest` 按消息 tenantId 落库 |
+
+**兼容策略**：两个消费端对 `tenantId == null` 的在途旧消息按默认租户收敛并打 WARN
+（P0 存量数据全在默认租户），新消息必须携带。租户字段加在消息体尾部，
+`FAIL_ON_UNKNOWN_PROPERTIES` 不会因新增字段拒绝旧消费者；但 agent-gateway /
+reminder-service / document-service 的生产配置是 `true`，**本批改动要求相关服务同批发布**，
+否则老消费者读到带 `tenantId` 的新消息会拒收。Java↔Python 协议未改（仍属第 5 条）。
+
+**边界**：`findOutboxBatch` / `findDue` 是有意的跨租户扫描，请求参数不再带 tenantId；
+写侧 `insert` / `advance` / `complete` 仍逐行带 `tenant_id` 谓词，租户边界在写侧保证。
+`TenantIsolationContractTest` 是文件级判定，这两个文件因写侧仍含 `tenant_id`，无需新增豁免，
+已在测试内注释说明。`AuditEventService.findByTraceId` 目前无 HTTP 入口（审计服务是纯消费者），
+暂保留默认租户，待管理面暴露查询时一并收口。
+
+**尚未完成**：`ParseResultHandler`（Python 解析回写）仍属第 5 条 Java↔Python 协议范围；
+§5.2 第 5 条协议、第 6 条 pgvector/MinIO/Redis、域名路由、OPA ABAC 仍未开始。
+
+验证：`mvn -o test` → 全绿；`mvn -o checkstyle:check` → 0 违规。
 
 ---
 

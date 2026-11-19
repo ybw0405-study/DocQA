@@ -14,5 +14,16 @@ public record AuditEvent(
         String traceId,
         UUID userId,
         UUID conversationId,
-        Map<String, Object> payloadRedacted) {
+        Map<String, Object> payloadRedacted,
+        UUID tenantId) {
+
+    /**
+     * outbox 行的 {@code tenant_id} 才是租户归属的权威来源；工厂生成事件时尚未补写，
+     * 由 relay 在投递前用这个方法补上。
+     */
+    public AuditEvent withTenant(UUID tenantId) {
+        return new AuditEvent(
+                eventId, eventType, agentName, source, severity, occurredAt, traceId,
+                userId, conversationId, payloadRedacted, tenantId);
+    }
 }

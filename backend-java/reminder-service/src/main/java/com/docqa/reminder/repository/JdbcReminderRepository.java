@@ -3,6 +3,7 @@ package com.docqa.reminder.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.docqa.reminder.domain.DueReminder;
 import com.docqa.reminder.domain.ReminderRow;
 import com.docqa.reminder.domain.ReminderStatus;
 import java.sql.ResultSet;
@@ -118,20 +119,24 @@ public class JdbcReminderRepository implements ReminderRepository {
     }
 
     @Override
-    public List<ReminderRow> findDue(UUID tenantId, Instant now, int limit) {
+    public List<DueReminder> findDue(Instant now, int limit) {
+        // 定时任务跨租户扫描：每行带回自己的 tenant_id，由投放侧 stamp 到消息并用于后续写入。
         return jdbcTemplate.query("""
-                        SELECT %s
+                        SELECT tenant_id, %s
                         FROM reminder
-                        WHERE tenant_id = ? AND status = 'ACTIVE' AND next_trigger_at IS NOT NULL
+                        WHERE status = 'ACTIVE' AND next_trigger_at IS NOT NULL
                           AND next_trigger_at <= ?
                         ORDER BY next_trigger_at
                         LIMIT ?
                         """.formatted(COLUMNS),
-                rowMapper,
-                tenantId.toString(),
+                dueRowMapper,
                 Timestamp.from(now),
                 limit);
     }
+
+    private final RowMapper<DueReminder> dueRowMapper = (rs, rowNum) -> new DueReminder(
+            UUID.fromString(rs.getString("tenant_id")),
+            mapRow(rs, rowNum));
 
     @Override
     public int advance(UUID tenantId, UUID id, long expectedVersion, Instant nextTriggerAt,

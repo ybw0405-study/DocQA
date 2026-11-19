@@ -79,8 +79,15 @@ public class ReminderTriggerIngestService {
                 null,
                 deliveredAt,
                 deliveredAt);
-        // P0: reminder.due 消息尚未携带 tenant_id，P1 随消息传递；当前存量数据全在默认租户。
-        UUID tenantId = TenantContext.DEFAULT_TENANT_ID;
+        UUID tenantId = event.tenantId();
+        if (tenantId == null) {
+            // 部署窗口内可能还有不带 tenantId 的在途旧消息；P0 存量数据全在默认租户，
+            // 按默认租户收敛并告警，新消息必须携带 tenantId。
+            LOGGER.warn(
+                    "Reminder due event missing tenantId, falling back to default tenant: reminderId={}, traceId={}",
+                    event.reminderId(), traceId);
+            tenantId = TenantContext.DEFAULT_TENANT_ID;
+        }
         try {
             reminderTriggerRepository.insert(tenantId, row);
         } catch (DuplicateKeyException ex) {

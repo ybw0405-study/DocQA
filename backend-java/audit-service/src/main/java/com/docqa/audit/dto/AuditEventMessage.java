@@ -14,5 +14,6 @@ public record AuditEventMessage(
         String traceId,
         UUID userId,
         UUID conversationId,
-        Map<String, Object> payloadRedacted) {
+        Map<String, Object> payloadRedacted,
+        UUID tenantId) {
 }

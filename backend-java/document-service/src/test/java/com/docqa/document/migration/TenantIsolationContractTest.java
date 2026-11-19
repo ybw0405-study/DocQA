@@ -30,6 +30,16 @@ class TenantIsolationContractTest {
     /** 跨租户运维任务：按全局游标清理过期行，不按单租户过滤。 */
     private static final List<String> GLOBAL_MAINTENANCE_METHODS = List.of("deleteExpiredTerminal");
 
+    /*
+     * 有意的跨租户扫描（不属于数据泄漏，不要给它们补 tenant_id 谓词）：
+     * - JdbcAgentExecutionRepository.findOutboxBatch / outboxBacklog：审计 outbox 的全局 relay，
+     *   按单一游标投递；每行自带 tenant_id，由 relay stamp 到消息再下发。
+     * - JdbcReminderRepository.findDue：定时到期扫描，返回 DueReminder(tenantId, row)，
+     *   由投放侧用行上的 tenantId 做消息 stamp 与后续 CAS 写入。
+     * 两者的写侧（insert / advance / complete）仍逐行带 tenant_id 谓词，租户边界在写侧保证。
+     * 本测试是文件级判定，这两个文件仍因写侧而含 tenant_id，故无需新增豁免。
+     */
+
     /**
      * 不适用「必须含 tenant_id」判定的仓库：tenant 表本身就是租户清单，
      * 它的行没有「所属租户」这个属性。除此之外不接受任何豁免。

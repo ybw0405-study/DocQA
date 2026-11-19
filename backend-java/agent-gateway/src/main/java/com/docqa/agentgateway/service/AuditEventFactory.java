@@ -128,7 +128,8 @@ public class AuditEventFactory {
                 traceId,
                 userId,
                 conversationId,
-                Map.copyOf(payload));
+                Map.copyOf(payload),
+                null);
     }
 
     public Instant now() {

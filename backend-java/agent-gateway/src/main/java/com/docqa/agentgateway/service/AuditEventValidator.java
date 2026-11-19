@@ -138,7 +138,8 @@ public class AuditEventValidator {
                 traceId,
                 userId,
                 conversationId,
-                payload);
+                payload,
+                null);
     }
 
     private PayloadFilter filterPayload(Map<String, Object> payload) {

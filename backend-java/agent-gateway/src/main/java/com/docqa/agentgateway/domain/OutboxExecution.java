@@ -5,5 +5,5 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-public record OutboxExecution(UUID id, Instant recordedAt, List<AuditEvent> events) {
+public record OutboxExecution(UUID id, UUID tenantId, Instant recordedAt, List<AuditEvent> events) {
 }

@@ -35,6 +35,7 @@ import org.springframework.dao.DuplicateKeyException;
 class AuditEventServiceTest {
 
     private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
+    private static final UUID INGEST_TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
     private static final UUID EVENT_ID = UUID.fromString("0192f3a4-a1b2-7c33-9d01-1234567890ab");
     private static final UUID USER_ID = UUID.fromString("0192f3a4-7b2c-7d10-9e8f-1234567890ab");
     private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
@@ -63,7 +64,7 @@ class AuditEventServiceTest {
         AuditEventService.IngestOutcome outcome = service.ingest(message(), null);
 
         ArgumentCaptor<AuditEventRow> captor = ArgumentCaptor.forClass(AuditEventRow.class);
-        verify(repository).insert(eq(TENANT_ID), captor.capture());
+        verify(repository).insert(eq(INGEST_TENANT_ID), captor.capture());
         AuditEventRow row = captor.getValue();
         assertThat(row.id()).isEqualTo(EVENT_ID);
         assertThat(row.traceId()).isEqualTo(TRACE_ID);
@@ -75,6 +76,19 @@ class AuditEventServiceTest {
         assertThat(row.ingestedAt()).isEqualTo(NOW);
         assertThat(outcome).isEqualTo(AuditEventService.IngestOutcome.INGESTED);
         verify(idempotencyStore).markProcessed(EVENT_ID);
+    }
+
+    @Test
+    void fallsBackToDefaultTenantForLegacyMessageMissingTenantId() {
+        AuditEventMessage legacy = new AuditEventMessage(
+                EVENT_ID, "RAG_RETRIEVED", "rag_retriever", "PYTHON", "INFO",
+                NOW.minusSeconds(1), TRACE_ID, USER_ID,
+                UUID.fromString("0192f3a4-8c3d-7e21-8f90-abcdef123456"),
+                Map.of("chunkCount", 6), null);
+
+        service.ingest(legacy, null);
+
+        verify(repository).insert(eq(TENANT_ID), any());
     }
 
     @Test
@@ -102,7 +116,7 @@ class AuditEventServiceTest {
     void rejectsInvalidCoreFieldsBeforeTouchingStorage() {
         AuditEventMessage invalid = new AuditEventMessage(
                 null, "RAG_RETRIEVED", "rag", "PYTHON", "INFO",
-                NOW, TRACE_ID, USER_ID, null, Map.of());
+                NOW, TRACE_ID, USER_ID, null, Map.of(), INGEST_TENANT_ID);
 
         assertThatThrownBy(() -> service.ingest(invalid, null))
                 .isInstanceOf(AuditEventRejectedException.class)
@@ -163,6 +177,7 @@ class AuditEventServiceTest {
                 TRACE_ID,
                 USER_ID,
                 UUID.fromString("0192f3a4-8c3d-7e21-8f90-abcdef123456"),
-                Map.of("chunkCount", 6, "durationMs", 182));
+                Map.of("chunkCount", 6, "durationMs", 182),
+                INGEST_TENANT_ID);
     }
 }

@@ -40,7 +40,7 @@ import org.springframework.dao.DuplicateKeyException;
 @ExtendWith(MockitoExtension.class)
 class ReminderTriggerIngestServiceTest {
 
-    private static final UUID TENANT_ID = TenantContext.DEFAULT_TENANT_ID;
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
     private static final UUID USER_ID = UUID.fromString("0192f3a4-7b2c-7d10-9e8f-1234567890ab");
     private static final UUID REMINDER_ID = UUID.fromString("0192f3a4-7b2c-7d10-9e8f-1234567890ac");
     private static final UUID EVENT_ID = UUID.fromString("0192f3a4-7b2c-7d10-9e8f-1234567890ad");
@@ -89,6 +89,26 @@ class ReminderTriggerIngestServiceTest {
         assertThat(stored.createdAt()).isEqualTo(NOW);
         assertThat(stored.updatedAt()).isEqualTo(NOW);
         assertThat(stored.readAt()).isNull();
+    }
+
+    @Test
+    void storesTheRowUnderTheTenantCarriedByTheEvent() {
+        ingest(new Draft());
+
+        verify(reminderTriggerRepository).insert(eq(TENANT_ID), any());
+    }
+
+    @Test
+    void legacyEventMissingTenantIdFallsBackToDefaultTenant() {
+        ReminderDueEvent legacy = new Draft().event();
+        legacy = new ReminderDueEvent(
+                legacy.eventId(), legacy.traceId(), legacy.reminderId(), legacy.userId(),
+                legacy.title(), legacy.description(), legacy.sourceType(), legacy.rrule(), legacy.timezone(),
+                legacy.occurrenceStartUtc(), legacy.nextTriggerAt(), legacy.occurredAt(), null);
+
+        service(NOW).ingest(legacy, MESSAGE_ID);
+
+        verify(reminderTriggerRepository).insert(eq(TenantContext.DEFAULT_TENANT_ID), any());
     }
 
     @Test
@@ -254,11 +274,12 @@ class ReminderTriggerIngestServiceTest {
         private Instant occurrenceStartUtc = OCCURRENCE;
         private Instant nextTriggerAt = NEXT_TRIGGER;
         private Instant occurredAt = OCCURRED_AT;
+        private UUID tenantId = TENANT_ID;
 
         private ReminderDueEvent event() {
             return new ReminderDueEvent(
                     eventId, traceId, reminderId, userId, title, description, sourceType, rrule, timezone,
-                    occurrenceStartUtc, nextTriggerAt, occurredAt);
+                    occurrenceStartUtc, nextTriggerAt, occurredAt, tenantId);
         }
     }
 }
