@@ -34,8 +34,8 @@ LOG_FILE=/root/parse-worker.log
 VECTOR_LOG_FILE=/root/vector-worker.log
 CPP_DEB_URL="${ROCKETMQ_CPP_DEB_URL:-https://github.com/apache/rocketmq-client-cpp/releases/download/2.2.0/rocketmq-client-cpp-2.2.0.amd64.deb}"
 INFRA_ENV=/opt/docqa-infra/.env
-# VM 里的 Redis 与 WSL 里的 broker 是两个位置，这里逐项探测；IP 变化后需同步 DOCQA_AI_REDIS_URL
-REDIS_HOSTPORT="${DOCQA_REDIS_HOSTPORT:-192.168.40.128:6379}"
+# Redis 与 broker 分处两个位置，这里逐项探测；地址变化后需同步 DOCQA_AI_REDIS_URL
+REDIS_HOSTPORT="${DOCQA_REDIS_HOSTPORT:-127.0.0.1:16379}"
 
 port_open() {
   local host="${1%%:*}" port="${1##*:}"
@@ -165,7 +165,7 @@ status() {
 
 # ---- topic 预建 -------------------------------------------------------------
 # 消费者不会自动建 topic：订阅一个不存在的 topic 只会静默空轮询，日志里除了
-# "the topic[xxx] not exist" 之外没有任何错误，属于沉默故障（S11-4 实测）。
+# "the topic[xxx] not exist" 之外没有任何错误，属于沉默故障（实测确认）。
 # 生产端第一次发送虽然能靠 autoCreateTopicEnable 建出 topic，但队列数与读写权限
 # 由 broker 模板决定，且首个消费者要等下一轮 rebalance（约 20s）才开始消费。
 # 因此把 7 个 topic 的预建纳入启动顺序，updateTopic 幂等，可反复执行。

@@ -335,18 +335,18 @@ DELETE FROM flyway_schema_history WHERE version = '10' AND success = 0;
 
 **排障记录（三连撞车，都是"两个项目共享一个内核"的病）**：
 
-1. **RocketMQ 9876 端口撞车**。恢复 agentflow 时 `docker start` 拉起的
-   `agentflow-rmq-namesrv`（Docker Desktop）与 WSL 发行版里 host 网络模式的
+1. **RocketMQ 9876 端口撞车**。恢复同机另一套本地容器栈时，`docker start` 拉起的
+   namesrv 容器（Docker Desktop）与 WSL 发行版里 host 网络模式的
    `docqa-rmq-namesrv` 争 9876——WSL2 NAT 模式下 Docker Desktop VM 与发行版
    共享端口面，后者报 `BindException: Address already in use` 无限崩溃
    （`Restarting (255)`），`docqa-infra.service` 卡 `activating`。孤儿 socket
-   （`ss -tlnpe` 无进程属主、cgroup 空）是共享端口面的指纹。处置：停
-   agentflow RMQ 两容器后 9876 立即释放，docqa namesrv/broker 自愈。
-   **两个项目的 RMQ 不能同时跑**，除非给 agentflow 换端口。
-2. **Redis 6379 同病**。WSL 里 `*:6379` 的监听者其实是 Docker Desktop 的
-   `agentflow-redis`（停掉即消失）；DOCQA 设计上中间件栈没有 Redis，
-   `DOCQA_REDIS_HOST=192.168.40.128` 是已失联的历史 VM 地址。解法不是蹭
-   agentflow 的 Redis（无密码 + 数据混用，双重不可接受），而是给 docqa-infra
+   （`ss -tlnpe` 无进程属主、cgroup 空）是共享端口面的指纹。处置：停掉
+   占用端口的外部容器后 9876 立即释放，docqa namesrv/broker 自愈。
+   **两套 RMQ 不能同时跑**，除非其中一套换端口。
+2. **Redis 6379 同病**。WSL 里 `*:6379` 的监听者其实是 Docker Desktop 侧另一项目的
+   Redis 容器（停掉即消失）；DOCQA 设计上中间件栈没有 Redis，
+   `DOCQA_REDIS_HOST` 若指向已失联的历史 VM 地址同样不可用。解法不是蹭
+   别的项目那套无密码、数据混用的 Redis，而是给 docqa-infra
    加**专属 Redis**：`local-stack.compose.yaml` 新增 `docqa-redis`
    （host 网络、**16379 避让**、`--requirepass` 从 `/opt/docqa-infra/.env` 注入）。
    Windows 侧同步：`DOCQA_REDIS_PORT=16379`、`DOCQA_REDIS_HOST=<当前 WSL IP>`、

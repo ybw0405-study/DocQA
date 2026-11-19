@@ -5,8 +5,8 @@
 #   却一个进程都没停，jar 一直被占用，下一次 mvn package 改名失败、整个启动中断。
 #
 # 为什么按「仓库路径」而不是按模块名 / java.exe 全量匹配：
-#   同机还有 AgentFlow 跑着 java.exe 与 agent-gateway-0.1.0.jar。按模块名或按任意
-#   java.exe 匹配会把另一个项目一起杀掉（2026-11-18 事故）。这里只认三种归属证据：
+#   同机可能还有其它本地项目跑着 java.exe 与同名 gateway jar。按模块名或按任意
+#   java.exe 匹配会把别的项目一起杀掉。这里只认三种归属证据：
 #   解释器/脚本路径在仓库内、绝对 jar 路径在仓库内、相对 jar 路径能在仓库根下解析到真实文件。
 param(
     [switch]$Infra,
