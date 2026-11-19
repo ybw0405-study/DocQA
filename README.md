@@ -38,6 +38,8 @@
 - **控制面 / 数据面分离**：Java 负责认证、路由、治理与业务状态；Python 负责解析、向量化与 RAG。AI 依赖被收敛到唯一入口，预算、配额、熔断与审计可治理。
 - **本地优先**：中间件、模型适配与数据都在本机或自己的服务器上，课件不必上传到第三方。
 - **工程化完整**：三端统一门禁、数据库最小权限、审计只追加、架构约束与契约测试。
+- **租户隔离地基**：全链路 `tenant_id` 强过滤、JWT 租户声明与租户级治理开关已就位；
+  当前默认单租户运行，第二租户由运维 bootstrap 端点供给（见下方设计文档）。
 
 ## 功能特性
 
@@ -190,8 +192,10 @@ powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -Includ
 | [archunit-rules.md](docs/00-infra/archunit-rules.md) | 架构约束与 ArchUnit 规则 |
 | [git-workflow.md](docs/00-infra/git-workflow.md) | 分支模型、提交规范、PR 检查项 |
 | [storage.md](docs/02-design/storage.md) | 表结构、索引与向量存储 |
-| [openapi-java.yaml](docs/02-design/openapi-java.yaml) | Java 对外接口契约 |
+| [openapi-java.yaml](docs/02-design/openapi-java.yaml) | Java 对外接口契约（当前 2.6.0） |
 | [cross-language-protocol.md](docs/02-design/cross-language-protocol.md) | Java ↔ Python 治理协议 |
+| [saas-kernel-upgrade.md](docs/02-design/saas-kernel-upgrade.md) | SaaS 内核升级方案与 P1-B 落地记录 |
+| [saas-tenant-decisions.md](docs/02-design/saas-tenant-decisions.md) | 多租户遗留决策清单（D1～D6） |
 
 ## 参与贡献
 

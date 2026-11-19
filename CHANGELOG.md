@@ -5,6 +5,48 @@
 
 ## [Unreleased]
 
+> 本轮为 SaaS 多租户内核升级（分支 `feat/saas-tenant-foundation`，2026-11-18～19）。
+> 完整落地记录见 [saas-kernel-upgrade.md](docs/02-design/saas-kernel-upgrade.md)，
+> 产品决策见 [saas-tenant-decisions.md](docs/02-design/saas-tenant-decisions.md)。
+
+### Added
+
+- **租户地基**：新增 `tenant` 表与 Flyway V10 迁移，全部业务表加 `tenant_id`；JWT 增加
+  `tenant_id` claim 且 4 处验签强制校验；17 个 Jdbc 仓库全部按租户谓词强过滤。
+- **P1-B 租户隔离**：登录 / 注册按请求体 `tenantSlug` 解析租户（`TenantResolver`），
+  刷新令牌家族携带 tenantId；管理面、MQ、定时任务、文档解析链路全部收口到真实租户。
+- **Java ↔ Python 协议租户上下文**：问答请求双向必填 `tenantId`，
+  `ProtocolTenantContractTest` 锁定字段集合；parse_worker MQ 消息契约测试锁定 6 个字段。
+- **MinIO 对象键租户化**：新键为 `documents/{tenantId}/{userId}/{documentId}/source`，
+  存量旧键按落库 `object_key` 继续兼容读取，无需搬对象。
+- **可观测**：Java 侧 `TenantContext` 镜像 `tenantId` 到 MDC，三个服务日志渲染
+  `traceId` / `tenantId` 标签。
+- **D1 租户供给**：配置保护的 bootstrap 端点 `POST /api/v1/admin/tenants`
+  （`X-Bootstrap-Token`；令牌默认空即禁用、常量时间比较、`INSERT IGNORE` 幂等）；
+  out-of-band 运维入口，不经网关、不进对外契约。
+- **D3 租户级 AI Kill Switch**：保留平台级全局熔断，新增
+  `agent:kill-switch:tenant:{tenantId}` 及 `:meta`，全局 OR 租户；Java 管理面新增
+  `GET/PUT /api/v1/admin/ai/controls/tenant`（tenantId 取自已验签 JWT），Python
+  `RedisKillSwitch.is_active(tenant_id)` 在唯一执行点消费，双端同批发布。
+- **验收**：`MigrationOnRealMysqlTest` 在 Testcontainers MySQL 8.4 上验证 V1→V10 迁移
+  与真实第二租户的仓储级隔离；另补 MQ 消息跨语言字段契约测试。
+
+### Changed
+
+- **BREAKING**：`app_user.username` 唯一键由全局改为 `(tenant_id, username)`，存量数据
+  回填默认租户；V1–V9 已应用且不可修改，新增迁移只能 V10+。
+- **BREAKING**：Java ↔ Python 问答协议与 MQ 治理键需双端同批发布
+  （Python `StrictModel` 为 `extra="forbid"`）。
+- `openapi-java.yaml` 升至 **2.6.0**：登记租户级 kill switch 路径与
+  `KillSwitchStateEnvelope`；前端契约漂移测试同步裁决（schema 98→99）。
+- 移除 `JwtService` 可省略 tenantId 的签发重载，签发必须显式传租户，并加反射守卫测试。
+
+### Decisions
+
+- 明确**暂不引入**域名路由（D2）、全链 HTTP e2e（D4）、Prometheus tenant 标签（D5）、
+  OPA ABAC（D6）；触发条件与影响见决策清单。这是拍板结论，不是遗漏。
+- P2 计量计费 / P3 身份 / P4 可证删除仍属产品路线图，不在本轮范围。
+
 ## [1.0.1] - 2026-11-08
 
 ### Security
