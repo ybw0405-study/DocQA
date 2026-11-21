@@ -50,7 +50,7 @@ powershell -File scripts/verify-all.ps1 -Offline  # Windows PowerShell 5.1
 
 完整流程见 [docs/00-infra/git-workflow.md](docs/00-infra/git-workflow.md)。
 
-- 从最新 `main` 创建分支：`feature/REQ-{编号}-{描述}`、`hotfix/REQ-{编号}-{描述}`、`release/{major.minor.patch}`。
+- 从最新 `main` 创建分支：`feature/{issue-id}-{描述}`、`hotfix/{issue-id}-{描述}`、`release/{major.minor.patch}`；编号用 GitHub issue / PR 号，不使用内部任务书编号。
 - 分支名使用小写英文与连字符，长度尽量不超过 30 个字符。
 - 每日至少 rebase 一次 `origin/main`，合并前确保历史线性。
 - 提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)：
@@ -75,7 +75,7 @@ feat(document): reject encrypted pdf before parse
 PARSING 阶段无法读取加密流，提前在 complete 接口返回明确错误，
 避免任务反复重试并在 MQ 中堆积。
 
-Refs: REQ-103
+Refs: #103
 ```
 
 ## 4. 代码规范

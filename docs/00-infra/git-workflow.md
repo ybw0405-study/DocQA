@@ -7,24 +7,24 @@
 | 分支 | 命名 | 用途 | 生命周期 |
 |---|---|---|---|
 | 主干 | `main` | 唯一集成分支，受保护 | 永久 |
-| 功能 | `feature/REQ-{ID}-{描述}` | 单个需求或技术任务的开发 | 建议不超过 3 天 |
-| 修复 | `hotfix/REQ-{ID}-{描述}` | 线上紧急缺陷，仍须走 MR | 上线后立即删除 |
+| 功能 | `feature/{issue-id}-{描述}` | 单个需求或技术任务的开发 | 建议不超过 3 天 |
+| 修复 | `hotfix/{issue-id}-{描述}` | 线上紧急缺陷，仍须走 MR | 上线后立即删除 |
 | 发布 | `release/{major.minor.patch}` | 仅用于需要冻结的发布准备 | 发布后合并并删除 |
 
 功能分支命名示例：
 
 ```text
-feature/REQ-101-document-upload
-feature/REQ-107-rag-ask-contract
-feature/REQ-112-rrule-reminder
+feature/101-document-upload
+feature/107-rag-ask-contract
+feature/112-rrule-reminder
 ```
 
 规则：
 
-- `{ID}` 使用需求或缺陷编号，不允许无编号的 `feature/test`、`feature/dev`。
+- `{issue-id}` 使用 GitHub issue / PR 编号，不允许无编号的 `feature/test`、`feature/dev`。
 - `{描述}` 使用小写英文与连字符，长度尽量不超过 30 个字符。
 - 从最新 `main` 创建；每日至少 rebase 一次，避免最后一天集中解冲突。
-- 一个分支只服务一个 REQ，禁止"顺手重构整个项目"；跨需求的改动拆分支。
+- 一个分支只服务一个 issue，禁止"顺手重构整个项目"；跨需求的改动拆分支。
 - 合并后删除远端分支，保持分支列表可审计。
 
 推荐命令：
@@ -32,10 +32,10 @@ feature/REQ-112-rrule-reminder
 ```bash
 git switch main
 git pull --ff-only
-git switch -c feature/REQ-101-document-upload
+git switch -c feature/101-document-upload
 # 开发与本地自检
 git rebase origin/main
-git push -u origin feature/REQ-101-document-upload
+git push -u origin feature/101-document-upload
 ```
 
 ## 2. Conventional Commits 规范
@@ -72,7 +72,7 @@ git push -u origin feature/REQ-101-document-upload
 - `subject` 使用祈使句、描述结果，不超过 72 个字符，不使用"update code""fix bug"这类无信息描述。
 - 一个提交只表达一个意图；格式化与业务改动分开提交。
 - 破坏性变更使用 `feat!:` 或 `fix!:`，并在 footer 写 `BREAKING CHANGE:` 及迁移方式。
-- 关联需求或缺陷使用 footer：`Refs: REQ-101`。
+- 关联需求或缺陷使用 footer：`Refs: #101`。
 
 示例：
 
@@ -82,7 +82,7 @@ feat(document): reject encrypted pdf before parse
 PARSING 阶段无法读取加密流，提前在 complete 接口返回明确错误，
 避免任务反复重试并在 MQ 中堆积。
 
-Refs: REQ-103
+Refs: #103
 ```
 
 ## 3. MR 合并前必过检查项
@@ -168,7 +168,7 @@ backend-java/<module>/src/main/resources/db/migration/
 
 ## 5. 合并与回滚
 
-- 推荐 Squash Merge，一个 MR 对应一个可回滚提交；提交信息保留 REQ 编号。
+- 推荐 Squash Merge，一个 MR 对应一个可回滚提交；提交信息保留 issue 编号。
 - 回滚以 revert MR 为主，不直接 reset `main`。
 - 数据库变更不随应用回滚而自动撤销；回滚方案必须在 MR 描述中写明（前向兼容、补偿脚本或双写过渡）。
 - 发布后观察错误率、问答 P99、MQ 消费延迟和审计写入延迟，再关闭变更单。

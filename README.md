@@ -38,7 +38,8 @@
 - **控制面 / 数据面分离**：Java 负责认证、路由、治理与业务状态；Python 负责解析、向量化与 RAG。AI 依赖被收敛到唯一入口，预算、配额、熔断与审计可治理。
 - **本地优先**：中间件、模型适配与数据都在本机或自己的服务器上，课件不必上传到第三方。
 - **工程化完整**：三端统一门禁、数据库最小权限、审计只追加、架构约束与契约测试。
-- **租户隔离地基**：全链路 `tenant_id` 强过滤、JWT 租户声明与租户级治理开关已就位；
+- **租户隔离地基**：Java 控制面的业务表、JWT 租户声明、文档授权范围与租户级治理开关全链路强过滤；
+  pgvector 块表带 `tenant_id` 列，并在向量 / 词法检索谓词中强制过滤作为纵深防御（**授权判定仍在 Java 网关**）。
   当前默认单租户运行，第二租户由运维 bootstrap 端点供给（见下方设计文档）。
 
 ## 功能特性
@@ -50,6 +51,8 @@
 | 文档管理 | 分片上传、MD5 秒传、重命名、标签、软删除、失败重试、重建索引 |
 | 课表与提醒 | ICS 日历导入、作业截止提醒、自定义提醒、站内通知 |
 | 治理与可观测 | AI 调用开关、按用户配额、审计事件、用量统计、Prometheus 指标 |
+
+> **已知取舍**：RAG 回答正文按纯文本插值渲染、不解析 markdown（零 XSS 面，代价是 `**加粗**` 等标记原样显示）。若将来引入富文本渲染，必须同步 `frontend-vue/tests/redlines.spec.ts` 的注入白名单并配 DOMPurify。
 
 ## 架构
 
@@ -77,6 +80,27 @@ flowchart LR
 ```
 
 各服务职责、依赖方向与目录说明见 [docs/00-infra/maven-modules.md](docs/00-infra/maven-modules.md)。
+
+### 部署网络边界（必读）
+
+Python 数据面 `ai-api` 的端口**不得对公网或不可信网络可达**：该端口接收的 `tenantId` / `userId` /
+`documentScopes` 由调用方给出，身份结论以 Java 网关为准。生产部署必须同时满足：
+
+1. 网关与 Python 之间配置共享密钥 `DOCQA_AI_INTERNAL_TOKEN`（`X-Internal-Token` 头，常量时间比较）；
+   未配置时为本地开发模式、不启用校验，**生产环境留空会启动 fail-fast**。
+2. 网络层只允许 `agent-gateway` 访问 Python 端口（容器网络 / 安全组 / 防火墙），`/metrics` 同样不对外。
+3. Java 业务服务端口（8081~8083）与 MySQL / PostgreSQL / Redis / MinIO / RocketMQ 同样仅限内网。
+4. JWT 为 HS256 对称密钥：签发能力应只保留在 `user-service`，其余服务仅验签；密钥泄露等于可伪造任意
+   ADMIN，必须经密钥管理注入并定期轮换。
+
+隔离是「网关授权 + 数据面纵深过滤 + 网络边界」三层，任何一层单独都不构成「全链路隔离」的承诺。
+
+5. 六个 Java 服务共享同一个 MySQL schema（`agent-gateway` 直接读写 `conversation` / `message` /
+   `agent_execution` / `document` / `audit_event` 表），这是有意的「单体库多服务」取舍；
+   表结构演进必须同时核对全部引用方（V9 / V10 的复合键改造即按此执行），不要假设服务间有库级隔离。
+6. `ai-python` 用 LangGraph 搭的是两节点线性循环（`plan → tool / END`），保留它是为后续扩展工具链，
+   代价是需要持续跟踪 `langgraph` / `langchain-core` / `langsmith` 的安全基线；这是已知依赖取舍，不是架构缺口。
+
 
 ## 技术栈
 
@@ -191,6 +215,7 @@ powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -Includ
 | [maven-modules.md](docs/00-infra/maven-modules.md) | Java 模块职责与依赖边界 |
 | [archunit-rules.md](docs/00-infra/archunit-rules.md) | 架构约束与 ArchUnit 规则 |
 | [git-workflow.md](docs/00-infra/git-workflow.md) | 分支模型、提交规范、PR 检查项 |
+| [rollback-runbook.md](docs/00-infra/rollback-runbook.md) | 版本回退、迁移兼容性与向量索引回退预案 |
 | [storage.md](docs/02-design/storage.md) | 表结构、索引与向量存储 |
 | [openapi-java.yaml](docs/02-design/openapi-java.yaml) | Java 对外接口契约（当前 2.6.0） |
 | [cross-language-protocol.md](docs/02-design/cross-language-protocol.md) | Java ↔ Python 治理协议 |
