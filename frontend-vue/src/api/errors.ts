@@ -15,6 +15,9 @@ export const UPLOAD_ETAG_ERROR_CODE = 'CLIENT-UPLOAD-ETAG-001';
 /** 流式响应自身不合规：出现契约外事件名、帧序断裂或没有终止帧。 */
 export const STREAM_PROTOCOL_ERROR_CODE = 'CLIENT-STREAM-PROTOCOL-001';
 
+/** 流式响应缓冲超过上限：无换行/无终止帧的流会无限堆积，客户端主动断开以免撑爆标签页内存。 */
+export const STREAM_BUFFER_OVERFLOW_CODE = 'CLIENT-STREAM-BUFFER-001';
+
 /** 后端 ProblemDetail 的客户端表示；`detail` 已保证不含堆栈、SQL、PII 与密钥，可直接展示。 */
 export class ApiError extends Error {
   constructor(
@@ -47,5 +50,18 @@ export class StreamUnavailableError extends Error {
   constructor(readonly status: number) {
     super('当前部署未以事件流应答该请求。');
     this.name = 'StreamUnavailableError';
+  }
+}
+
+/**
+ * 流式响应的行缓冲或单帧 `data:` 行数超过上限。与 `StreamUnavailableError` 区分：
+ * 前者是「部署不支持流」，本错误是「响应不合规，已主动断开」。
+ * 继承 `ApiError` 是为了让 store 的 `applyFailure` 把明确文案与 code 呈现给用户；
+ * 状态用 502 而非 0，避免 `isNetworkFailure` 把安全断开误读成连不上服务。
+ */
+export class StreamBufferOverflowError extends ApiError {
+  constructor() {
+    super(502, STREAM_BUFFER_OVERFLOW_CODE, '流式响应缓冲区超过上限，已主动断开连接。', null);
+    this.name = 'StreamBufferOverflowError';
   }
 }

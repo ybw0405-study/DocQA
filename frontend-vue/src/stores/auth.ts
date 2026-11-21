@@ -80,13 +80,20 @@ export const useAuthStore = defineStore('auth', {
       }
       try {
         this.applyUser(await fetchCurrentUser());
+        this.resolved = true;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           this.clear();
           return;
         }
+        // 非 401（/auth/me 网络抖动、5xx）：原实现吞掉异常却仍置 resolved=true，
+        // 留下「token 在、user/roles 全空」的伪会话让守卫判定已登录，且此后不再重试。
+        // 改为清空本地状态、保持 resolved=false，让下一次导航的守卫重新水合（即重试）。
+        // clear() 内部会把 resolved 置真，这里必须显式改回 false。
+        // 守卫只在 !resolved 时水合；/login 允许匿名访问、守卫直接提交，不会形成重定向环。
+        this.clear();
+        this.resolved = false;
       }
-      this.resolved = true;
     },
 
     refreshAccessToken(): Promise<string | null> {

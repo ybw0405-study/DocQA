@@ -17,6 +17,8 @@ class ToolContext:
     scopes: tuple[DocumentScope, ...]
     retrieval: RetrievalService
     deadline: Deadline
+    # 请求级租户：document_search 工具二次检索时一并下推到 PG 的 tenant_id 谓词。
+    tenant_id: object | None = None
 
 
 @dataclass(frozen=True)

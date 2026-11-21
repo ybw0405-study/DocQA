@@ -32,7 +32,7 @@ from docqa_ai.rag.service import RetrievalService
 from docqa_ai.tools.base import ToolContext, ToolResult
 from docqa_ai.tools.calculator import CalculatorTool
 from docqa_ai.tools.registry import ToolRegistry
-from tests.conftest import DOCUMENT_ID, make_request, make_settings
+from tests.conftest import DOCUMENT_ID, TENANT_ID, make_request, make_settings
 
 
 def budget_store(*, token_budget: int = 8000) -> InMemoryBudgetStore:
@@ -65,6 +65,8 @@ async def retrieval_for(content: str, lexical_repository: object | None = None) 
                 content=content,
                 embedding=tuple(vector),
                 metadata={"index_version": "v1"},
+                # 读侧会带真实 tenantId 下推；替身行必须标注同一租户，否则语义与真实 SQL 不同。
+                tenant_id=str(TENANT_ID),
             )
         ]
     )

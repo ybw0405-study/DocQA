@@ -1,0 +1,64 @@
+name: sbom
+
+# G10：SBOM 产物门禁。每次 push main / PR / 手工触发都产出可下载的
+# CycloneDX JSON + SPDX JSON，作为 artifact 归档，供发布与回滚追溯。
+# Apache-2.0 项目的第三方归属由 NOTICE / THIRD-PARTY-LICENSES.md 承载，
+# 本文件产出的是带版本与哈希的逐包权威清单。
+# syft 由 anchore/sbom-action 安装（v0.24.3 附注 tag 解引用后的 commit，
+# 已用 git ls-remote 核实 40 位 SHA），不使用浮动 @vN。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sbom:
+    name: SBOM (syft / CycloneDX + SPDX)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: 准备输出目录
+        run: mkdir -p sbom
+
+      - name: 生成 CycloneDX SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom/docqa.cdx.json
+          upload-artifact: 'false'
+          upload-release-assets: 'false'
+
+      - name: 生成 SPDX SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom/docqa.spdx.json
+          upload-artifact: 'false'
+          upload-release-assets: 'false'
+
+      - name: 断言 SBOM 非空且为合法 JSON
+        run: |
+          test -s sbom/docqa.cdx.json
+          test -s sbom/docqa.spdx.json
+          python3 -c "import json; [json.load(open(p, encoding='utf-8')) for p in ('sbom/docqa.cdx.json', 'sbom/docqa.spdx.json')]"
+
+      - name: 上传 SBOM artifact（可下载）
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom/*.json
+          if-no-files-found: error
+          retention-days: 90

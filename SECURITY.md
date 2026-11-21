@@ -66,5 +66,10 @@
 ## 已知限制
 
 - 本地开发默认使用 HTTP 回环地址，生产部署必须启用 TLS
-- `main` 已启用 GitHub Branch Protection（必须走 PR、三端 CI 全绿、管理员同受约束），
-  见 [git-workflow.md](docs/00-infra/git-workflow.md)；公开仓库可免费启用 Code Scanning，目前尚未配置
+- `main` 已启用 GitHub Branch Protection（必须走 PR、三端 CI required status checks 全绿、
+  管理员同受约束、线性历史），见 [git-workflow.md](docs/00-infra/git-workflow.md)。
+  但当前 `required_approving_review_count=0`、`require_code_owner_reviews=false`，
+  即 0 审批即可合并、CODEOWNERS 不强制；补强步骤见 [CONTRIBUTING.md](CONTRIBUTING.md) 第 10 节
+- 代码扫描：仓库内已新增 `.github/workflows/security.yml`（CodeQL / dependency-review / npm audit，G9），
+  **合并推送到 `main` 后才开始运行**，本轮尚未在远端生效；仓库级 `secret scanning` /
+  `push protection` / 有效性检查仍需在 Settings → Code security and analysis 手动开启（G4）

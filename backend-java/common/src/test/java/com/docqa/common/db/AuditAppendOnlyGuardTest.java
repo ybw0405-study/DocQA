@@ -147,11 +147,12 @@ class AuditAppendOnlyGuardTest {
     }
 
     @Test
-    @DisplayName("模式解析：拼错的值必须报错，不能静默降级成 warn")
+    @DisplayName("模式解析：拼错的值必须报错，未配置默认收紧为 enforce")
     void unknownModeIsRejected() {
         assertThat(AuditAppendOnlyGuard.Mode.parse("enforce")).isEqualTo(AuditAppendOnlyGuard.Mode.ENFORCE);
         assertThat(AuditAppendOnlyGuard.Mode.parse(" OFF ")).isEqualTo(AuditAppendOnlyGuard.Mode.OFF);
-        assertThat(AuditAppendOnlyGuard.Mode.parse(null)).isEqualTo(AuditAppendOnlyGuard.Mode.WARN);
+        assertThat(AuditAppendOnlyGuard.Mode.parse(null)).isEqualTo(AuditAppendOnlyGuard.Mode.ENFORCE);
+        assertThat(AuditAppendOnlyGuard.Mode.parse("  ")).isEqualTo(AuditAppendOnlyGuard.Mode.ENFORCE);
         assertThatThrownBy(() -> AuditAppendOnlyGuard.Mode.parse("enfroce"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("enfroce");

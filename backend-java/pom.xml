@@ -164,7 +164,11 @@
                     </dependency>
                 </dependencies>
                 <configuration>
-                    <configLocation>${maven.multiModuleProjectDirectory}/config/checkstyle/checkstyle.xml</configLocation>
+                    <!-- CI 用仓库根的 ../mvnw 启动，maven.multiModuleProjectDirectory 会被解析成
+                         仓库根，而本配置实际在 backend-java/config/checkstyle/ 下。
+                         session.executionRootDirectory 是 Maven 启动时的 cwd（backend-java），
+                         不受 wrapper 所在目录影响，两种启动方式都指向同一份规则文件。 -->
+                    <configLocation>${session.executionRootDirectory}/config/checkstyle/checkstyle.xml</configLocation>
                     <consoleOutput>true</consoleOutput>
                     <failOnViolation>true</failOnViolation>
                     <includeTestSourceDirectory>false</includeTestSourceDirectory>

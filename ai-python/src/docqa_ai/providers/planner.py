@@ -445,7 +445,12 @@ class OpenAIPlanner:
         self.model = model
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
-        self._client = client
+        # CON-2：plan/astream 共用同一个 client；注入的由调用方所有、自建的由 aclose() 释放。
+        self._client = (
+            client
+            if client is not None
+            else httpx.AsyncClient(limits=httpx.Limits(max_connections=20, max_keepalive_connections=10))
+        )
         self._owns_client = client is None
 
     async def plan(self, context: PlanContext, timeout_s: float) -> PlannerOutput:
@@ -462,7 +467,7 @@ class OpenAIPlanner:
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
-        client = self._client or httpx.AsyncClient()
+        client = self._client
         try:
             response = await client.post(
                 f"{self._base_url}/chat/completions",
@@ -474,9 +479,6 @@ class OpenAIPlanner:
             raise PlannerTimeout("llm request timed out") from exc
         except httpx.HTTPError as exc:
             raise PlannerUnavailable("llm request failed") from exc
-        finally:
-            if self._owns_client:
-                await client.aclose()
         if response.status_code >= 400:
             raise PlannerUnavailable(f"llm provider returned {response.status_code}")
         try:
@@ -489,6 +491,10 @@ class OpenAIPlanner:
         token_out = _usage_tokens(usage.get("completion_tokens"), estimate_tokens(content))
         parsed = self._parse_content(content)
         return self._to_output(parsed, context, token_in, token_out)
+
+    async def aclose(self) -> None:
+        if self._owns_client:
+            await self._client.aclose()
 
     @staticmethod
     def _parse_content(content: object) -> dict:
@@ -581,7 +587,7 @@ class OpenAIPlanner:
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
-        client = self._client or httpx.AsyncClient()
+        client = self._client
         chunks: list[str] = []
         usage: dict = {}
         reader = _AnswerDeltaReader()
@@ -638,9 +644,6 @@ class OpenAIPlanner:
             raise PlannerTimeout("llm stream timed out") from exc
         except httpx.HTTPError as exc:
             raise PlannerUnavailable("llm stream failed") from exc
-        finally:
-            if self._owns_client:
-                await client.aclose()
         content = "".join(chunks)
         # 有真值用真值，没有则与 plan 同口径回退估算（供应商差异不改治理语义）。
         parsed = self._parse_content(content)

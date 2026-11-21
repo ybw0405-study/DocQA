@@ -17,11 +17,11 @@ public class DemoUserProperties {
     @NotNull
     private UUID userId = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
-    /** 种子账号同时持有 ADMIN，便于本地演示管理面；生产部署应置为 false。 */
-    private boolean admin = true;
+    /** 种子账号同时持有 ADMIN，便于本地演示管理面；默认关闭，需显式开启（SEC-5）。 */
+    private boolean admin = false;
 
-    /** 关掉后不再建种子账号，用于已接入真实注册流程的部署。 */
-    private boolean enabled = true;
+    /** 关掉后不再建种子账号，用于已接入真实注册流程的部署；默认关闭。 */
+    private boolean enabled = false;
 
     public String getUsername() {
         return username;

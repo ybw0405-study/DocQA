@@ -3,13 +3,21 @@
 # 默认由维护者负责所有路径；后续按模块拆分时在此追加具体路径。
 # 语法：<path> <owner...>
 # 文档：https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# 现状（2026-11-21 实测）：main 分支保护已启用；Y-super000 接受 write 协作者邀请后
+# 启用 required_approving_review_count=1 + require_code_owner_reviews=true，
+# 启用步骤见 CONTRIBUTING.md「分支与评审」。
+#
+# 诚实边界：两个账号由同一自然人持有，属形式上的第二道门禁而非独立复核；
+# 真正的把关来自 required_status_checks 与发布 runbook。PR 作者不能批准自己的 PR，
+# 因此 ybw0405-study 开的 PR 必须由 Y-super000 批准。
 
-* @ybw0405-study
+* @ybw0405-study @Y-super000
 
-/backend-java/ @ybw0405-study
-/ai-python/ @ybw0405-study
-/frontend-vue/ @ybw0405-study
-/docs/ @ybw0405-study
-/ops/ @ybw0405-study
-/scripts/ @ybw0405-study
-/.github/ @ybw0405-study
+/backend-java/ @ybw0405-study @Y-super000
+/ai-python/ @ybw0405-study @Y-super000
+/frontend-vue/ @ybw0405-study @Y-super000
+/docs/ @ybw0405-study @Y-super000
+/ops/ @ybw0405-study @Y-super000
+/scripts/ @ybw0405-study @Y-super000
+/.github/ @ybw0405-study @Y-super000

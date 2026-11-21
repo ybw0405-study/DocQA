@@ -1,47 +1,28 @@
 import { defineStore } from 'pinia';
 import { listAiQuotas, updateAiQuota } from '../api/admin';
-import { ApiError } from '../api/errors';
 import type { AiQuota, UpdateAiQuotaRequest } from '../types/admin';
 import { QUOTA_LIMIT_MAX, QUOTA_LIMIT_MIN } from '../types/admin';
+import {
+  isStaleCursor,
+  makeApplyFailure,
+  rejectLocal,
+  type FailureFields,
+} from './failureFields';
 
-/** 契约 `QuotaListLimit` 的默认值；显式发送，与通知面板同口径，免得两侧默认各自漂移。 */
+/** 契约 `QuotaListLimit` 的默认值；显式发送，与其余列表页同口径，免得两侧默认各自漂移。 */
 const PAGE_LIMIT = 50;
 
-interface FailureFields {
-  detail: string | null;
-  code: string | null;
-  traceId: string | null;
-}
+const applyFailure = makeApplyFailure('配额列表加载失败，请稍后重试。');
 
 export interface AdminQuotasState extends FailureFields {
   items: AiQuota[];
   nextCursor: string | null;
   loading: boolean;
   loaded: boolean;
+  /** 列表取数代号：写后刷新递增它，在途翻页的过期响应一律丢弃。 */
+  listSeq: number;
   /** 配额写入串行锁：整行替换语义下并发提交只会留下 last-write-wins，界面先把自己这一侧串起来。 */
   submitting: boolean;
-}
-
-function applyFailure(target: FailureFields, error: unknown): void {
-  if (error instanceof ApiError) {
-    target.detail = error.detail;
-    target.code = error.code;
-    target.traceId = error.traceId;
-    return;
-  }
-  target.detail = '配额列表加载失败，请稍后重试。';
-  target.code = null;
-  target.traceId = null;
-}
-
-function rejectLocal(target: FailureFields, message: string): void {
-  target.detail = message;
-  target.code = null;
-  target.traceId = null;
-}
-
-function isStaleCursor(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 400;
 }
 
 /**
@@ -62,6 +43,7 @@ export const useAdminQuotasStore = defineStore('adminQuotas', {
     nextCursor: null,
     loading: false,
     loaded: false,
+    listSeq: 0,
     submitting: false,
 
     detail: null,
@@ -80,25 +62,35 @@ export const useAdminQuotasStore = defineStore('adminQuotas', {
       this.traceId = null;
     },
 
+    /**
+     * 首次加载不设 `loading` 守卫：写后刷新与在途翻页并发时，新请求必须真正发出，
+     * 由 `fetchFirstPage` 递增 `listSeq` 把旧的在途响应丢弃，而不是被守卫直接挡掉导致刚改的配额不上屏。
+     */
     async loadFirst(): Promise<void> {
-      if (this.loading) {
-        return;
-      }
       await this.fetchFirstPage();
     },
 
     async fetchFirstPage(): Promise<void> {
+      const seq = ++this.listSeq;
       this.loading = true;
       try {
         const data = await listAiQuotas({ limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = data.items;
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         applyFailure(this, error);
       } finally {
-        this.loading = false;
-        this.loaded = true;
+        if (seq === this.listSeq) {
+          this.loading = false;
+          this.loaded = true;
+        }
       }
     },
 
@@ -107,13 +99,20 @@ export const useAdminQuotasStore = defineStore('adminQuotas', {
       if (!this.canLoadMore || cursor === null) {
         return;
       }
+      const seq = this.listSeq;
       this.loading = true;
       try {
         const data = await listAiQuotas({ cursor, limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = [...this.items, ...data.items];
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         if (isStaleCursor(error)) {
           // keyset 游标锚定 `updated_at DESC, user_id DESC`，两次翻页之间有人改过配额就会让锚点失效；
           // 停在坏游标上只会让人永远看不到剩余的行，所以回第一页。
@@ -125,7 +124,9 @@ export const useAdminQuotasStore = defineStore('adminQuotas', {
         }
         applyFailure(this, error);
       } finally {
-        this.loading = false;
+        if (seq === this.listSeq) {
+          this.loading = false;
+        }
       }
     },
 

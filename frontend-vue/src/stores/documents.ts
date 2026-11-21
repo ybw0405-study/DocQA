@@ -18,9 +18,7 @@ import {
   DOCUMENT_TITLE_MAX_LENGTH,
 } from '../types/documents';
 import type { DocumentListItemData, DocumentStatus, DocumentStatusData } from '../types/documents';
-
-/** 契约 `PageLimit` 的默认值；显式传 20 而不是省略，让「每页 20 条」在请求里可见。 */
-const PAGE_LIMIT = 20;
+import { isStaleCursor, PAGE_LIMIT } from './failureFields';
 
 /** 只在拿不到 ProblemDetail 时用（断网、超时）；服务端给了 detail 就原样转述。 */
 const LIST_FAILURE_HINT = '文档列表加载失败，请稍后重试。';
@@ -216,7 +214,7 @@ export const useDocumentsStore = defineStore('documents', {
           return;
         }
         // keyset 游标由服务端签发，两次翻页之间排序键变化或游标被篡改都会 400；回到首页比停在坏游标上更诚实。
-        if (error instanceof ApiError && error.status === 400) {
+        if (isStaleCursor(error)) {
           this.nextCursor = null;
           this.loading = false;
           await this.fetchFirstPage();

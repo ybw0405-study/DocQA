@@ -15,11 +15,28 @@ class _EventModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
 
 
+def require_tenant_id(value: object | None) -> str:
+    """J1/J2：跨进程信封缺 tenantId 立即拒收，绝不静默降级为空串。
+
+    兼容期允许字段缺省（滚动发布时在途的旧消息仍能被解析并明确报错、进入死信/重试），
+    但任何写路径都必须先过这里——写侧恒写空串正是 004 迁移导致全量召回失效的根因。
+    """
+    if value is None:
+        raise ValueError("tenantId is required in the cross-service event envelope")
+    tenant = str(value)
+    if not tenant.strip():
+        raise ValueError("tenantId must not be empty")
+    return tenant
+
+
 class ParseRequestedEvent(_EventModel):
     event_id: uuid.UUID = Field(alias="eventId")
     trace_id: str = Field(alias="traceId", pattern=r"^[0-9a-f]{32}$")
     document_id: uuid.UUID = Field(alias="documentId")
     user_id: uuid.UUID = Field(alias="userId")
+    # 租户信封：Java 控制面随每条 parse.requested 下发；缺省仅用于兼容在途旧消息，
+    # 写入边界由 require_tenant_id() 兜底拒绝，不允许落任何无租户的行。
+    tenant_id: str | None = Field(default=None, alias="tenantId", min_length=1, max_length=64)
     index_version: str = Field(alias="indexVersion", min_length=1, max_length=32)
     object_key: str = Field(alias="objectKey", min_length=1, max_length=512)
     file_name: str = Field(alias="fileName", min_length=1, max_length=255)
@@ -97,6 +114,8 @@ class VectorChangeRequestedEvent(_EventModel):
     trace_id: str = Field(alias="traceId", pattern=r"^[0-9a-f]{32}$")
     document_id: uuid.UUID = Field(alias="documentId")
     user_id: uuid.UUID = Field(alias="userId")
+    # 删除同样必须绑定到租户范围：没有 tenantId 时宁可拒收，也不能跨租户清空向量。
+    tenant_id: str | None = Field(default=None, alias="tenantId", min_length=1, max_length=64)
     operation: str = Field(min_length=1, max_length=32)
     index_version: str | None = Field(default=None, alias="indexVersion", max_length=32)
     occurred_at: datetime = Field(alias="occurredAt")

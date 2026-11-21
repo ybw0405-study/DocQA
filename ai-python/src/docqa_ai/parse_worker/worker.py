@@ -39,6 +39,7 @@ from docqa_ai.parse_worker.models import (
     ParsedChunk,
     ParseFailedEvent,
     ParseRequestedEvent,
+    require_tenant_id,
 )
 from docqa_ai.parse_worker.parser import DocumentParser
 from docqa_ai.parse_worker.publisher import ParseEventPublisher
@@ -128,6 +129,22 @@ class ParseWorker:
                 await self._finish(message_id)
                 return HandleOutcome.INVALID
 
+            # J1：租户信封缺失的消息必须拒收，不能进入写路径落库为空串（004 回归根因）。
+            try:
+                require_tenant_id(event.tenant_id)
+            except ValueError:
+                span.set_attribute("parse.status", "REJECTED_NO_TENANT")
+                log_event(
+                    LOGGER,
+                    logging.ERROR,
+                    "Rejected parse-requested event without tenantId",
+                    step="parse",
+                    errorCode="DOC-TENANT-001",
+                )
+                await self._finish(message_id)
+                return HandleOutcome.INVALID
+
+            span.set_attribute("document.tenant_id", str(event.tenant_id))
             span.set_attribute("document.id", str(event.document_id))
             span.set_attribute("document.index_version", event.index_version)
             span.set_attribute("document.retry_count", event.retry_count)
@@ -221,7 +238,9 @@ class ParseWorker:
         if len(data) != event.size_bytes or hashlib.md5(data, usedforsecurity=False).hexdigest() != event.md5:
             raise ParseJobError(INVALID_DOCUMENT, _CHECKSUM_FAILED, retryable=False)
 
-        document = self._parser.parse(data, event.content_type, event.file_name)
+        # 解析是 CPU/IO 密集的同步调用，直接放在事件循环里会冻结信号与超时控制；
+        # 与上面的 _read 保持一致，交给线程池执行（C-6）。
+        document = await asyncio.to_thread(self._parser.parse, data, event.content_type, event.file_name)
         text_chunks = chunk_document(
             document.pages,
             chunk_size=self._settings.chunk_size_chars,
@@ -260,7 +279,12 @@ class ParseWorker:
                 )
             )
         try:
-            rows_written = await self._writer.replace(event.document_id, event.index_version, records)
+            rows_written = await self._writer.replace(
+                event.document_id,
+                event.index_version,
+                records,
+                tenant_id=require_tenant_id(event.tenant_id),
+            )
         except VectorWriteError as exc:
             raise ParseJobError(INTERNAL, _INDEX_FAILED, retryable=True) from exc
         return parsed, rows_written
@@ -359,6 +383,7 @@ def main() -> int:
     from docqa_ai.parse_worker.publisher import RocketMqParsePublisher
     from docqa_ai.parse_worker.storage import MinioObjectStorage
     from docqa_ai.parse_worker.vector_writer import PgVectorWriter
+    from docqa_ai.rag.pg_connection import build_pg_provider
     from docqa_ai.tracing import build_tracing
 
     settings = Settings()
@@ -374,6 +399,8 @@ def main() -> int:
         return 2
 
     tracer, provider = build_tracing(settings)
+    # 单一组装根：worker 进程只建一次连接池，writer 共用；关闭时统一释放。
+    pg_provider = build_pg_provider(settings.pg_dsn, settings.pg_connect_timeout_s)
     LOGGER.info("Parse worker starting: %s", settings.redacted_summary())
     redis_client = Redis.from_url(
         settings.redis_url,
@@ -404,6 +431,7 @@ def main() -> int:
             settings.pg_table,
             dimensions=settings.embedding_dimensions,
             connect_timeout_s=settings.pg_connect_timeout_s,
+            connection_provider=pg_provider,
         ),
         publisher=publisher,
         idempotency=RedisIdempotencyStore(
@@ -441,8 +469,18 @@ def main() -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        # DQ-4：loop.stop() 只停调度；mq.py 用 run_coroutine_threadsafe 投递的解析任务可能仍在途。
+        # 先给在途任务一个收口窗口（带超时），再按序关闭共享资源，避免幽灵任务访问已关闭的
+        # publisher/redis 并打出 "Task was destroyed but it is pending!"。
         consumer.shutdown()
+        pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
+        if pending:
+            try:
+                loop.run_until_complete(asyncio.wait_for(asyncio.gather(*pending, return_exceptions=True), timeout=10))
+            except TimeoutError:
+                LOGGER.warning("Timed out draining %d in-flight parse tasks", len(pending))
         publisher.shutdown()
+        loop.run_until_complete(pg_provider.aclose())
         loop.run_until_complete(redis_client.aclose())
         loop.close()
         provider.shutdown()

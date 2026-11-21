@@ -89,6 +89,7 @@ class AuthControllerTest {
     private RoleRepository roleRepository;
     private JwtService jwtService;
     private InMemoryRefreshTokenRepository refreshTokenRepository;
+    private LoginRateLimiter loginRateLimiter;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -138,7 +139,9 @@ class AuthControllerTest {
                 new AccessTokenAuthenticator(jwtService, new RecordingRevocationStore());
 
         RegistrationRateLimiter registrationRateLimiter = mock(RegistrationRateLimiter.class);
-        when(registrationRateLimiter.check(any())).thenReturn(RateLimitDecision.permit());
+        when(registrationRateLimiter.check(any(), any())).thenReturn(RateLimitDecision.permit());
+        loginRateLimiter = mock(LoginRateLimiter.class);
+        when(loginRateLimiter.check(any(), any())).thenReturn(RateLimitDecision.permit());
 
         AuthService authService = new AuthService(
                 userRepository,
@@ -148,7 +151,7 @@ class AuthControllerTest {
                 new PasswordPolicy(),
                 new IdempotencyGuard(new InMemoryIdempotencyStore(), objectMapper, clock),
                 registrationRateLimiter,
-                new LoginRateLimiter(authProperties, clock),
+                loginRateLimiter,
                 jwtService,
                 passwordEncoder,
                 authProperties,
@@ -157,7 +160,8 @@ class AuthControllerTest {
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AuthController(
-                        authService, authenticator, new RefreshCookieFactory(authProperties)))
+                        authService, authenticator, new RefreshCookieFactory(authProperties),
+                        new com.docqa.user.web.ClientIpResolver(java.util.List.of())))
                 .setControllerAdvice(new AuthExceptionHandler(), new GlobalExceptionHandler())
                 .addFilters(new TraceIdFilter())
                 .setMessageConverters(converter)
@@ -234,6 +238,9 @@ class AuthControllerTest {
                     .andExpect(status().isUnauthorized());
         }
 
+        // 限流器已收敛到 Redis 双键；controller 层只关心 check 的判定结果，
+        // 这里直接给出 reject 以验证 429 + Retry-After 的映射（计数语义由 LoginRateLimiterTest 覆盖）。
+        when(loginRateLimiter.check(any(), any())).thenReturn(RateLimitDecision.reject(60));
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginJson(USERNAME, PASSWORD)))

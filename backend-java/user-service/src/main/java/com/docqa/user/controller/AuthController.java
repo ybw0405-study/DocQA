@@ -11,6 +11,7 @@ import com.docqa.user.service.AuthService;
 import com.docqa.user.service.IssuedSession;
 import com.docqa.user.service.IssuedToken;
 import com.docqa.user.service.JwtIdentity;
+import com.docqa.user.web.ClientIpResolver;
 import com.docqa.user.web.RefreshCookieFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -33,21 +34,24 @@ public class AuthController {
     private final AuthService authService;
     private final AccessTokenAuthenticator accessTokenAuthenticator;
     private final RefreshCookieFactory refreshCookieFactory;
+    private final ClientIpResolver clientIpResolver;
 
     public AuthController(
             AuthService authService,
             AccessTokenAuthenticator accessTokenAuthenticator,
-            RefreshCookieFactory refreshCookieFactory) {
+            RefreshCookieFactory refreshCookieFactory,
+            ClientIpResolver clientIpResolver) {
         this.authService = authService;
         this.accessTokenAuthenticator = accessTokenAuthenticator;
         this.refreshCookieFactory = refreshCookieFactory;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
-        return sessionResponse(authService.login(request, httpRequest.getRemoteAddr()), HttpStatus.OK);
+        return sessionResponse(authService.login(request, clientIpResolver.resolve(httpRequest)), HttpStatus.OK);
     }
 
     @PostMapping("/register")
@@ -55,7 +59,7 @@ public class AuthController {
             @RequestHeader(IDEMPOTENCY_KEY_HEADER) String idempotencyKey,
             @Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpRequest) {
-        IssuedSession session = authService.register(request, idempotencyKey, httpRequest.getRemoteAddr());
+        IssuedSession session = authService.register(request, idempotencyKey, clientIpResolver.resolve(httpRequest));
         return sessionResponse(session, HttpStatus.CREATED);
     }
 

@@ -1,24 +1,26 @@
 import { defineStore } from 'pinia';
 import { listUsers, replaceUserRoles, updateUserStatus } from '../api/users';
-import { ApiError } from '../api/errors';
 import type { UserRole, UserStatus } from '../types/api';
 import type { UserListQuery } from '../api/users';
 import type { UserSummary } from '../types/users';
+import {
+  clearFailureFields,
+  isStaleCursor,
+  makeApplyFailure,
+  PAGE_LIMIT,
+  rejectLocal,
+  type FailureFields,
+} from './failureFields';
 
-/** 契约全局 `PageLimit` 的默认值（也是 Java 侧 `defaultValue`）；显式发送，与其余列表 store 同口径。 */
-const PAGE_LIMIT = 20;
-
-interface FailureFields {
-  detail: string | null;
-  code: string | null;
-  traceId: string | null;
-}
+const applyFailure = makeApplyFailure('用户列表加载失败，请稍后重试。');
 
 export interface AdminUsersState extends FailureFields {
   items: UserSummary[];
   nextCursor: string | null;
   loading: boolean;
   loaded: boolean;
+  /** 列表取数代号：过滤切换递增它，在途翻页的过期响应一律丢弃。 */
+  listSeq: number;
   /** 写操作串行锁：角色是整集替换，两次并发提交会互相覆盖成后写那一套。 */
   submitting: boolean;
 
@@ -32,28 +34,6 @@ export interface UserFilterInput {
   role?: UserRole | null;
 }
 
-function applyFailure(target: FailureFields, error: unknown): void {
-  if (error instanceof ApiError) {
-    target.detail = error.detail;
-    target.code = error.code;
-    target.traceId = error.traceId;
-    return;
-  }
-  target.detail = '用户列表加载失败，请稍后重试。';
-  target.code = null;
-  target.traceId = null;
-}
-
-function rejectLocal(target: FailureFields, message: string): void {
-  target.detail = message;
-  target.code = null;
-  target.traceId = null;
-}
-
-function isStaleCursor(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 400;
-}
-
 /** 服务端把筛选条件放在每一页重新求值，本地按同一口径判断「这一行还该不该留在列表里」。 */
 function matches(row: UserSummary, status: UserStatus | null, role: UserRole | null): boolean {
   return (status === null || row.status === status) && (role === null || row.roles.includes(role));
@@ -65,6 +45,7 @@ export const useAdminUsersStore = defineStore('adminUsers', {
     nextCursor: null,
     loading: false,
     loaded: false,
+    listSeq: 0,
     submitting: false,
 
     filterStatus: null,
@@ -90,9 +71,7 @@ export const useAdminUsersStore = defineStore('adminUsers', {
 
   actions: {
     clearFailure(): void {
-      this.detail = null;
-      this.code = null;
-      this.traceId = null;
+      clearFailureFields(this);
     },
 
     async loadFirst(): Promise<void> {
@@ -102,18 +81,28 @@ export const useAdminUsersStore = defineStore('adminUsers', {
       await this.fetchFirstPage();
     },
 
+    /** 不受 `loading` 守卫约束：过滤切换后必须真取新条件结果，过期响应按代号丢弃。 */
     async fetchFirstPage(): Promise<void> {
+      const seq = ++this.listSeq;
       this.loading = true;
       try {
         const data = await listUsers(this.queryParams);
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = data.items;
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         applyFailure(this, error);
       } finally {
-        this.loading = false;
-        this.loaded = true;
+        if (seq === this.listSeq) {
+          this.loading = false;
+          this.loaded = true;
+        }
       }
     },
 
@@ -122,13 +111,20 @@ export const useAdminUsersStore = defineStore('adminUsers', {
       if (!this.canLoadMore || cursor === null) {
         return;
       }
+      const seq = this.listSeq;
       this.loading = true;
       try {
         const data = await listUsers({ ...this.queryParams, cursor });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = [...this.items, ...data.items];
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         if (isStaleCursor(error)) {
           // 排序键是 `created_at DESC`，游标锚定「排序毫秒|记录ID」；锚点失效后停在坏游标上只会看不到更旧的行。
           this.nextCursor = null;
@@ -139,7 +135,9 @@ export const useAdminUsersStore = defineStore('adminUsers', {
         }
         applyFailure(this, error);
       } finally {
-        this.loading = false;
+        if (seq === this.listSeq) {
+          this.loading = false;
+        }
       }
     },
 

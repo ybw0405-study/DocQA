@@ -1152,13 +1152,17 @@ describe('契约 ↔ 前端类型对账', () => {
     ];
 
     expect(readNumber('default')).toBe(20);
+    // PAGE_LIMIT 已收敛到 failureFields.ts 单一来源；逐个 store 只校验确实从该模块导入，
+    // 避免常量漂移时 6 份副本各改一半（P1-3 竞态修复同时抽掉了样板）。
+    const sharedPageLimit = tsNumberConst('src/stores/failureFields.ts', 'PAGE_LIMIT');
+    expect(sharedPageLimit).toBe(readNumber('default'));
+    expect(sharedPageLimit).toBeGreaterThanOrEqual(readNumber('minimum'));
+    expect(sharedPageLimit).toBeLessThanOrEqual(readNumber('maximum'));
     for (const store of stores) {
-      expect(tsNumberConst(store, 'PAGE_LIMIT'), `${store} 的 PAGE_LIMIT 应等于契约 PageLimit 默认值`).toBe(
-        readNumber('default'),
+      expect(readFileSync(store, 'utf8'), `${store} 应从 failureFields.ts 复用 PAGE_LIMIT`).toMatch(
+        /import\s*\{[^}]*PAGE_LIMIT[^}]*\}\s*from\s*'\.\/failureFields'/,
       );
     }
-    expect(stores.every((store) => tsNumberConst(store, 'PAGE_LIMIT') >= readNumber('minimum'))).toBe(true);
-    expect(stores.every((store) => tsNumberConst(store, 'PAGE_LIMIT') <= readNumber('maximum'))).toBe(true);
 
     /**
      * 管理面两个列表各有**自己的** limit 参数（契约刻意不放宽全局 `PageLimit`，
@@ -1336,5 +1340,74 @@ describe('契约 ↔ 前端类型对账', () => {
       offenders,
       `后端引入了排除 null 的 Jackson 装配：${offenders.join(', ')}；前端的「键恒在」镜像需要重新裁决。`,
     ).toEqual([]);
+  });
+
+  /**
+   * CT-3：从契约文本读某字段是否声明 nullable。原先 49 处 nullable 没有任何机检入口，
+   * 前端类型把字段写成可选/必填全靠人工登记；这里补上可复用的判据。
+   */
+  function contractNullable(schema: string, field: string): boolean {
+    const body = SCHEMAS.get(schema);
+    if (body === undefined) {
+      return false;
+    }
+    const start = body.findIndex((line) => line === `        ${field}:`);
+    if (start < 0) {
+      return false;
+    }
+    for (let index = start + 1; index < body.length; index += 1) {
+      if (/^ {8}[A-Za-z]/.test(body[index])) {
+        break; // 已跨到下一个字段
+      }
+      if (body[index].trim() === 'nullable: true') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  it('registers every constraint keyword found in the yaml (CT-3)', () => {
+    // 登记表由 scripts/check_contract_single_source.py --emit-registry 生成。
+    // 这里用一条**独立的**正则反向扫全文，断言「扫到的每一处都进了登记表」——
+    // 正是方案 CT-3 指出的「369 处约束只有约 60 条手工登记、且没有反向扫描」缺口。
+    const registry = JSON.parse(
+      readFileSync(join(ROOT, '..', 'scripts', 'contract_constraints.json'), 'utf8'),
+    ) as {
+      keywords: string[];
+      entries: Array<{ line: number; keyword: string; schema: string; field: string; value: unknown }>;
+    };
+    const keywordRe = new RegExp(`^\\s+(${registry.keywords.join('|')}):\\s*.*$`);
+    const scanned = new Set<string>();
+    contractLines.forEach((line, index) => {
+      const match = keywordRe.exec(line);
+      if (match !== null) {
+        scanned.add(`${index + 1}:${match[1]}`);
+      }
+    });
+    expect(scanned.size).toBeGreaterThan(100); // 防「两端同时变空」的恒真
+
+    const registered = new Set(registry.entries.map((entry) => `${entry.line}:${entry.keyword}`));
+    const missing = [...scanned].filter((item) => !registered.has(item));
+    expect(missing, `这些约束未进登记表：${missing.slice(0, 5).join(', ')}`).toEqual([]);
+    // 反向：改了契约却忘重新生成登记表，也要变红。
+    const stale = [...registered].filter((item) => !scanned.has(item));
+    expect(stale).toEqual([]);
+  });
+
+  it('contractNullable resolves every registered nullable field (CT-3)', () => {
+    const registry = JSON.parse(
+      readFileSync(join(ROOT, '..', 'scripts', 'contract_constraints.json'), 'utf8'),
+    ) as {
+      entries: Array<{ keyword: string; schema: string; field: string; value: unknown }>;
+    };
+    const nullableFields = registry.entries.filter(
+      (entry) => entry.keyword === 'nullable' && entry.value === true && entry.schema && entry.field,
+    );
+    expect(nullableFields.length).toBeGreaterThan(0);
+    for (const entry of nullableFields) {
+      expect(contractNullable(entry.schema, entry.field), `${entry.schema}.${entry.field}`).toBe(true);
+    }
+    // 反例：明确的必填字段不能被误判为可空。
+    expect(contractNullable('AskRequest', 'question')).toBe(false);
   });
 });

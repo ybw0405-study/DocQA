@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from opentelemetry import trace
@@ -11,6 +12,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor, SpanExporter
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 from opentelemetry.trace import SpanKind, Status, StatusCode, Tracer
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 _TRACEPARENT = re.compile(r"^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$")
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
@@ -127,3 +129,23 @@ def annotate_expected_trace(trace_id: str, continuation: bool) -> None:
     span.set_attribute("trace_continuation", continuation)
     if not continuation:
         span.set_attribute("expected_trace_id", trace_id)
+
+
+# 方案 4.3：显式使用 W3C TraceContext 传播器，不依赖全局 propagator 是否被配置。
+_PROPAGATOR = TraceContextTextMapPropagator()
+
+
+def propagation_headers(carrier: dict[str, str] | None = None) -> dict[str, str]:
+    """把当前 span 的 W3C 上下文注入出站载体（MQ 消息头 / HTTP 头）。
+
+    调用方可无条件把返回值 merge 进 envelope：没有活跃 span 时返回空 dict，
+    不会写出无效 traceparent。Java 侧对应 {@code com.docqa.common.trace.TracePropagation}。
+    """
+    target: dict[str, str] = carrier if carrier is not None else {}
+    _PROPAGATOR.inject(target)
+    return target
+
+
+def context_from_headers(headers: Mapping[str, str]) -> object:
+    """从入站载体提取父 context；无有效 traceparent 时返回空 context（不是 None）。"""
+    return _PROPAGATOR.extract({key.lower(): value for key, value in headers.items()})

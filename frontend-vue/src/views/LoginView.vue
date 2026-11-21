@@ -90,7 +90,8 @@ async function submit(): Promise<void> {
     if (isRegister.value) {
       await auth.signUp(username.value.trim(), password.value);
     } else {
-      await auth.signIn(username.value, password.value);
+      // 与注册口径一致：登录也 trim，避免尾随空格导致 401（C-13）
+      await auth.signIn(username.value.trim(), password.value);
     }
     password.value = '';
     await router.replace(safeInternalPath(route.query.redirect));

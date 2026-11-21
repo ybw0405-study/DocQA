@@ -51,9 +51,23 @@ class ActuatorManagementConfigTest {
         assertThat(health.getGroup().get("liveness").getInclude())
                 .as("liveness 只看进程自身，不因下游抖动被杀")
                 .containsExactlyInAnyOrder("livenessState", "ping");
+        // DQ-3 后半：readiness 追加 mq / minio 两个真实依赖探针，与 Python /health/ready 同口径。
         assertThat(health.getGroup().get("readiness").getInclude())
-                .as("readiness 纳入 db / redis，下游不可用时如实摘流")
-                .containsExactlyInAnyOrder("readinessState", "db", "redis");
+                .as("readiness 探真实依赖（db / redis / mq / minio），下游不可用时如实摘流")
+                .containsExactlyInAnyOrder("readinessState", "db", "redis", "mq", "minio");
+    }
+
+    @Test
+    void livenessGroupExcludesEveryDownstreamDependency() {
+        HealthEndpointProperties health = Binder.get(ENVIRONMENT)
+                .bind("management.endpoint.health", Bindable.of(HealthEndpointProperties.class))
+                .orElseThrow(() -> new AssertionError("application.yml 缺少 management.endpoint.health"));
+        // 与 Python 侧 liveness 恒活对齐：任何下游依赖都不能进 liveness，
+        // 否则 MQ / MinIO 抖动会触发滚动重启，而不是单纯摘流。
+        assertThat(health.getGroup().get("liveness").getInclude())
+                .doesNotContain("db", "redis", "mq", "minio");
+        assertThat(health.getGroup().get("readiness").getInclude())
+                .contains("mq", "minio");
     }
 
     @Test

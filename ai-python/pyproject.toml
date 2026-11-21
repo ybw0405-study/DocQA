@@ -16,7 +16,9 @@ dependencies = [
     "pydantic-settings>=2.4",
     "httpx>=0.27",
     "redis>=5.0",
-    "psycopg[binary]>=3.2",
+    # pool extra 提供 psycopg_pool.AsyncConnectionPool；离线 venv 若缺该可选包，
+    # rag/pg_connection.py 会自动回退逐次直连，服务与测试不受影响。
+    "psycopg[binary,pool]>=3.2",
     # 安全基线：LangGraph 1.x / LangChain Core 1.x / LangSmith 0.8+ 修复了
     # checkpoint 反序列化、缓存 pickle fallback、prompt pull 与 tracing 相关漏洞。
     "langgraph>=1.0.10,<2",

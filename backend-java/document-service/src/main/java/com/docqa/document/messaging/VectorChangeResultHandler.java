@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.DocumentRepository;
+import com.docqa.document.repository.VectorCleanupTaskRepository;
 import com.docqa.document.support.TraceScope;
 import java.io.IOException;
 import java.time.Clock;
@@ -24,16 +25,19 @@ public class VectorChangeResultHandler {
     private final MqIdempotencyMarker idempotencyMarker;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final VectorCleanupTaskRepository cleanupTasks;
 
     public VectorChangeResultHandler(
             DocumentRepository documentRepository,
             MqIdempotencyMarker idempotencyMarker,
             ObjectMapper objectMapper,
-            Clock clock) {
+            Clock clock,
+            VectorCleanupTaskRepository cleanupTasks) {
         this.documentRepository = documentRepository;
         this.idempotencyMarker = idempotencyMarker;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.cleanupTasks = cleanupTasks;
     }
 
     public void handle(String messageId, byte[] body) {
@@ -70,16 +74,33 @@ public class VectorChangeResultHandler {
         UUID tenantId = found.get().tenantId();
         DocumentRow document = found.get().document();
         if (!event.completed()) {
+            // DQ-1：修复前这里只打日志就 return，handle() 仍无条件 markProcessed，
+            // 于是失败的删除确认被永久 ACK，孤儿向量再无任何重投机会。
+            // 抛回 consumer 由 RECONSUME_LATER 有限次重投（最终进 DLQ 供运维介入），
+            // 且不写幂等标记，避免「处理过」掩盖一次真正失败的删除。
             LOGGER.warn(
-                    "Vector change failed; business state kept and consistency stays readable:"
+                    "Vector change failed; returning the confirmation to the broker:"
                             + " documentId={}, operation={}, indexVersion={}, errorCode={}",
                     document.id(),
                     operation,
                     event.indexVersion(),
                     event.errorCode());
-            return;
+            throw new IllegalStateException(
+                    "vector change reported FAILED: documentId=" + document.id()
+                            + ", operation=" + operation
+                            + ", indexVersion=" + event.indexVersion()
+                            + ", errorCode=" + event.errorCode());
         }
         if (operation == VectorChangeOperation.DELETE_VERSION) {
+            // DQ-1：只有真正删成功才出队。FAILED 走上面的异常分支，outbox 行保留，
+            // 由 republishPendingVectorCleanups() 有限次重投，不会永久残留孤儿向量。
+            if (event.indexVersion() != null && !event.indexVersion().isBlank()) {
+                cleanupTasks.remove(
+                        tenantId,
+                        document.id(),
+                        event.indexVersion(),
+                        operation.name());
+            }
             LOGGER.info(
                     "Obsolete index version removed from the vector side: documentId={}, indexVersion={},"
                             + " remainingRows={}",

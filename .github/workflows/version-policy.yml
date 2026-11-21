@@ -1,0 +1,122 @@
+name: version-policy
+
+# G12：CI 的 java/node/python 版本以根目录 .java-version / .nvmrc / .python-version
+# 为单一来源（ci.yml 用 *-version-file 读取）。本 job 用矩阵显式声明并验证
+# 各语言「下限」：下限取自 backend-java/pom.xml / frontend-vue/package.json engines /
+# ai-python/pyproject.toml requires-python；断言「下限 == 矩阵声明」
+# 「固定版本 >= 下限」，并在该下限版本上真实启动一次工具做冒烟。
+# 任一不一致即失败，不使用恒真兜底 / continue-on-error。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version-floor:
+    name: 版本下限矩阵 ${{ matrix.tool }} ${{ matrix.floor }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tool: java
+            floor: '17'
+          - tool: node
+            floor: '22.22.2'
+          - tool: python
+            floor: '3.11'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: 校验版本声明与矩阵下限一致
+        env:
+          TOOL: ${{ matrix.tool }}
+          FLOOR: ${{ matrix.floor }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          root = Path('.')
+          read = lambda p: (root / p).read_text(encoding='utf-8')
+
+          java_pinned = read('.java-version').strip()
+          m = re.search(r'<java\.version>(\d+)</java\.version>', read('backend-java/pom.xml'))
+          if not m:
+              print('backend-java/pom.xml 缺少 <java.version>', file=sys.stderr)
+              sys.exit(1)
+          java_floor = m.group(1)
+          if java_pinned != java_floor:
+              print(f'.java-version({java_pinned}) != pom java.version({java_floor})', file=sys.stderr)
+              sys.exit(1)
+
+          node_pinned = read('.nvmrc').strip()
+          node_engine = json.loads(read('frontend-vue/package.json'))['engines']['node']
+          node_floor = node_engine.lstrip('>=')
+          if node_pinned.split('.')[0] != node_floor.split('.')[0]:
+              print(f'.nvmrc({node_pinned}) 主版本与 engines.node({node_engine}) 不一致', file=sys.stderr)
+              sys.exit(1)
+
+          py_pinned = read('.python-version').strip()
+          m = re.search(r'requires-python\s*=\s*">=(\d+\.\d+)"', read('ai-python/pyproject.toml'))
+          if not m:
+              print('ai-python/pyproject.toml 缺少 requires-python', file=sys.stderr)
+              sys.exit(1)
+          py_floor = m.group(1)
+          if tuple(map(int, py_pinned.split('.'))) < tuple(map(int, py_floor.split('.'))):
+              print(f'.python-version({py_pinned}) 低于下限({py_floor})', file=sys.stderr)
+              sys.exit(1)
+
+          declared = {'java': java_floor, 'node': node_floor, 'python': py_floor}
+          tool, floor = os.environ['TOOL'], os.environ['FLOOR']
+          if declared.get(tool) != floor:
+              print(f'矩阵下限 {tool}={floor} 与项目声明 {declared.get(tool)} 不一致', file=sys.stderr)
+              sys.exit(1)
+          print(f'java  pinned={java_pinned} floor={java_floor}')
+          print(f'node  pinned={node_pinned} floor={node_floor}')
+          print(f'python pinned={py_pinned} floor={py_floor}')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as fh:
+              fh.write(f'### 版本下限校验通过（{tool} {floor}）\n\n')
+              fh.write(f'| 工具 | 固定版本 | 声明下限 |\n| --- | --- | --- |\n')
+              fh.write(f'| java | {java_pinned} | {java_floor} |\n')
+              fh.write(f'| node | {node_pinned} | {node_floor} |\n')
+              fh.write(f'| python | {py_pinned} | {py_floor} |\n')
+          PY
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        if: matrix.tool == 'java'
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.floor }}
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        if: matrix.tool == 'node'
+        with:
+          node-version: ${{ matrix.floor }}
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        if: matrix.tool == 'python'
+        with:
+          python-version: ${{ matrix.floor }}
+
+      - name: 在声明的下限版本上冒烟
+        run: |
+          case "${{ matrix.tool }}" in
+            java)   java -version ;;
+            node)   node --version ;;
+            python) python --version ;;
+            *) echo "未知的 matrix.tool"; exit 1 ;;
+          esac

@@ -1,17 +1,19 @@
 import { defineStore } from 'pinia';
 import { listAuditEvents } from '../api/admin';
-import { ApiError } from '../api/errors';
 import type { AuditEventItem } from '../types/admin';
 import { AUDIT_EVENT_TYPE_PATTERN, AUDIT_TRACE_ID_PATTERN } from '../types/admin';
+import {
+  clearFailureFields,
+  isStaleCursor,
+  makeApplyFailure,
+  rejectLocal,
+  type FailureFields,
+} from './failureFields';
 
-/** 契约 `AuditQueryLimit` 的默认值。 */
+/** 契约 `AuditQueryLimit` 的默认值；其余列表页用共享的 20，本页按契约是 100。 */
 const PAGE_LIMIT = 100;
 
-interface FailureFields {
-  detail: string | null;
-  code: string | null;
-  traceId: string | null;
-}
+const applyFailure = makeApplyFailure('审计事件加载失败，请稍后重试。');
 
 /** 查询条件表单的输入；与 store 字段的区别只在于这里都是可选的原始文本。 */
 export interface AuditFilterInput {
@@ -38,6 +40,8 @@ export interface AdminAuditState extends FailureFields {
   nextCursor: string | null;
   loading: boolean;
   loaded: boolean;
+  /** 列表取数代号：查询条件切换递增它，在途翻页的过期响应一律丢弃。 */
+  listSeq: number;
   /** 查询条件提交的在途标记；与列表读锁分开，翻页不该让「查询」按钮转起来。 */
   submitting: boolean;
 
@@ -46,28 +50,6 @@ export interface AdminAuditState extends FailureFields {
   filterEventType: string | null;
   filterFrom: string | null;
   filterTo: string | null;
-}
-
-function applyFailure(target: FailureFields, error: unknown): void {
-  if (error instanceof ApiError) {
-    target.detail = error.detail;
-    target.code = error.code;
-    target.traceId = error.traceId;
-    return;
-  }
-  target.detail = '审计事件加载失败，请稍后重试。';
-  target.code = null;
-  target.traceId = null;
-}
-
-function rejectLocal(target: FailureFields, message: string): void {
-  target.detail = message;
-  target.code = null;
-  target.traceId = null;
-}
-
-function isStaleCursor(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 400;
 }
 
 /** 空串与纯空格都归一成「不给这个条件」：契约的 pattern 对空串同样校验，发出去只会换来 400。 */
@@ -82,6 +64,7 @@ export const useAdminAuditStore = defineStore('adminAudit', {
     nextCursor: null,
     loading: false,
     loaded: false,
+    listSeq: 0,
     submitting: false,
 
     filterTraceId: null,
@@ -116,9 +99,7 @@ export const useAdminAuditStore = defineStore('adminAudit', {
 
   actions: {
     clearFailure(): void {
-      this.detail = null;
-      this.code = null;
-      this.traceId = null;
+      clearFailureFields(this);
     },
 
     async loadFirst(): Promise<void> {
@@ -128,18 +109,28 @@ export const useAdminAuditStore = defineStore('adminAudit', {
       await this.fetchFirstPage();
     },
 
+    /** 不受 `loading` 守卫约束：查询条件切换后必须真取新条件结果，过期响应按代号丢弃。 */
     async fetchFirstPage(): Promise<void> {
+      const seq = ++this.listSeq;
       this.loading = true;
       try {
         const data = await listAuditEvents(this.queryParams);
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.events = data.items;
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         applyFailure(this, error);
       } finally {
-        this.loading = false;
-        this.loaded = true;
+        if (seq === this.listSeq) {
+          this.loading = false;
+          this.loaded = true;
+        }
       }
     },
 
@@ -148,13 +139,20 @@ export const useAdminAuditStore = defineStore('adminAudit', {
       if (!this.canLoadMore || cursor === null) {
         return;
       }
+      const seq = this.listSeq;
       this.loading = true;
       try {
         const data = await listAuditEvents({ ...this.queryParams, cursor });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.events = [...this.events, ...data.items];
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         if (isStaleCursor(error)) {
           // 排序键是 `occurred_at DESC, id DESC`：锚点失效就回第一页，停在坏游标上只会看不到更旧的事件。
           this.nextCursor = null;
@@ -165,7 +163,9 @@ export const useAdminAuditStore = defineStore('adminAudit', {
         }
         applyFailure(this, error);
       } finally {
-        this.loading = false;
+        if (seq === this.listSeq) {
+          this.loading = false;
+        }
       }
     },
 

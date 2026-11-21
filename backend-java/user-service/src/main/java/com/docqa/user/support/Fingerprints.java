@@ -1,22 +1,15 @@
 package com.docqa.user.support;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-
+/**
+ * 方案 4.2 步 4：纯算法实现已下沉 common，这里保留同名薄委托以固定本服务的调用点。
+ * 业务边界（谁调用、算什么指纹）不变，只把 SHA-256 收敛成单一来源。
+ */
 public final class Fingerprints {
 
     private Fingerprints() {
     }
 
     public static String sha256(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 is not available", ex);
-        }
+        return com.docqa.common.support.Fingerprints.sha256(value);
     }
 }

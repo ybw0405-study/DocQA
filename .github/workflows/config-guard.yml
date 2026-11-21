@@ -1,0 +1,111 @@
+name: config-guard
+
+# G19：ops/、scripts/、docs/ 此前没有任何 job。这里让这三类目录的改动有真实门禁：
+# pull_request.paths 显式列出它们及 workflow 自身；push main 无条件跑。
+# 校验项都是硬失败：compose 可解析且镜像按 digest 固定、全部 workflow YAML
+# safe_load 通过且每条 workflow 保留 timeout/permissions/concurrency、
+# action 无浮动 @vN、无 continue-on-error、无恒真兜底、scripts 语法自检。
+# 不使用 continue-on-error 或恒真兜底绕过。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "ops/**"
+      - "scripts/**"
+      - "docs/**"
+      - ".github/workflows/**"
+      - "Dockerfile"
+      - ".nvmrc"
+      - ".python-version"
+      - ".java-version"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  config-guard:
+    name: ops / scripts / docs 配置守卫
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version-file: .python-version
+
+      - name: 安装 PyYAML
+        run: python -m pip install --quiet pyyaml
+
+      - name: docker compose config（含 G16 digest 固定）
+        run: docker compose -f ops/docker-compose.infra.yml --env-file ops/env/local.env.example config --quiet
+
+      - name: workflow / compose 静态门禁
+        run: |
+          python - <<'PY'
+          import glob
+          import re
+          import sys
+          from pathlib import Path
+          import yaml
+
+          errors = []
+          workflows = sorted(glob.glob('.github/workflows/*.yml') + glob.glob('.github/workflows/*.yaml'))
+          if not workflows:
+              errors.append('没有找到任何 workflow YAML')
+
+          for path in workflows:
+              text = Path(path).read_text(encoding='utf-8')
+              try:
+                  doc = yaml.safe_load(text)
+              except yaml.YAMLError as exc:
+                  errors.append(f'{path}: yaml.safe_load 失败: {exc}')
+                  continue
+              if not isinstance(doc, dict):
+                  errors.append(f'{path}: 顶层不是 mapping')
+                  continue
+              for key in ('permissions', 'concurrency'):
+                  if key not in doc:
+                      errors.append(f'{path}: 缺少顶层 {key}')
+              for job_name, job in (doc.get('jobs') or {}).items():
+                  if not isinstance(job, dict) or 'timeout-minutes' not in job:
+                      errors.append(f'{path}: job {job_name} 缺少 timeout-minutes')
+              # 逐行检查 uses: 步骤，避免匹配到本脚本内嵌的正则字面量
+              for line in text.splitlines():
+                  if re.match(r'\s*-\s*uses:\s*[^\s#]+@(?:v\d|main|master)', line):
+                      errors.append(f'{path}: 存在浮动 tag / 分支 action 引用（必须为 40 位 SHA）')
+              if re.search(r'^\s*continue-on-error\s*:', text, re.M):
+                  errors.append(f'{path}: 存在 continue-on-error（禁止绕过门禁）')
+              if re.search(r'\|\|\s*true', text):
+                  errors.append(f'{path}: 存在恒真兜底（禁止绕过门禁）')
+
+          compose = yaml.safe_load(Path('ops/docker-compose.infra.yml').read_text(encoding='utf-8'))
+          for name, service in (compose.get('services') or {}).items():
+              image = service.get('image', '')
+              if '@sha256:' not in image:
+                  errors.append(f'ops/docker-compose.infra.yml: 服务 {name} 的镜像未按 digest 固定: {image}')
+
+          if errors:
+              print('配置守卫失败：', file=sys.stderr)
+              for item in errors:
+                  print(f'  - {item}', file=sys.stderr)
+              sys.exit(1)
+          print(f'配置守卫通过：{len(workflows)} 个 workflow、compose 镜像全部按 digest 固定。')
+          PY
+
+      - name: scripts/ Python 语法自检
+        run: python -m compileall -q scripts
+
+      - name: scripts/ shell 语法自检
+        run: |
+          for f in scripts/*.sh; do
+            [ -f "$f" ] || continue
+            bash -n "$f" || exit 1
+          done

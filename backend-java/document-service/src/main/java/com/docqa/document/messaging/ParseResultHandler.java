@@ -9,6 +9,7 @@ import com.docqa.document.domain.DocumentStatus;
 import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.ChunkRepository;
 import com.docqa.document.repository.DocumentRepository;
+import com.docqa.document.repository.VectorCleanupTaskRepository;
 import com.docqa.document.support.SafeText;
 import com.docqa.document.support.TraceScope;
 import com.docqa.document.transaction.TransactionRunner;
@@ -41,6 +42,7 @@ public class ParseResultHandler {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final BusinessMetrics metrics;
+    private final VectorCleanupTaskRepository cleanupTasks;
 
     public ParseResultHandler(
             DocumentRepository documentRepository,
@@ -50,7 +52,8 @@ public class ParseResultHandler {
             MqIdempotencyMarker idempotencyMarker,
             ObjectMapper objectMapper,
             Clock clock,
-            BusinessMetrics metrics) {
+            BusinessMetrics metrics,
+            VectorCleanupTaskRepository cleanupTasks) {
         this.documentRepository = documentRepository;
         this.chunkRepository = chunkRepository;
         this.documentEventPublisher = documentEventPublisher;
@@ -59,6 +62,7 @@ public class ParseResultHandler {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.metrics = metrics;
+        this.cleanupTasks = cleanupTasks;
     }
 
     public void handleCompleted(String messageId, byte[] body) {
@@ -150,10 +154,20 @@ public class ParseResultHandler {
         LOGGER.info("Document indexed: documentId={}, chunks={}", document.id(), chunks.size());
         metrics.documentParse(parseDuration(document, now), "INDEXED");
         if (outcome.obsoleteIndexVersion() != null) {
+            // DQ-1：先把「待确认删除」持久化，再发消息。发布失败 / 消费端 FAILED /
+            // 进程重启都不再让旧版本向量永久残留 —— 对账任务会按 outbox 重投。
+            cleanupTasks.enqueue(
+                    tenantId,
+                    document.id(),
+                    document.userId(),
+                    outcome.obsoleteIndexVersion(),
+                    VectorChangeOperation.DELETE_VERSION.name(),
+                    now);
             publishVectorChangeQuietly(VectorChangeRequestedEvent.deleteVersion(
                     TraceIdContext.currentOrCreate(),
                     document.id(),
                     document.userId(),
+                    tenantId,
                     outcome.obsoleteIndexVersion(),
                     now));
         }
@@ -281,6 +295,7 @@ public class ParseResultHandler {
                         TraceIdContext.currentOrCreate(),
                         current.id(),
                         current.userId(),
+                        tenantId,
                         current.indexVersion(),
                         current.objectKey(),
                         current.fileName(),
@@ -359,12 +374,20 @@ public class ParseResultHandler {
         transactionRunner.execute(() -> documentRepository.markFailed(tenantId, documentId, errorCode, errorMessage));
     }
 
+    /** 发布失败只记日志、不影响 index 已提交的业务状态；残留的旧版本由对账任务与 DLQ 告警兜底。
+     *
+     * <p>修复前这里声称「等 S9 sweep」，但仓库里从来没有 S9，属于注释与实现脱节。
+     * 当前真实边界：DELETE_DOCUMENT 由 {@code republishUnconfirmedDeletions} 按未确认删除重投；
+     * DELETE_VERSION 依赖 vector-change-completed 的 FAILED 重投链（见 VectorChangeResultHandler）。
+     * 持久化「待清理版本」列仍是待办项，不能在这里假装已有自动清理。
+     */
     private void publishVectorChangeQuietly(VectorChangeRequestedEvent event) {
         try {
             documentEventPublisher.publishVectorChangeRequested(event);
         } catch (RuntimeException ex) {
+            // 不重投、不吞掉：outbox 已持久化，republishPendingVectorCleanups() 会接管。
             LOGGER.error(
-                    "vector.change.requested publish failed; orphan vectors stay unreachable until S9 sweep:"
+                    "vector.change.requested publish failed; cleanup task stays in outbox for reconciliation:"
                             + " traceId={}, documentId={}, indexVersion={}",
                     event.traceId(),
                     event.documentId(),

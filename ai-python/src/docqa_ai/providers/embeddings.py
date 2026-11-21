@@ -98,7 +98,13 @@ class OpenAIEmbeddingProvider:
         self.max_batch_rows = max_batch_rows
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
-        self._client = client
+        # CON-2：构造时持有共享 client，避免每次 embed 都新建+销毁（含 TLS 握手）。
+        # 注入的 client 由调用方所有；自建的由 aclose() 在应用关闭时释放。
+        self._client = (
+            client
+            if client is not None
+            else httpx.AsyncClient(limits=httpx.Limits(max_connections=20, max_keepalive_connections=10))
+        )
         self._owns_client = client is None
 
     async def embed(self, texts: list[str], timeout_s: float) -> list[list[float]]:
@@ -110,7 +116,7 @@ class OpenAIEmbeddingProvider:
         # dimensions 必须显式发送：E43 实测不发送时 v4/v3 都「恰好」返回 1024 维，
         # 那是端点默认值而非承诺。声明后它成为请求约束，与下面的形状校验闭环。
         payload = {"model": self.model, "input": texts, "dimensions": self.dimensions}
-        client = self._client or httpx.AsyncClient()
+        client = self._client
         try:
             response = await client.post(
                 f"{self._base_url}/embeddings",
@@ -122,9 +128,6 @@ class OpenAIEmbeddingProvider:
             raise EmbeddingTimeout("embedding request timed out") from exc
         except httpx.HTTPError as exc:
             raise EmbeddingUnavailable("embedding request failed") from exc
-        finally:
-            if self._owns_client:
-                await client.aclose()
         if response.status_code >= 400:
             raise EmbeddingUnavailable(f"embedding provider returned {response.status_code}")
         try:
@@ -136,6 +139,10 @@ class OpenAIEmbeddingProvider:
         if len(vectors) != len(texts) or any(len(vector) != self.dimensions for vector in vectors):
             raise EmbeddingUnavailable("embedding response has an unexpected shape")
         return vectors
+
+    async def aclose(self) -> None:
+        if self._owns_client:
+            await self._client.aclose()
 
 
 def cosine_similarity(left: list[float], right: list[float]) -> float:

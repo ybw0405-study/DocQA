@@ -37,7 +37,7 @@ from docqa_ai.parse_worker.vector_writer import (
 from docqa_ai.parse_worker.worker import HandleOutcome, ParseWorker, _build_embedder
 from docqa_ai.providers.embeddings import OPENAI_COMPATIBLE_MAX_BATCH_ROWS, OfflineEmbeddingProvider
 from docqa_ai.tracing import build_tracing, traceparent_for
-from tests.conftest import DOCUMENT_ID, TRACE_ID, make_settings
+from tests.conftest import DOCUMENT_ID, TENANT_ID, TRACE_ID, make_settings
 
 USER_ID = "11111111-1111-4111-8111-111111111111"
 OBJECT_KEY = "uploads/doc.txt"
@@ -50,6 +50,7 @@ def requested_event(data: bytes = TEXT_BODY, **overrides: object) -> dict[str, o
         "traceId": TRACE_ID,
         "documentId": str(DOCUMENT_ID),
         "userId": USER_ID,
+        "tenantId": str(TENANT_ID),
         "indexVersion": "v1",
         "objectKey": OBJECT_KEY,
         "fileName": "doc.txt",
@@ -319,7 +320,13 @@ async def test_publish_failure_releases_message_for_redelivery() -> None:
 
 async def test_vector_write_failure_publishes_retryable_failed_event() -> None:
     class FailingWriter:
-        async def replace(self, document_id: object, index_version: str, records: object) -> None:
+        async def replace(
+            self,
+            document_id: object,
+            index_version: str,
+            records: object,
+            tenant_id: object | None = None,
+        ) -> None:
             raise VectorWriteError("db down")
 
     publisher = InMemoryParsePublisher()

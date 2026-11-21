@@ -20,6 +20,7 @@ import com.docqa.document.domain.DocumentStatus;
 import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.ChunkRepository;
 import com.docqa.document.repository.DocumentRepository;
+import com.docqa.document.repository.VectorCleanupTaskRepository;
 import com.docqa.document.transaction.TransactionRunner;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
@@ -65,6 +66,8 @@ class ParseResultHandlerTest {
     private StringRedisTemplate redisTemplate;
     @Mock
     private ValueOperations<String, String> valueOperations;
+    @Mock
+    private VectorCleanupTaskRepository cleanupTasks;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private ParseResultHandler handler;
@@ -81,7 +84,8 @@ class ParseResultHandlerTest {
                 new MqIdempotencyMarker(redisTemplate, properties),
                 objectMapper,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                new BusinessMetrics(new SimpleMeterRegistry()));
+                new BusinessMetrics(new SimpleMeterRegistry()),
+                cleanupTasks);
 
         lenient().when(transactionRunner.execute(any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(0)).get());
@@ -152,6 +156,8 @@ class ParseResultHandlerTest {
         assertThat(event.getValue().indexVersion()).isEqualTo("v1");
         assertThat(event.getValue().documentId()).isEqualTo(DOCUMENT_ID);
         assertThat(event.getValue().userId()).isEqualTo(USER_ID);
+        // DQ-1：发布前必须先把待确认删除落进 outbox，发布失败才有重投依据。
+        verify(cleanupTasks).enqueue(TENANT_ID, DOCUMENT_ID, USER_ID, "v1", "DELETE_VERSION", NOW);
     }
 
     @Test

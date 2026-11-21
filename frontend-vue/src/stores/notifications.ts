@@ -1,17 +1,18 @@
 import { defineStore } from 'pinia';
 import { listNotifications, markNotificationsRead } from '../api/notifications';
-import { ApiError } from '../api/errors';
 import type { NotificationData, NotificationReadRequest } from '../types/notifications';
 import { NOTIFICATION_IDS_MAX } from '../types/notifications';
+import { clearFailureFields, isStaleCursor, makeApplyFailure, PAGE_LIMIT } from './failureFields';
 
-/** 契约 `PageLimit` 的默认值；显式发送，与看板、文档页、问答页同口径。 */
-const PAGE_LIMIT = 20;
+const applyFailure = makeApplyFailure('通知面板加载失败，请稍后重试。');
 
 export interface NotificationsState {
   items: NotificationData[];
   nextCursor: string | null;
   listLoading: boolean;
   listLoaded: boolean;
+  /** 列表取数代号：写后刷新与「只看未读」切换递增它，在途翻页的过期响应一律丢弃。 */
+  listSeq: number;
   /** 契约 `unreadOnly`：true 只返回 `readAt` 为 null 的行。 */
   unreadOnly: boolean;
   /** 标记已读在途；与列表读锁分开，红点刷新不该被一次翻页挡住。 */
@@ -24,32 +25,13 @@ export interface NotificationsState {
   traceId: string | null;
 }
 
-function applyFailure(target: NotificationsState, error: unknown): void {
-  if (error instanceof ApiError) {
-    target.detail = error.detail;
-    target.code = error.code;
-    target.traceId = error.traceId;
-    return;
-  }
-  target.detail = '通知面板加载失败，请稍后重试。';
-  target.code = null;
-  target.traceId = null;
-}
-
-/**
- * 游标 400 的唯一正确动作是回第一页：keyset 游标锚定排序键，两次翻页之间有新通知落库
- * 就可能让锚点失效，停在坏游标上只会让用户永远看不到剩余未读。
- */
-function isStaleCursor(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 400;
-}
-
 export const useNotificationsStore = defineStore('notifications', {
   state: (): NotificationsState => ({
     items: [],
     nextCursor: null,
     listLoading: false,
     listLoaded: false,
+    listSeq: 0,
     unreadOnly: false,
     marking: false,
     lastUpdated: null,
@@ -71,9 +53,7 @@ export const useNotificationsStore = defineStore('notifications', {
 
   actions: {
     clearFailure(): void {
-      this.detail = null;
-      this.code = null;
-      this.traceId = null;
+      clearFailureFields(this);
     },
 
     async loadListFirst(): Promise<void> {
@@ -83,19 +63,31 @@ export const useNotificationsStore = defineStore('notifications', {
       await this.fetchFirstPage();
     },
 
-    /** 不受 `listLoading` 守卫约束：写操作之后必须真取新结果，否则服务端事实被一次在途旧读挤掉。 */
+    /**
+     * 不受 `listLoading` 守卫约束：写操作或「只看未读」切换后必须真取新结果，
+     * 否则服务端事实被一次在途旧读挤掉；过期响应按代号丢弃。
+     */
     async fetchFirstPage(): Promise<void> {
+      const seq = ++this.listSeq;
       this.listLoading = true;
       try {
         const data = await listNotifications({ unreadOnly: this.unreadOnly, limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = data.items;
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         applyFailure(this, error);
       } finally {
-        this.listLoading = false;
-        this.listLoaded = true;
+        if (seq === this.listSeq) {
+          this.listLoading = false;
+          this.listLoaded = true;
+        }
       }
     },
 
@@ -104,13 +96,20 @@ export const useNotificationsStore = defineStore('notifications', {
       if (!this.canLoadMore || cursor === null) {
         return;
       }
+      const seq = this.listSeq;
       this.listLoading = true;
       try {
         const data = await listNotifications({ unreadOnly: this.unreadOnly, cursor, limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = [...this.items, ...data.items];
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         if (isStaleCursor(error)) {
           this.nextCursor = null;
           this.listLoading = false;
@@ -120,7 +119,9 @@ export const useNotificationsStore = defineStore('notifications', {
         }
         applyFailure(this, error);
       } finally {
-        this.listLoading = false;
+        if (seq === this.listSeq) {
+          this.listLoading = false;
+        }
       }
     },
 

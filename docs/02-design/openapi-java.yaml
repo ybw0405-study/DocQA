@@ -4682,7 +4682,7 @@ components:
             因此界面只在 `kind=COURSE` 时显示「提前 N 分钟」徽章。
             上限 10080（七天）与写入面逐字相同：`ReminderListItemData` 原样投影 `lead_minutes` 列，
             而课表导入与截止创建都允许到 10080，读侧写 1440 会把一次合法的「提前两天」导入
-            读成非法响应（S4-4 由前端契约对账尺子发现并更正，登记在 `cr-log-s4-reminder.md`）。
+            读成非法响应（由前端契约对账测试发现并更正；读侧与写入面的上限必须逐字一致）。
         nextTriggerAt:
           type: string
           format: date-time

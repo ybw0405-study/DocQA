@@ -20,7 +20,7 @@ from docqa_ai.parse_worker.publisher import InMemoryVectorChangePublisher
 from docqa_ai.parse_worker.vector_worker import VectorChangeWorker
 from docqa_ai.parse_worker.vector_writer import VectorWriteError
 from docqa_ai.parse_worker.worker import HandleOutcome
-from tests.conftest import DOCUMENT_ID, TRACE_ID
+from tests.conftest import DOCUMENT_ID, TENANT_ID, TRACE_ID
 
 USER_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 EVENT_ID = uuid.UUID("44444444-4444-4444-8444-444444444444")
@@ -32,6 +32,7 @@ def requested(**overrides: object) -> dict[str, object]:
         "traceId": TRACE_ID,
         "documentId": str(DOCUMENT_ID),
         "userId": str(USER_ID),
+        "tenantId": str(TENANT_ID),
         "operation": "DELETE_DOCUMENT",
         "indexVersion": None,
         "occurredAt": datetime.now(UTC).isoformat(),
@@ -49,13 +50,23 @@ class RecordingWriter:
         self.scopes: list[tuple[uuid.UUID, str | None]] = []
         self.remaining = remaining
 
-    async def delete(self, document_id: uuid.UUID, index_version: str | None) -> int:
+    async def delete(
+        self,
+        document_id: uuid.UUID,
+        index_version: str | None,
+        tenant_id: object | None = None,
+    ) -> int:
         self.scopes.append((document_id, index_version))
         return self.remaining
 
 
 class FailingWriter(RecordingWriter):
-    async def delete(self, document_id: uuid.UUID, index_version: str | None) -> int:
+    async def delete(
+        self,
+        document_id: uuid.UUID,
+        index_version: str | None,
+        tenant_id: object | None = None,
+    ) -> int:
         self.scopes.append((document_id, index_version))
         raise VectorWriteError("psycopg connection to secret-host failed: password=hunter2")
 

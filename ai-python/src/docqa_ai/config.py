@@ -79,7 +79,8 @@ class Settings(BaseSettings):
     service_name: str = "docqa-ai"
     environment: Literal["dev", "test", "prod"] = "dev"
     log_level: str = "INFO"
-    api_host: str = "0.0.0.0"
+    # 默认只监听 loopback：Python 数据面不对公网暴露，需要跨主机时由部署显式放宽。
+    api_host: str = "127.0.0.1"
     api_port: int = Field(default=8000, ge=1, le=65535)
 
     redis_url: str = Field(
@@ -220,10 +221,26 @@ class Settings(BaseSettings):
     otel_endpoint: str = ""
     otel_sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
 
-    # §4.2 的 9 项 Python 侧业务指标经此端点以 Prometheus 文本格式导出。
-    # 默认开启（否则 F-1 仍然是「查不到」），但它**没有任何鉴权**：部署时若 Python 端口
-    # 可被公网访问，必须置 false 或由反向代理限制来源——指标本身不含 PII，却会暴露业务量。
-    metrics_exposed: bool = True
+    # §4.2 的 9 项 Python 侧业务指标经独立端口的 /metrics 以 Prometheus 文本格式导出。
+    # 默认关闭（生产默认 metrics_exposed=False 语义不变）：打开时 main() 才在
+    # metrics_host:metrics_port（默认 loopback 9090）起一个只含 /metrics 的最小 app，
+    # 主业务端口不再注册任何指标端点。
+    metrics_exposed: bool = False
+    metrics_host: str = "127.0.0.1"
+    metrics_port: int = Field(default=9090, ge=1, le=65535)
+
+    # 方案 4.2 步 3：内部鉴权升级为 HMAC 签名请求（时间戳 + body）。
+    # 非空时以签名为唯一凭据，静态 X-Internal-Token 头不再单独放行；空时保留上一轮的
+    # 静态 token 兼容期（Java WebClient 尚未接入签名，属跨服务业务边界，本轮不硬改）。
+    # 生产 fail-fast 仍只校验 internal_token，语义不变。
+    internal_hmac_secret: SecretStr = SecretStr("")
+
+    # 网关 → 数据面共享密钥（跨项目协调：Java WebClient 在请求里带同名 X-Internal-Token 头）。
+    # 空串 = 不启用校验，仅用于显式 dev/local/test 环境；一旦配置，除探针外缺失/错误头一律 401。
+    # 生产判据默认最严（只有显式 dev/local/test 才放宽），生产且 token 为空时
+    # create_app 的 lifespan 与 main() 都会 fail-fast 拒绝启动。
+    # 用 SecretStr 避免出现在日志与 redacted_summary。
+    internal_token: SecretStr = SecretStr("")
 
     @model_validator(mode="after")
     def validate_consistency(self) -> Settings:
@@ -312,4 +329,5 @@ class Settings(BaseSettings):
             "otel_enabled": self.otel_enabled,
             "pg_configured": bool(self.pg_dsn),
             "pg_table": self.pg_table,
+            "internal_token_configured": bool(self.internal_token.get_secret_value()),
         }

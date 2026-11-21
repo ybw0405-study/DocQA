@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { postSseStream, type SseFrame, type SseRequest } from './sse';
-import { ApiError, NETWORK_ERROR_CODE, StreamUnavailableError, UNKNOWN_ERROR_CODE } from './errors';
+import {
+  ApiError,
+  NETWORK_ERROR_CODE,
+  STREAM_BUFFER_OVERFLOW_CODE,
+  StreamBufferOverflowError,
+  StreamUnavailableError,
+  UNKNOWN_ERROR_CODE,
+} from './errors';
 import { bindSessionToAuthStore } from '../stores/sessionBridge';
 import { useAuthStore } from '../stores/auth';
 import {
@@ -273,6 +280,49 @@ describe('api/sse', () => {
     expect(error.status).toBe(0);
     expect(error.code).toBe(NETWORK_ERROR_CODE);
     expect(error.isNetworkFailure).toBe(true);
+  });
+
+  it('aborts and throws a clear error when a no-newline stream overruns the buffer', async () => {
+    let cancelled = false;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        // 单块就超过 1 MiB 且没有任何行终止符：takeLines 切不出完整行，buffer 会无界增长。
+        controller.enqueue(encoder.encode('x'.repeat(1024 * 1024 + 1)));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    stubFetch(() => new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+
+    const error = await expectThrown(collect(postSseStream(streamRequest())));
+
+    expect(error).toBeInstanceOf(StreamBufferOverflowError);
+    expect((error as ApiError).code).toBe(STREAM_BUFFER_OVERFLOW_CODE);
+    // 超限时必须主动断开上游，而不是让标签页内存继续被撑大。
+    expect(cancelled).toBe(true);
+  });
+
+  it('aborts when a frame keeps stacking data lines without a terminator', async () => {
+    let cancelled = false;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        // 10001 条 data: 行、始终没有空行收尾：dataLines 同样会无界增长。
+        controller.enqueue(encoder.encode('data: x\n'.repeat(10_001)));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    stubFetch(() => new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+
+    const error = await expectThrown(collect(postSseStream(streamRequest())));
+
+    expect(error).toBeInstanceOf(StreamBufferOverflowError);
+    expect((error as ApiError).code).toBe(STREAM_BUFFER_OVERFLOW_CODE);
+    expect(cancelled).toBe(true);
   });
 
   it('cancels the connection when the consumer stops reading early', async () => {

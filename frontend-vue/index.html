@@ -7,14 +7,22 @@
       访问令牌只驻内存，刷新凭据由 HttpOnly Cookie 持有，页面脚本既不读也不写；
       浏览器存储唯一允许的状态是界面主题偏好，owner 固定为 src/theme.ts（键名与禁现字面量
       由 tests/redlines.spec.ts 的三重白名单当场对账）。XSS 仍是主要威胁面，因此禁止内联脚本：
-      首帧主题改下面这个独立模块，而不是写在 head 里。style-src 的 unsafe-inline 是
-      Vite dev 注入样式所需的最小放宽。生产环境应由网关下发同名 CSP 头。
+      首帧主题改下面这个独立模块，而不是写在 head 里。
+
+      CT-5：meta 只保留与 dev/prod 一致的最小同源策略。style-src 的 unsafe-inline 与
+      connect-src 的两个 dev HMR websocket 白名单已移除——前者扩大 XSS 面，后者只属于 dev。
+      frame-ancestors / nosniff / HSTS 不能以 meta 表达，统一由托管层或网关以响应头下发
+      （见 nginx.conf.example），这里保留 meta 只是纵深防御的一层。
+
+      CT-7：运行时配置由 config.js 在所有应用脚本之前注入 window.__APP_CONFIG__，
+      桶名与挂载前缀都不进构建期常量；托管层必须对 config.js 下发 no-store。
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws://localhost:5173 ws://127.0.0.1:5173; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>DocQA · 智能学习助手</title>
+    <script src="./config.js"></script>
   </head>
   <body>
     <div id="app"></div>

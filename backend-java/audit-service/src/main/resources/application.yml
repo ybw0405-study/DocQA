@@ -10,7 +10,7 @@ spring:
       write-dates-as-timestamps: false
   datasource:
     url: ${DOCQA_DB_URL:jdbc:mysql://127.0.0.1:3306/docqa?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
-    username: ${DOCQA_AUDIT_DB_USERNAME:${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:root}}}
+    username: ${DOCQA_AUDIT_DB_USERNAME:${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:}}}
     password: ${DOCQA_AUDIT_DB_PASSWORD:${DOCQA_APP_DB_PASSWORD:${DOCQA_DB_PASSWORD:}}}
     hikari:
       maximum-pool-size: 10
@@ -43,7 +43,7 @@ docqa:
     # 启动自检：读 information_schema 证明本进程的账号改不动 audit_event 的历史行。
     # off / warn / enforce；默认 warn —— 还没做权限收敛的环境（含仍用 root 的本机）必须能起得来。
     # 收敛完成后再设 DOCQA_AUDIT_APPEND_ONLY_GUARD=enforce，让漂移在下一次重启就变红。
-    append-only-guard: ${DOCQA_AUDIT_APPEND_ONLY_GUARD:warn}
+    append-only-guard: ${DOCQA_AUDIT_APPEND_ONLY_GUARD:enforce}
 
 logging:
   level:

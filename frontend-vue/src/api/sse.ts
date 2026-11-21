@@ -6,7 +6,13 @@
  * 401 语义会各自漂移（一边续期重放、一边直接掉登录）。
  */
 import type { ProblemDetail } from '../types/api';
-import { ApiError, NETWORK_ERROR_CODE, StreamUnavailableError, UNKNOWN_ERROR_CODE } from './errors';
+import {
+  ApiError,
+  NETWORK_ERROR_CODE,
+  StreamBufferOverflowError,
+  StreamUnavailableError,
+  UNKNOWN_ERROR_CODE,
+} from './errors';
 import {
   API_BASE_URL,
   AUTH_HEADER,
@@ -30,6 +36,14 @@ export interface SseRequest {
   idempotencyKey: string;
   signal?: AbortSignal;
 }
+
+/**
+ * 行缓冲上限（≈1 MiB UTF-16 码元）。SSE 行以换行符终止：服务端若持续下发无换行字节，
+ * `buffer` 会无界增长撑爆标签页内存，必须在超过阈值前断开。
+ */
+const MAX_BUFFER_CHARS = 1024 * 1024;
+/** 单帧 `data:` 行数上限：没有空行收尾的帧会无限堆行，同样要断开。 */
+const MAX_DATA_LINES = 10_000;
 
 /**
  * 发起流式 POST 并按帧产出。抛出三类错误：
@@ -71,6 +85,11 @@ export async function* sseFrames(
         break;
       }
       buffer += decoder.decode(result.value, { stream: true });
+      // 无换行流会把整段字节堆在 buffer 里：超过上限立即断开并抛出明确错误，不能继续累积。
+      if (buffer.length > MAX_BUFFER_CHARS) {
+        await reader.cancel();
+        throw new StreamBufferOverflowError();
+      }
       const taken = takeLines(buffer, false);
       buffer = taken.rest;
       for (const line of taken.lines) {
@@ -97,6 +116,11 @@ export async function* sseFrames(
         } else if (field === 'data') {
           dataLines.push(value);
           dataSeen = true;
+          // 没有空行收尾的帧会让 dataLines 无限增长：同样断开并抛出明确错误。
+          if (dataLines.length > MAX_DATA_LINES) {
+            await reader.cancel();
+            throw new StreamBufferOverflowError();
+          }
         }
         // `id` / `retry` 本契约不用，按规范忽略即可。
       }

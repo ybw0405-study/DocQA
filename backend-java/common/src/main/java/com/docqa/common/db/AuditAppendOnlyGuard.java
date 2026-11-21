@@ -29,9 +29,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 行为探测放在运维脚本里做（{@code ops/sql/verify-least-privilege.ps1}），它不受这条约束且
  * 能覆盖 DDL；进程内只做声明式核对，两者互补而非重复。</p>
  *
- * <p>三种模式：{@code off} 关闭；{@code warn}（默认）只记日志；{@code enforce} 判违规即
- * 拒绝启动。默认必须是 {@code warn}——否则任何还没做权限收敛的环境（包括当前仍用 root 的
- * 本机）一升级就起不来，这会把安全改进变成事故。</p>
+ * <p>三种模式：{@code off} 关闭；{@code warn} 只记日志；{@code enforce}（默认）判违规即
+ * 拒绝启动。默认收紧为 {@code enforce}（LOG-2）：审计只追加是核心宣称，默认不设防等于
+ * 宣称落空。尚未收敛的环境须显式设 {@code DOCQA_AUDIT_APPEND_ONLY_GUARD=warn|off}
+ * 才能放宽——本地启动脚本已显式写入最小值权限账号，生产须先跑授权脚本。</p>
  */
 public class AuditAppendOnlyGuard implements ApplicationRunner {
 
@@ -77,7 +78,7 @@ public class AuditAppendOnlyGuard implements ApplicationRunner {
          */
         public static Mode parse(String raw) {
             if (raw == null || raw.isBlank()) {
-                return WARN;
+                return ENFORCE;
             }
             return switch (raw.trim().toLowerCase(Locale.ROOT)) {
                 case "off", "false", "none", "disabled" -> OFF;

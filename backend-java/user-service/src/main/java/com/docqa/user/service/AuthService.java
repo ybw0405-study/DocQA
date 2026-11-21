@@ -131,7 +131,8 @@ public class AuthService {
         if (!properties.isSelfRegistrationEnabled()) {
             throw new BusinessException(ErrorCode.USR_FORBIDDEN_001, "自助注册已关闭，请联系管理员建号。");
         }
-        RateLimitDecision decision = registrationRateLimiter.check(remoteAddress);
+        // 双维 key：解析后的客户端 IP + 提交的用户名指纹，避免网关转发后 IP 塌缩成全站共享配额。
+        RateLimitDecision decision = registrationRateLimiter.check(remoteAddress, request.username());
         if (!decision.allowed()) {
             throw new RateLimitedException(ErrorCode.COM_RATE_LIMIT_001, decision.retryAfterSeconds());
         }

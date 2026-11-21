@@ -51,23 +51,28 @@ class RedisKillSwitch:
         cached = self._cache.get(key)
         if cached is not None and now < cached[1]:
             return cached[0]
+        failed = False
         try:
             value = await self._redis.get(key)
         except RedisError:
+            # 与工具限流的 fail-closed 哲学一致：读不到开关时不能假设"没人按下过停机键"。
+            # 短暂拒绝 AI 调用，代价远小于熔断失效时继续消耗额度。
+            failed = True
             log_event(
                 LOGGER,
                 logging.WARNING,
-                "Kill switch lookup failed; AI calls remain enabled",
+                "Kill switch lookup failed; failing closed (AI calls blocked)",
                 step="kill_switch",
             )
-            active = False
+            active = True
         else:
             if isinstance(value, bytes):
                 text = value.decode("utf-8", "ignore")
             else:
                 text = "" if value is None else str(value)
             active = text.strip().lower() in {"1", "true", "on", "yes"}
-        self._cache[key] = (active, now + self._cache_seconds)
+        # 故障期间的保守态不进常规缓存窗口：Redis 一恢复，下一个请求立刻重新判定。
+        self._cache[key] = (active, now + (0 if failed else self._cache_seconds))
         return active
 
 
