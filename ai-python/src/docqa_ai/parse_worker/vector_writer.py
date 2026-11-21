@@ -8,8 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-import psycopg
-
+from docqa_ai.rag.pg_connection import PgConnectionProvider
 from docqa_ai.rag.repository import vector_literal
 
 VECTOR_NAMESPACE = uuid.UUID("c9810eb7-698d-511a-b56f-d9430325bda9")
@@ -41,12 +40,14 @@ class VectorWriter(Protocol):
         document_id: uuid.UUID,
         index_version: str,
         records: Sequence[VectorRecord],
+        tenant_id: object | None = None,
     ) -> int: ...
 
     async def delete(
         self,
         document_id: uuid.UUID,
         index_version: str | None,
+        tenant_id: object | None = None,
     ) -> int: ...
 
 
@@ -60,6 +61,7 @@ class PgVectorWriter:
         *,
         dimensions: int = 1024,
         connect_timeout_s: int = 3,
+        connection_provider: PgConnectionProvider | None = None,
     ) -> None:
         if not _TABLE_NAME.fullmatch(table):
             raise ValueError("invalid vector table name")
@@ -67,12 +69,14 @@ class PgVectorWriter:
         self._table = table
         self._dimensions = dimensions
         self._connect_timeout_s = connect_timeout_s
+        self._connections = connection_provider or PgConnectionProvider(dsn, connect_timeout_s)
 
     async def replace(
         self,
         document_id: uuid.UUID,
         index_version: str,
         records: Sequence[VectorRecord],
+        tenant_id: object | None = None,
     ) -> int:
         if not records:
             return 0
@@ -81,51 +85,63 @@ class PgVectorWriter:
                 raise VectorWriteError("embedding dimension mismatch")
             if not all(math.isfinite(value) for value in record.embedding):
                 raise VectorWriteError("embedding contains a non-finite value")
-        delete_sql = f"DELETE FROM {self._table} WHERE document_id = %s AND index_version = %s"
+        tenant_value = str(tenant_id) if tenant_id is not None else ""
+        tenant_predicate = " AND tenant_id = %s" if tenant_id is not None else ""
+        scope_params: list[Any] = [document_id, index_version]
+        if tenant_id is not None:
+            scope_params.append(tenant_value)
+        delete_sql = f"DELETE FROM {self._table} WHERE document_id = %s AND index_version = %s{tenant_predicate}"
+        # 每行都带 tenant_id：读侧 WHERE 的纵深谓词才有可比对的值。
         insert_sql = (
             f"INSERT INTO {self._table} "
-            "(vector_id, document_id, chunk_index, content, embedding, metadata, index_version) "
-            "VALUES (%s, %s, %s, %s, %s::vector, %s::jsonb, %s) "
+            "(vector_id, document_id, chunk_index, content, embedding, metadata, index_version, tenant_id) "
+            "VALUES (%s, %s, %s, %s, %s::vector, %s::jsonb, %s, %s) "
             "ON CONFLICT (vector_id) DO UPDATE SET "
             "document_id = EXCLUDED.document_id, "
             "chunk_index = EXCLUDED.chunk_index, "
             "content = EXCLUDED.content, "
             "embedding = EXCLUDED.embedding, "
             "metadata = EXCLUDED.metadata, "
-            "index_version = EXCLUDED.index_version"
+            "index_version = EXCLUDED.index_version, "
+            "tenant_id = EXCLUDED.tenant_id"
         )
-        count_sql = f"SELECT COUNT(*) FROM {self._table} WHERE document_id = %s AND index_version = %s"
-        try:
-            connection = await psycopg.AsyncConnection.connect(
-                self._dsn,
-                connect_timeout=self._connect_timeout_s,
+        # CON-3：一次 executemany 代替逐行 INSERT 的网络往返；参数列表与 INSERT 占位符逐位对齐。
+        rows: list[tuple[Any, ...]] = [
+            (
+                record.vector_id,
+                document_id,
+                record.chunk_index,
+                record.content,
+                vector_literal(record.embedding),
+                json.dumps(record.metadata, ensure_ascii=False, separators=(",", ":")),
+                index_version,
+                tenant_value,
             )
-            try:
+            for record in records
+        ]
+        count_sql = (
+            f"SELECT COUNT(*) FROM {self._table} WHERE document_id = %s AND index_version = %s{tenant_predicate}"
+        )
+        try:
+            async with self._connections.connection() as connection:
                 async with connection.transaction():
                     async with connection.cursor() as cursor:
-                        await cursor.execute(delete_sql, (document_id, index_version))
-                        for record in records:
-                            await cursor.execute(
-                                insert_sql,
-                                (
-                                    record.vector_id,
-                                    document_id,
-                                    record.chunk_index,
-                                    record.content,
-                                    vector_literal(record.embedding),
-                                    json.dumps(record.metadata, ensure_ascii=False, separators=(",", ":")),
-                                    index_version,
-                                ),
-                            )
-                        await cursor.execute(count_sql, (document_id, index_version))
+                        await cursor.execute(delete_sql, tuple(scope_params))
+                        await cursor.executemany(insert_sql, rows)
+                        await cursor.execute(count_sql, tuple(scope_params))
                         rows_written = await _read_count(cursor)
-            finally:
-                await connection.close()
-        except psycopg.Error as exc:
+        except VectorWriteError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - driver/pool failures are sanitized below
             raise VectorWriteError("vector write failed") from exc
         return rows_written
 
-    async def delete(self, document_id: uuid.UUID, index_version: str | None) -> int:
+    async def delete(
+        self,
+        document_id: uuid.UUID,
+        index_version: str | None,
+        tenant_id: object | None = None,
+    ) -> int:
         """Delete one scope and count what is left inside the same transaction.
 
         ``index_version=None`` means every version of the document; a missing version never widens
@@ -133,26 +149,26 @@ class PgVectorWriter:
         """
         if index_version is None:
             predicate = "document_id = %s"
-            params: tuple[Any, ...] = (document_id,)
+            params: list[Any] = [document_id]
         else:
             predicate = "document_id = %s AND index_version = %s"
-            params = (document_id, index_version)
+            params = [document_id, index_version]
+        if tenant_id is not None:
+            predicate += " AND tenant_id = %s"
+            params.append(str(tenant_id))
         delete_sql = f"DELETE FROM {self._table} WHERE {predicate}"
         count_sql = f"SELECT COUNT(*) FROM {self._table} WHERE {predicate}"
+        bound = tuple(params)
         try:
-            connection = await psycopg.AsyncConnection.connect(
-                self._dsn,
-                connect_timeout=self._connect_timeout_s,
-            )
-            try:
+            async with self._connections.connection() as connection:
                 async with connection.transaction():
                     async with connection.cursor() as cursor:
-                        await cursor.execute(delete_sql, params)
-                        await cursor.execute(count_sql, params)
+                        await cursor.execute(delete_sql, bound)
+                        await cursor.execute(count_sql, bound)
                         remaining_rows = await _read_count(cursor)
-            finally:
-                await connection.close()
-        except psycopg.Error as exc:
+        except VectorWriteError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - driver/pool failures are sanitized below
             raise VectorWriteError("vector delete failed") from exc
         return remaining_rows
 
@@ -176,11 +192,17 @@ class InMemoryVectorWriter:
         document_id: uuid.UUID,
         index_version: str,
         records: Sequence[VectorRecord],
+        tenant_id: object | None = None,
     ) -> int:
         self._store[(document_id, index_version)] = tuple(records)
         return len(records)
 
-    async def delete(self, document_id: uuid.UUID, index_version: str | None) -> int:
+    async def delete(
+        self,
+        document_id: uuid.UUID,
+        index_version: str | None,
+        tenant_id: object | None = None,
+    ) -> int:
         self.deleted_scopes.append((document_id, index_version))
         if index_version is None:
             for key in [key for key in self._store if key[0] == document_id]:

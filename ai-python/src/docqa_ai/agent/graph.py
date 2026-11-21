@@ -97,6 +97,7 @@ class AgentGraph:
         metrics: ToolMetrics | None = None,
         business: BusinessMetrics | None = None,
         answer_sink: Callable[[str], None] | None = None,
+        tenant_id: object | None = None,
     ) -> None:
         self._planner = planner
         self._tools = tools
@@ -115,6 +116,7 @@ class AgentGraph:
         self._metrics = metrics
         self._business = business
         self._answer_sink = answer_sink
+        self._tenant_id = tenant_id
         self._rounds_used = 0
         self._context: PlanContext | None = None
         self._graph = self._build()
@@ -337,6 +339,7 @@ class AgentGraph:
             scopes=self._scopes,
             retrieval=self._retrieval,
             deadline=self._deadline,
+            tenant_id=self._tenant_id,
         )
         started = time.perf_counter()
         success = True

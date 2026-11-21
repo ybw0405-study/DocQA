@@ -43,6 +43,12 @@ class BudgetedEmbeddingProvider:
             raise ExperimentBudgetExhausted("embedding")
         return await self._provider.embed(texts, timeout_s)
 
+    async def aclose(self) -> None:
+        """把 CON-2 的共享 client 关闭透传到被包装的真实 Provider。"""
+        closer = getattr(self._provider, "aclose", None)
+        if closer is not None:
+            await closer()
+
 
 class BudgetedRerankProvider:
     """rerank 与 embedding 同形：名次是增量能力，花的是真实额度，所以必须进同一本账（D-106）。
@@ -64,3 +70,9 @@ class BudgetedRerankProvider:
         if not await self._store.authorize_call(reserved):
             raise ExperimentBudgetExhausted("rerank")
         return await self._provider.rerank(query, documents, timeout_s)
+
+    async def aclose(self) -> None:
+        """把 CON-2 的共享 client 关闭透传到被包装的真实 Provider。"""
+        closer = getattr(self._provider, "aclose", None)
+        if closer is not None:
+            await closer()

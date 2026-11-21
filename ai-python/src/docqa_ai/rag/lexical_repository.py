@@ -9,6 +9,7 @@ from typing import Any, Protocol
 import psycopg
 
 from docqa_ai.protocol.models import DocumentScope
+from docqa_ai.rag.pg_connection import PgConnectionProvider
 from docqa_ai.rag.repository import _TABLE_NAME, ChunkRecord
 from docqa_ai.text.lexical import LEXICAL_TSQUERY_SQL, LEXICAL_TSVECTOR_SQL
 
@@ -37,10 +38,11 @@ class LexicalRepository(Protocol):
         lexical_query: str,
         scopes: Sequence[DocumentScope],
         limit: int,
+        tenant_id: object | None = None,
     ) -> list[LexicalHit]: ...
 
 
-def build_lexical_search_sql(table: str, scope_count: int) -> str:
+def build_lexical_search_sql(table: str, scope_count: int, *, tenant_scoped: bool = False) -> str:
     """词法通道唯一的检索语句形态。
 
     两个常量各出现两次：`to_tsvector(...)` 在 `WHERE` 与 `ORDER BY` 的 `ts_rank` 里必须同形，
@@ -48,16 +50,20 @@ def build_lexical_search_sql(table: str, scope_count: int) -> str:
     会被规划成不使用 GIN 的主键顺序扫描（E30），而这一形态在零命中、窄授权、密集命中三种分布下
     都稳定走 `BitmapAnd(docver, lexical)`（E31）。授权谓词与向量通道逐字同形，词法通道不单独
     构造范围（D-87）。
+
+    `tenant_scoped=True` 时在 WHERE 最前追加 `tenant_id = %s`，与 `lexical_params` 的同名开关
+    必须成对传入，否则占位符与参数错位（由 MAINT-1 的 SQL 契约测试对账）。
     """
     if not _TABLE_NAME.fullmatch(table):
         raise ValueError("invalid lexical table name")
     if scope_count <= 0:
         raise ValueError("scope_count must be positive")
     placeholders = ", ".join("(%s::uuid, %s::text)" for _ in range(scope_count))
+    tenant_prefix = "tenant_id = %s AND " if tenant_scoped else ""
     return (
         f"SELECT document_id, chunk_index, content, metadata "
         f"FROM {table} "
-        f"WHERE (document_id, index_version) IN ({placeholders}) "
+        f"WHERE {tenant_prefix}(document_id, index_version) IN ({placeholders}) "
         f"AND {LEXICAL_TSVECTOR_SQL} @@ {LEXICAL_TSQUERY_SQL} "
         f"ORDER BY ts_rank({LEXICAL_TSVECTOR_SQL}, {LEXICAL_TSQUERY_SQL}) DESC, vector_id "
         f"LIMIT %s"
@@ -68,13 +74,19 @@ def lexical_params(
     lexical_query: str,
     scopes: Sequence[DocumentScope],
     limit: int,
+    *,
+    tenant_id: object | None = None,
 ) -> list[object]:
-    """位置参数表：授权对 → `WHERE` 的 tsquery → `ORDER BY` 的 tsquery → `LIMIT`。
+    """位置参数表：租户 → 授权对 → `WHERE` 的 tsquery → `ORDER BY` 的 tsquery → `LIMIT`。
 
     两个 tsquery 位是**同一个局部变量**，所以不存在「两次编译产生两份查询」的可能；
     调用方不得为了填第二个占位符再调一次 `build_lexical_query`。
+    `tenant_id` 非空时在列表最前插入绑定值，与 `build_lexical_search_sql(tenant_scoped=True)`
+    的 `tenant_id = %s` 对齐；为空时保持修复前的形态（本地 dev / 替身测试零改动）。
     """
     values: list[object] = []
+    if tenant_id is not None:
+        values.append(str(tenant_id))
     for scope in scopes:
         values.extend([str(scope.document_id), scope.index_version])
     values.extend([lexical_query, lexical_query, limit])
@@ -89,30 +101,31 @@ class PgLexicalRepository:
         dsn: str,
         table: str = "chunk_embedding_1024",
         connect_timeout_s: int = 3,
+        *,
+        connection_provider: PgConnectionProvider | None = None,
     ) -> None:
         self._dsn = dsn
         if not _TABLE_NAME.fullmatch(table):
             raise ValueError("invalid lexical table name")
         self._table = table
         self._connect_timeout_s = connect_timeout_s
+        self._connections = connection_provider or PgConnectionProvider(dsn, connect_timeout_s)
 
     async def search(
         self,
         lexical_query: str,
         scopes: Sequence[DocumentScope],
         limit: int,
+        tenant_id: object | None = None,
     ) -> list[LexicalHit]:
         if not scopes or limit <= 0:
             return []
         if not lexical_query:
             raise LexicalStoreError("lexical query is empty")
-        sql = build_lexical_search_sql(self._table, len(scopes))
-        params = lexical_params(lexical_query, scopes, limit)
+        sql = build_lexical_search_sql(self._table, len(scopes), tenant_scoped=tenant_id is not None)
+        params = lexical_params(lexical_query, scopes, limit, tenant_id=tenant_id)
         try:
-            async with await psycopg.AsyncConnection.connect(
-                self._dsn,
-                connect_timeout=self._connect_timeout_s,
-            ) as connection:
+            async with self._connections.connection() as connection:
                 async with connection.cursor() as cursor:
                     await cursor.execute(sql, params)
                     rows = await cursor.fetchall()
@@ -137,6 +150,7 @@ class UnavailableLexicalRepository:
         lexical_query: str,
         scopes: Sequence[DocumentScope],
         limit: int,
+        tenant_id: object | None = None,
     ) -> list[LexicalHit]:
         raise LexicalStoreUnavailable("lexical index is not configured")
 
@@ -177,6 +191,7 @@ class InMemoryLexicalRepository:
         lexical_query: str,
         scopes: Sequence[DocumentScope],
         limit: int,
+        tenant_id: object | None = None,
     ) -> list[LexicalHit]:
         if not scopes or limit <= 0:
             return []
@@ -184,8 +199,12 @@ class InMemoryLexicalRepository:
         if not surfaces:
             raise LexicalStoreError("lexical query is empty")
         allowed = {(scope.document_id, scope.index_version) for scope in scopes}
+        tenant = str(tenant_id) if tenant_id is not None else None
         ranked: list[tuple[int, LexicalHit]] = []
         for chunk in self._chunks:
+            # 已标注租户的块必须匹配；未标注（空串）的存量/替身行不参与租户过滤。
+            if tenant is not None and chunk.tenant_id and chunk.tenant_id != tenant:
+                continue
             version = str(chunk.metadata.get("index_version", ""))
             if (chunk.document_id, version) not in allowed:
                 continue

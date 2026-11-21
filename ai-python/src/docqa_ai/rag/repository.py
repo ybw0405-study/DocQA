@@ -10,6 +10,7 @@ from typing import Any, Protocol
 import psycopg
 
 from docqa_ai.protocol.models import DocumentScope
+from docqa_ai.rag.pg_connection import PgConnectionProvider
 
 _TABLE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
@@ -30,6 +31,8 @@ class ChunkRecord:
     content: str
     embedding: tuple[float, ...]
     metadata: dict[str, Any] = field(default_factory=dict)
+    # 空串表示「未标注租户」的存量/替身行：真实写入路径会带上 str(tenant_id)。
+    tenant_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,7 @@ class VectorRepository(Protocol):
         embedding: Sequence[float],
         scopes: Sequence[DocumentScope],
         top_k: int,
+        tenant_id: object | None = None,
     ) -> list[VectorHit]: ...
 
 
@@ -78,6 +82,8 @@ class PgVectorRepository:
         table: str = "chunk_embedding_1024",
         connect_timeout_s: int = 3,
         dimensions: int = 1024,
+        *,
+        connection_provider: PgConnectionProvider | None = None,
     ) -> None:
         self._dsn = dsn
         if not _TABLE_NAME.fullmatch(table):
@@ -85,12 +91,14 @@ class PgVectorRepository:
         self._table = table
         self._connect_timeout_s = connect_timeout_s
         self._dimensions = dimensions
+        self._connections = connection_provider or PgConnectionProvider(dsn, connect_timeout_s)
 
     async def search(
         self,
         embedding: Sequence[float],
         scopes: Sequence[DocumentScope],
         top_k: int,
+        tenant_id: object | None = None,
     ) -> list[VectorHit]:
         if len(embedding) != self._dimensions:
             raise VectorStoreError("embedding dimension mismatch")
@@ -100,8 +108,12 @@ class PgVectorRepository:
         if not scopes or top_k <= 0:
             return []
         vector = vector_literal(embedding)
+        tenant_value = str(tenant_id) if tenant_id is not None else None
+        # 纵深防御：租户谓词与授权 IN 谓词同时成立，不能只靠 document scope。
+        # 谓词置于 WHERE 最前，绑定参数也置于列表最前，占位符与参数逐位对齐（MAINT-1 对账）。
+        tenant_prefix = "tenant_id = %s AND " if tenant_value is not None else ""
         placeholders = ", ".join("(%s::uuid, %s::text)" for _ in scopes)
-        params: list[object] = [vector]
+        params: list[object] = [vector] if tenant_value is None else [tenant_value, vector]
         for scope in scopes:
             params.extend([str(scope.document_id), scope.index_version])
         params.extend([vector, top_k])
@@ -109,15 +121,12 @@ class PgVectorRepository:
             f"SELECT document_id, chunk_index, content, metadata, "
             f"1 - (embedding <=> %s::vector) AS score "
             f"FROM {self._table} "
-            f"WHERE (document_id, index_version) IN ({placeholders}) "
+            f"WHERE {tenant_prefix}(document_id, index_version) IN ({placeholders}) "
             f"ORDER BY embedding <=> %s::vector "
             f"LIMIT %s"
         )
         try:
-            async with await psycopg.AsyncConnection.connect(
-                self._dsn,
-                connect_timeout=self._connect_timeout_s,
-            ) as connection:
+            async with self._connections.connection() as connection:
                 async with connection.cursor() as cursor:
                     await cursor.execute(sql, params)
                     rows = await cursor.fetchall()
@@ -147,6 +156,7 @@ class UnavailableVectorRepository:
         embedding: Sequence[float],
         scopes: Sequence[DocumentScope],
         top_k: int,
+        tenant_id: object | None = None,
     ) -> list[VectorHit]:
         raise VectorStoreUnavailable("PGVector is not configured")
 
@@ -165,10 +175,15 @@ class InMemoryVectorRepository:
         embedding: Sequence[float],
         scopes: Sequence[DocumentScope],
         top_k: int,
+        tenant_id: object | None = None,
     ) -> list[VectorHit]:
         allowed = {(scope.document_id, scope.index_version) for scope in scopes}
+        tenant = str(tenant_id) if tenant_id is not None else None
         scored: list[tuple[float, ChunkRecord]] = []
         for chunk in self._chunks:
+            # 已标注租户的块必须匹配；未标注（空串）的存量/替身行不参与租户过滤。
+            if tenant is not None and chunk.tenant_id and chunk.tenant_id != tenant:
+                continue
             version = str(chunk.metadata.get("index_version", ""))
             if (chunk.document_id, version) not in allowed:
                 continue

@@ -32,6 +32,7 @@ class DocumentSearchTool:
                 context.scopes,
                 deadline=context.deadline,
                 top_k=self._max_results,
+                tenant_id=context.tenant_id,
             )
         except RetrievalDeadlineExceeded as exc:
             raise DeadlineExceeded("deadline expired during document search") from exc

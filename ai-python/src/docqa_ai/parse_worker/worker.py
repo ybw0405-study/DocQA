@@ -221,7 +221,9 @@ class ParseWorker:
         if len(data) != event.size_bytes or hashlib.md5(data, usedforsecurity=False).hexdigest() != event.md5:
             raise ParseJobError(INVALID_DOCUMENT, _CHECKSUM_FAILED, retryable=False)
 
-        document = self._parser.parse(data, event.content_type, event.file_name)
+        # 解析是 CPU/IO 密集的同步调用，直接放在事件循环里会冻结信号与超时控制；
+        # 与上面的 _read 保持一致，交给线程池执行（C-6）。
+        document = await asyncio.to_thread(self._parser.parse, data, event.content_type, event.file_name)
         text_chunks = chunk_document(
             document.pages,
             chunk_size=self._settings.chunk_size_chars,

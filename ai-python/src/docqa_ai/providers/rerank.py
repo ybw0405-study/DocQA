@@ -66,7 +66,12 @@ class DashScopeRerankProvider:
         self.model = model
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
-        self._client = client
+        # CON-2：共享 client，注入的由调用方所有、自建的由 aclose() 释放。
+        self._client = (
+            client
+            if client is not None
+            else httpx.AsyncClient(limits=httpx.Limits(max_connections=20, max_keepalive_connections=10))
+        )
         self._owns_client = client is None
 
     async def rerank(self, query: str, documents: list[str], timeout_s: float) -> list[RerankedItem]:
@@ -80,7 +85,7 @@ class DashScopeRerankProvider:
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
-        client = self._client or httpx.AsyncClient()
+        client = self._client
         try:
             response = await client.post(
                 self._base_url,
@@ -92,9 +97,6 @@ class DashScopeRerankProvider:
             raise RerankTimeout("rerank request timed out") from exc
         except httpx.HTTPError as exc:
             raise RerankUnavailable("rerank request failed") from exc
-        finally:
-            if self._owns_client:
-                await client.aclose()
         if response.status_code >= 400:
             raise RerankUnavailable(f"rerank provider returned {response.status_code}")
         try:
@@ -109,3 +111,7 @@ class DashScopeRerankProvider:
         if any(not math.isfinite(item.score) for item in items):
             raise RerankOutputInvalid("rerank response has a non-finite score")
         return sorted(items, key=lambda item: (-item.score, item.index))
+
+    async def aclose(self) -> None:
+        if self._owns_client:
+            await self._client.aclose()

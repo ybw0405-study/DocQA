@@ -11,6 +11,7 @@ MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
 VECTOR_MIGRATION = "001_chunk_embedding_1024.sql"
 LEXICAL_MIGRATION = "002_chunk_lexical_index.sql"
 REAL_MODEL_MIGRATION = "003_chunk_embedding_1024_text_embedding_v4.sql"
+TENANT_MIGRATION = "004_add_tenant_id.sql"
 OFFLINE_TABLE = "chunk_embedding_1024"
 REAL_MODEL_TABLE = "chunk_embedding_1024_text_embedding_v4"
 
@@ -55,6 +56,7 @@ def test_gate_discovers_every_migration_file() -> None:
         VECTOR_MIGRATION,
         LEXICAL_MIGRATION,
         REAL_MODEL_MIGRATION,
+        TENANT_MIGRATION,
     ]
 
 

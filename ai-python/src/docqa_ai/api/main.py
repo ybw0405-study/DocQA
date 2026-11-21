@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import os
@@ -80,6 +81,17 @@ LOGGER = logging.getLogger(__name__)
 _MAX_BODY_BYTES = 256 * 1024
 _MAX_ERRORS = 20
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
+_INTERNAL_TOKEN_HEADER = "x-internal-token"
+_PRODUCTION_ENV_NAMES = ("DOCQA_ENV", "APP_ENV", "SPRING_PROFILES_ACTIVE", "DOCQA_AI_ENVIRONMENT")
+
+
+def _runs_in_production() -> bool:
+    """任一环境信号含 prod/production 即视为生产；内部 token 不得为空。"""
+    for name in _PRODUCTION_ENV_NAMES:
+        raw = os.getenv(name, "")
+        if any(part.strip().lower() in {"prod", "production"} for part in raw.split(",")):
+            return True
+    return False
 
 
 def _payload_too_large() -> AgentError:
@@ -285,6 +297,7 @@ def build_default_service(
         top_k=settings.retrieval_top_k,
         min_score=settings.retrieval_min_score,
         embedding_timeout_s=settings.embedding_timeout_ms / 1000.0,
+        embedding_dimensions=settings.embedding_dimensions,
         lexical_repository=lexical_repository,
         lexical_enabled=settings.lexical_recall_enabled,
         lexical_candidate_limit=settings.retrieval_lexical_candidate_limit,
@@ -372,6 +385,12 @@ def create_app(
     business_metrics: BusinessMetrics | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
+    expected_token = settings.internal_token.get_secret_value()
+    if _runs_in_production() and not expected_token:
+        raise RuntimeError(
+            "DOCQA_AI_INTERNAL_TOKEN must be configured in production: "
+            "the data plane otherwise accepts unauthenticated identity fields"
+        )
     if tracer is None:
         tracer, tracer_provider = build_tracing(settings, exporter=span_exporter)
     metrics, meter_provider = build_metrics(settings)
@@ -430,6 +449,24 @@ def create_app(
         )
     app.add_middleware(TraceContextMiddleware, tracer=tracer)
 
+    if expected_token:
+
+        @app.middleware("http")
+        async def internal_token_guard(request: Request, call_next):
+            """网关 → 数据面共享密钥：配置后 /agent/* 与 /metrics 必须带 X-Internal-Token。
+
+            未配置时保持本地 dev / 现有测试零改动；身份字段仍由 Java 网关给出，
+            这是纵深防御的一层，不能替代网络隔离。
+            """
+            if request.url.path.startswith("/agent/") or request.url.path == "/metrics":
+                supplied = request.headers.get(_INTERNAL_TOKEN_HEADER, "")
+                if not hmac.compare_digest(supplied, expected_token):
+                    return JSONResponse(
+                        status_code=401,
+                        content={"code": "AGT-AUTH-001", "detail": "internal token missing or invalid"},
+                    )
+            return await call_next(request)
+
     @app.exception_handler(AgentError)
     async def agent_error_handler(request: Request, exc: AgentError) -> JSONResponse:
         problem = exc.to_problem()
@@ -463,9 +500,9 @@ def create_app(
         async def prometheus_metrics() -> Response:
             """Prometheus 文本格式导出（§4.2 的 Python 侧 9 项）。
 
-            刻意不挂鉴权：它和内网 scrape 的常规形态一致，且序列里没有 PII、没有用户维度。
-            真正的边界是「Python 端口不对公网开放」（前端不直连 Python），需要更严时可置
-            `DOCQA_AI_METRICS_EXPOSED=false` 或在反向代理层限制来源。
+            配置 `DOCQA_AI_INTERNAL_TOKEN` 后 /metrics 与 /agent/* 一并受校验；
+            序列里没有 PII、没有用户维度，但仍要求网络层只允许内网 scrape。
+            真正的边界始终是「Python 端口不对公网开放」（前端不直连 Python）。
             """
 
             return Response(
@@ -591,7 +628,7 @@ def create_app(
                             )
                         yield _sse_frame("done", event.response.model_dump_json(by_alias=True))
             except AgentError as exc:
-                yield _sse_frame("error", json.dumps({"code": exc.code, "detail": exc.detail}, ensure_ascii=False))
+                yield _sse_frame("error", json.dumps(exc.to_problem().as_dict(), ensure_ascii=False))
 
         return StreamingResponse(frames(), media_type="text/event-stream")
 

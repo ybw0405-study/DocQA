@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 import uuid
@@ -36,6 +37,29 @@ LOGGER = logging.getLogger(__name__)
 RERANKER_NAME = "lexical-coverage-v1"
 
 ChunkKey = tuple[uuid.UUID, int]
+
+
+def _accepts_tenant_id(repository: object) -> bool:
+    """Duck-typed Protocol：真实数据面实现带 tenant_id 参数，测试替身多为三参 search。
+
+    构造期探测一次，让真实 PG/InMemory 实现拿到租户谓词，同时不强制所有替身同步改签名。
+    """
+    try:
+        parameters = inspect.signature(repository.search).parameters
+    except (TypeError, ValueError):
+        return False
+    return "tenant_id" in parameters or any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+    )
+
+
+async def _maybe_aclose(resource: object) -> None:
+    closer = getattr(resource, "aclose", None)
+    if closer is None:
+        return
+    result = closer()
+    if inspect.isawaitable(result):
+        await result
 
 
 class RetrievalError(Exception):
@@ -145,6 +169,7 @@ class RetrievalService:
         tracer: Tracer | None = None,
         business: BusinessMetrics | None = None,
         vector_collection: str = "",
+        embedding_dimensions: int = 1024,
     ) -> None:
         self._repository = repository
         self._embedder = embedder
@@ -163,6 +188,9 @@ class RetrievalService:
         # 直接构造的场景里都不该被迫持有一个 Prometheus 注册表。
         self._business = business
         self._vector_collection = vector_collection
+        self._embedding_dimensions = embedding_dimensions
+        self._vector_tenant_aware = _accepts_tenant_id(repository)
+        self._lexical_tenant_aware = _accepts_tenant_id(lexical_repository) if lexical_repository is not None else False
 
     async def retrieve(
         self,
@@ -171,6 +199,7 @@ class RetrievalService:
         *,
         deadline: Deadline | None = None,
         top_k: int | None = None,
+        tenant_id: object | None = None,
     ) -> RetrievalResult:
         """检索入口：只做计时外壳，真正的流程在 `_retrieve`。
 
@@ -183,7 +212,7 @@ class RetrievalService:
         index_version = scopes[0].index_version if scopes else ""
         started_at = time.perf_counter()
         try:
-            retrieved = await self._retrieve(question, scopes, deadline=deadline, top_k=top_k)
+            retrieved = await self._retrieve(question, scopes, deadline=deadline, top_k=top_k, tenant_id=tenant_id)
         except Exception:
             # 任何异常都必须留一条 ERROR 样本，否则失败检索在耗时分布里彻底消失。
             self._observe_retrieval(started_at, "ERROR", index_version)
@@ -213,6 +242,7 @@ class RetrievalService:
         *,
         deadline: Deadline | None = None,
         top_k: int | None = None,
+        tenant_id: object | None = None,
     ) -> RetrievalResult:
         if not scopes:
             return RetrievalResult.empty()
@@ -223,8 +253,8 @@ class RetrievalService:
             span.set_attribute("retrieval.top_k", output_limit)
             span.set_attribute("retrieval.scope_count", len(scopes))
             embedding = await self._embed(question, deadline)
-            vector_hits = await self._search_vector(embedding, scopes, candidate_limit)
-            lexical = await self._search_lexical(question, scopes, candidate_limit, deadline)
+            vector_hits = await self._search_vector(embedding, scopes, candidate_limit, tenant_id)
+            lexical = await self._search_lexical(question, scopes, candidate_limit, deadline, tenant_id)
             with self._tracer.start_as_current_span("retrieval.fuse") as fuse_span:
                 fuse_span.set_attribute("fusion_rrf_k", self._fusion_rrf_k)
                 fuse_span.set_attribute("vector.candidate_count", len(vector_hits))
@@ -283,11 +313,15 @@ class RetrievalService:
         embedding: tuple[float, ...],
         scopes: Sequence[DocumentScope],
         candidate_limit: int,
+        tenant_id: object | None = None,
     ) -> list[VectorHit]:
         with self._tracer.start_as_current_span("vector.query") as query_span:
             started_at = time.perf_counter()
             try:
-                hits = await self._repository.search(embedding, scopes, candidate_limit)
+                if tenant_id is not None and self._vector_tenant_aware:
+                    hits = await self._repository.search(embedding, scopes, candidate_limit, tenant_id=tenant_id)
+                else:
+                    hits = await self._repository.search(embedding, scopes, candidate_limit)
             except VectorStoreError as exc:
                 self._observe_vector_search(started_at, "ERROR")
                 query_span.set_attribute("error.type", type(exc).__name__)
@@ -314,6 +348,7 @@ class RetrievalService:
         scopes: Sequence[DocumentScope],
         candidate_limit: int,
         deadline: Deadline | None,
+        tenant_id: object | None = None,
     ) -> _LexicalChannel:
         repository = self._lexical_repository
         if not self._lexical_enabled or repository is None:
@@ -331,7 +366,10 @@ class RetrievalService:
             span.set_attribute("lexical.enabled", "true")
             if deadline is not None and deadline.remaining_seconds() <= 0.0:
                 return self._degrade(span, surfaces, len(phrases), "deadline expired before lexical query")
-            search = repository.search(lexical_query, scopes, candidate_limit)
+            if tenant_id is not None and self._lexical_tenant_aware:
+                search = repository.search(lexical_query, scopes, candidate_limit, tenant_id=tenant_id)
+            else:
+                search = repository.search(lexical_query, scopes, candidate_limit)
             try:
                 if deadline is None:
                     hits = await search
@@ -494,6 +532,11 @@ class RetrievalService:
                 raise RetrievalUnavailable("experiment budget exhausted") from exc
             except BudgetError as exc:
                 raise RetrievalUnavailable("experiment budget unavailable") from exc
-        if len(vectors) != 1 or len(vectors[0]) != 1024:
+        if len(vectors) != 1 or len(vectors[0]) != self._embedding_dimensions:
             raise RetrievalUnavailable("embedding dimension mismatch")
         return vectors[0]
+
+    async def aclose(self) -> None:
+        """关闭共享 httpx client（CON-2）；offline / noop 替身没有 aclose，安全跳过。"""
+        await _maybe_aclose(self._embedder)
+        await _maybe_aclose(self._reranker)

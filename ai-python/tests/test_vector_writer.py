@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Sequence
 
 import psycopg
 import pytest
@@ -44,6 +45,10 @@ class FakeCursor:
 
     async def execute(self, sql: str, params: object) -> None:
         self._statements.append((sql, params))
+
+    async def executemany(self, sql: str, batch: Sequence[tuple[object, ...]]) -> None:
+        # 批量写入只产生一次语句记录，参数保留为 list，便于断言整批内容。
+        self._statements.append((sql, list(batch)))
 
     async def fetchone(self) -> tuple[int] | None:
         return self._count_row
@@ -106,14 +111,14 @@ async def test_replace_deletes_scope_then_inserts_parameterized_rows(monkeypatch
     assert statements[-1] == ("COMMIT", None)
 
     inserts = [item for item in statements if str(item[0]).startswith("INSERT INTO")]
-    assert len(inserts) == 2
-    for insert, expected in zip(inserts, records, strict=True):
-        sql, params = insert
-        assert "%s::vector" in sql
-        assert "%s::jsonb" in sql
-        assert "ON CONFLICT (vector_id) DO UPDATE" in sql
-        assert "user_id" not in sql
-        assert params == (
+    assert len(inserts) == 1, "executemany 应把整批合并为一次网络往返"
+    sql, params = inserts[0]
+    assert isinstance(params, list) and len(params) == len(records)
+    assert "%s::vector" in sql and "%s::jsonb" in sql
+    assert "ON CONFLICT (vector_id) DO UPDATE" in sql
+    assert "tenant_id" in sql and "user_id" not in sql
+    for row, expected in zip(params, records, strict=True):
+        assert row == (
             expected.vector_id,
             DOCUMENT_ID,
             expected.chunk_index,
@@ -121,6 +126,7 @@ async def test_replace_deletes_scope_then_inserts_parameterized_rows(monkeypatch
             vector_writer.vector_literal(expected.embedding),
             json.dumps(expected.metadata, ensure_ascii=False, separators=(",", ":")),
             VERSION,
+            "",  # 未指定 tenant_id 写空串，读侧可区分已标注 / 未标注行
         )
 
 

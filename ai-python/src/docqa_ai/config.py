@@ -223,7 +223,14 @@ class Settings(BaseSettings):
     # §4.2 的 9 项 Python 侧业务指标经此端点以 Prometheus 文本格式导出。
     # 默认开启（否则 F-1 仍然是「查不到」），但它**没有任何鉴权**：部署时若 Python 端口
     # 可被公网访问，必须置 false 或由反向代理限制来源——指标本身不含 PII，却会暴露业务量。
+    # 配置 internal_token 后 /metrics 与所有 /agent/* 一并受 X-Internal-Token 校验。
     metrics_exposed: bool = True
+
+    # 网关 → 数据面共享密钥（跨项目协调：Java WebClient 在请求里带同名 X-Internal-Token 头）。
+    # 空串 = 不启用校验，保证本地 dev 与现有测试零改动；一旦配置，缺失/错误头一律 401。
+    # 生产环境（DOCQA_ENV/APP_ENV/SPRING_PROFILES_ACTIVE/DOCQA_AI_ENVIRONMENT 为 prod/production）
+    # 且为空时，create_app 启动期 fail-fast 拒绝启动。用 SecretStr 避免出现在日志与 redacted_summary。
+    internal_token: SecretStr = SecretStr("")
 
     @model_validator(mode="after")
     def validate_consistency(self) -> Settings:
@@ -312,4 +319,5 @@ class Settings(BaseSettings):
             "otel_enabled": self.otel_enabled,
             "pg_configured": bool(self.pg_dsn),
             "pg_table": self.pg_table,
+            "internal_token_configured": bool(self.internal_token.get_secret_value()),
         }

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import inspect
 import logging
 import time
 from collections.abc import AsyncIterator, Callable
@@ -49,6 +51,7 @@ from docqa_ai.protocol.models import (
 )
 from docqa_ai.providers.planner import ContextBlock, PlanContext, Planner, PlannerTimeout, PlannerUnavailable
 from docqa_ai.providers.tokens import estimate_tokens
+from docqa_ai.rag.pg_connection import PgConnectionProvider
 from docqa_ai.rag.service import (
     RetrievalDeadlineExceeded,
     RetrievalResult,
@@ -87,6 +90,77 @@ class _Prepared:
     tools: ToolRegistry
 
 
+def _audit_pii_block(collector: AuditCollector, categories: tuple[str, ...], count: int) -> None:
+    collector.add(
+        "PII_LEAK_BLOCKED",
+        "agent_service",
+        severity="ERROR",
+        piiCategories=list(categories),
+        piiCount=count,
+        maskingVersion=PII_VERSION,
+    )
+
+
+def _map_agent_error(
+    collector: AuditCollector,
+    request: AgentAskRequest,
+    exc: BaseException,
+    deadline: Deadline,
+) -> AgentError:
+    """`ask` 与 `ask_stream` 共用的异常映射（ELE-2）。
+
+    修复前两条路径各有一份逐字复制的 8 分支映射，改一处漏一处就会让同步与流式的错误码、
+    审计事件分叉。这里返回一个 AgentError，由调用方 `raise ... from exc` 保持因果链。
+    """
+    if isinstance(exc, (DeadlineExceeded, RetrievalDeadlineExceeded)):
+        collector.add(
+            "AGENT_DEADLINE_EXCEEDED",
+            "agent_service",
+            severity="ERROR",
+            errorCode=AGT_UPSTREAM_002,
+        )
+        return deadline_exceeded(audit_events=collector.events(), trace_id=request.trace_id)
+    if isinstance(exc, PiiLeakError):
+        _audit_pii_block(collector, exc.categories, exc.count)
+        return pii_blocked(audit_events=collector.events(), trace_id=request.trace_id)
+    if isinstance(exc, PlannerTimeout):
+        expired = deadline.expired()
+        collector.add(
+            "AGENT_FAILED",
+            "agent_service",
+            severity="ERROR",
+            errorCode=AGT_UPSTREAM_002 if expired else AGT_UPSTREAM_001,
+        )
+        error_factory = deadline_exceeded if expired else upstream_unavailable
+        return error_factory(audit_events=collector.events(), trace_id=request.trace_id)
+    if isinstance(exc, (PlannerUnavailable, PlannerProtocolError, RetrievalUnavailable, BudgetError)):
+        collector.add(
+            "AGENT_FAILED",
+            "agent_service",
+            severity="ERROR",
+            errorCode=AGT_UPSTREAM_001,
+        )
+        log_event(LOGGER, logging.ERROR, "Agent upstream failed", step="agent", errorType=type(exc).__name__)
+        return upstream_unavailable(audit_events=collector.events(), trace_id=request.trace_id)
+    collector.add(
+        "AGENT_FAILED",
+        "agent_service",
+        severity="ERROR",
+        errorCode=AGT_INTERNAL_001,
+    )
+    log_event(LOGGER, logging.ERROR, "Agent execution failed", step="agent", errorType=type(exc).__name__)
+    return internal_error(audit_events=collector.events(), trace_id=request.trace_id)
+
+
+async def _aclose_if_present(resource: object) -> None:
+    closer = getattr(resource, "aclose", None)
+    if closer is None:
+        return
+    result = closer()
+    if inspect.isawaitable(result):
+        await result
+
+
 class AgentAskService:
     def __init__(
         self,
@@ -105,6 +179,7 @@ class AgentAskService:
         rate_limiter: ToolRateLimiter | None = None,
         metrics: ToolMetrics | None = None,
         business: BusinessMetrics | None = None,
+        pg_provider: PgConnectionProvider | None = None,
     ) -> None:
         self._settings = settings
         self._budget = budget
@@ -120,6 +195,7 @@ class AgentAskService:
         self._rate_limiter = rate_limiter
         self._metrics = metrics
         self._business = business
+        self._pg_provider = pg_provider
 
     async def publish_experiment_limits(self) -> None:
         """启动时把实验额度上限发布到账本，供管理面回显（S9-5e）。
@@ -149,6 +225,11 @@ class AgentAskService:
             await self._mcp.aclose()
         if self._web is not None:
             await self._web.aclose()
+        # CON-2 的共享 httpx client 与 CON-1 的连接池都在应用关闭时统一释放。
+        await _aclose_if_present(self._planner)
+        await _aclose_if_present(self._retrieval)
+        if self._pg_provider is not None:
+            await self._pg_provider.aclose()
 
     async def ask(self, request: AgentAskRequest, *, deadline: Deadline | None = None) -> AgentAskResponse:
         started = time.monotonic()
@@ -178,53 +259,8 @@ class AgentAskService:
             )
         except AgentError:
             raise
-        except DeadlineExceeded as exc:
-            collector.add(
-                "AGENT_DEADLINE_EXCEEDED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_UPSTREAM_002,
-            )
-            raise deadline_exceeded(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except RetrievalDeadlineExceeded as exc:
-            collector.add(
-                "AGENT_DEADLINE_EXCEEDED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_UPSTREAM_002,
-            )
-            raise deadline_exceeded(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except PiiLeakError as exc:
-            self._audit_pii_block(collector, exc.categories, exc.count)
-            raise pii_blocked(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except PlannerTimeout as exc:
-            expired = deadline.expired()
-            collector.add(
-                "AGENT_FAILED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_UPSTREAM_002 if expired else AGT_UPSTREAM_001,
-            )
-            error_factory = deadline_exceeded if expired else upstream_unavailable
-            raise error_factory(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except (PlannerUnavailable, PlannerProtocolError, RetrievalUnavailable, BudgetError) as exc:
-            collector.add(
-                "AGENT_FAILED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_UPSTREAM_001,
-            )
-            log_event(LOGGER, logging.ERROR, "Agent upstream failed", step="agent", errorType=type(exc).__name__)
-            raise upstream_unavailable(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except Exception as exc:  # noqa: BLE001 - mapped to a sanitized ProblemDetail
-            collector.add(
-                "AGENT_FAILED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_INTERNAL_001,
-            )
-            log_event(LOGGER, logging.ERROR, "Agent execution failed", step="agent", errorType=type(exc).__name__)
-            raise internal_error(audit_events=collector.events(), trace_id=request.trace_id) from exc
+        except Exception as exc:  # noqa: BLE001 - 统一映射到脱敏 ProblemDetail
+            raise _map_agent_error(collector, request, exc, deadline) from exc
 
     async def _prepare(
         self,
@@ -352,6 +388,7 @@ class AgentAskService:
             metrics=self._metrics,
             business=self._business,
             answer_sink=answer_sink,
+            tenant_id=request.tenant_id,
         )
 
     async def ask_stream(
@@ -417,60 +454,21 @@ class AgentAskService:
         except asyncio.CancelledError:
             if graph_task is not None:
                 graph_task.cancel()
+                # C-8：取消后必须 await 收口，否则取消点抛出的异常会变成
+                # "exception was never retrieved" 噪音，且幽灵任务继续占用事件循环。
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await graph_task
             raise
         except GeneratorExit:
             if graph_task is not None:
                 graph_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await graph_task
             raise
         except AgentError:
             raise
-        except DeadlineExceeded as exc:
-            collector.add(
-                "AGENT_DEADLINE_EXCEEDED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_UPSTREAM_002,
-            )
-            raise deadline_exceeded(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except RetrievalDeadlineExceeded as exc:
-            collector.add(
-                "AGENT_DEADLINE_EXCEEDED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_UPSTREAM_002,
-            )
-            raise deadline_exceeded(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except PiiLeakError as exc:
-            self._audit_pii_block(collector, exc.categories, exc.count)
-            raise pii_blocked(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except PlannerTimeout as exc:
-            expired = deadline.expired()
-            collector.add(
-                "AGENT_FAILED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_UPSTREAM_002 if expired else AGT_UPSTREAM_001,
-            )
-            error_factory = deadline_exceeded if expired else upstream_unavailable
-            raise error_factory(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except (PlannerUnavailable, PlannerProtocolError, RetrievalUnavailable, BudgetError) as exc:
-            collector.add(
-                "AGENT_FAILED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_UPSTREAM_001,
-            )
-            log_event(LOGGER, logging.ERROR, "Agent upstream failed", step="agent", errorType=type(exc).__name__)
-            raise upstream_unavailable(audit_events=collector.events(), trace_id=request.trace_id) from exc
-        except Exception as exc:  # noqa: BLE001 - mapped to a sanitized ProblemDetail
-            collector.add(
-                "AGENT_FAILED",
-                "agent_service",
-                severity="ERROR",
-                errorCode=AGT_INTERNAL_001,
-            )
-            log_event(LOGGER, logging.ERROR, "Agent execution failed", step="agent", errorType=type(exc).__name__)
-            raise internal_error(audit_events=collector.events(), trace_id=request.trace_id) from exc
+        except Exception as exc:  # noqa: BLE001 - 与同步路径共用同一映射
+            raise _map_agent_error(collector, request, exc, deadline) from exc
 
     def _validate_request_pii(self, request: AgentAskRequest, collector: AuditCollector) -> str:
         original = mask_text(request.question)
@@ -530,6 +528,7 @@ class AgentAskService:
                 question,
                 request.document_scopes,
                 deadline=deadline,
+                tenant_id=request.tenant_id,
             )
         except RetrievalDeadlineExceeded:
             raise
@@ -701,11 +700,4 @@ class AgentAskService:
 
     @staticmethod
     def _audit_pii_block(collector: AuditCollector, categories: tuple[str, ...], count: int) -> None:
-        collector.add(
-            "PII_LEAK_BLOCKED",
-            "agent_service",
-            severity="ERROR",
-            piiCategories=list(categories),
-            piiCount=count,
-            maskingVersion=PII_VERSION,
-        )
+        _audit_pii_block(collector, categories, count)

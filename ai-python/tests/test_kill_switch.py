@@ -40,13 +40,15 @@ async def test_switch_cache_avoids_reading_redis_on_every_call() -> None:
     await redis.aclose()
 
 
-async def test_switch_fails_open_when_redis_is_unavailable() -> None:
+async def test_switch_fails_closed_when_redis_is_unavailable() -> None:
+    """Redis 不可达时按"开关已按下"保守处理，绝不继续放行业务 AI 调用。"""
+
     class FailingRedis:
         async def get(self, key: str) -> bytes:
             raise RedisError("down")
 
     switch = RedisKillSwitch(FailingRedis(), KEY, cache_ms=0)  # type: ignore[arg-type]
-    assert await switch.is_active() is False
+    assert await switch.is_active() is True
 
 
 async def test_static_switch_is_deterministic() -> None:
