@@ -92,7 +92,7 @@ def test_tenant_migration_covers_both_spaces_in_query_order() -> None:
 def test_read_side_binds_tenant_before_the_document_scope() -> None:
     source = (MIGRATIONS.parent / "src/docqa_ai/rag/repository.py").read_text(encoding="utf-8")
     assert 'tenant_prefix = "tenant_id = %s AND "' in source
-    assert 'WHERE {tenant_prefix}(document_id, index_version) IN' in source
+    assert "WHERE {tenant_prefix}(document_id, index_version) IN" in source
 
 
 def test_write_side_never_defaults_tenant_to_an_empty_string() -> None:

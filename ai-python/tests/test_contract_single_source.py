@@ -1,4 +1,5 @@
 """CT-3：Pydantic ``model_json_schema()`` ↔ ``openapi-java.yaml`` 单源对账。"""
+
 from __future__ import annotations
 
 import importlib.util

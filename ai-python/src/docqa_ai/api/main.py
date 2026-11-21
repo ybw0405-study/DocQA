@@ -758,9 +758,7 @@ def main() -> None:
 async def _serve(settings: Settings) -> None:
     """主业务端口 +（可选）独立内网 metrics 端口；后者只在 metrics_exposed=True 时监听。"""
     servers: list[uvicorn.Server] = [
-        uvicorn.Server(
-            uvicorn.Config(app, host=settings.api_host, port=settings.api_port, log_config=None)
-        )
+        uvicorn.Server(uvicorn.Config(app, host=settings.api_host, port=settings.api_port, log_config=None))
     ]
     if settings.metrics_exposed:
         metrics_app = build_metrics_app(app.state.business_metrics)

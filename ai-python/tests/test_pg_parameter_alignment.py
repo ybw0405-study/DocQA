@@ -5,6 +5,7 @@
 100% 报 InvalidTextRepresentation —— 只有接 pgvector 的契约用例能抓到。
 这里用捕获型 cursor 在任何环境都把「逐位对齐」钉住，避免同类回归再次穿过 CI。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -60,9 +61,7 @@ class _CaptureProvider:
 
 async def _search(tenant_id: object | None) -> tuple[str, list[object]]:
     provider = _CaptureProvider()
-    repository = PgVectorRepository(
-        "postgresql://unused", TABLE, 3, 1024, connection_provider=provider
-    )
+    repository = PgVectorRepository("postgresql://unused", TABLE, 3, 1024, connection_provider=provider)
     scope = DocumentScope(document_id=uuid.uuid4(), index_version="v1")
     await repository.search(EMBEDDING, [scope], 10, tenant_id=tenant_id)
     assert provider.cursor.captured is not None

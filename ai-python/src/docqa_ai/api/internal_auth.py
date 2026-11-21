@@ -3,6 +3,7 @@
 规范串把 method / path / 时间戳 / body 的 SHA-256 摘要一起签进去，服务端用短时钟漂移
 窗口拒绝过期请求，配合调用方 nonce 可挡重放。密钥不进日志、不进响应、不进异常。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -27,14 +28,10 @@ def canonical(method: str, path: str, timestamp: str, body: bytes) -> bytes:
     )
 
 
-def sign(
-    secret: str, method: str, path: str, body: bytes = b"", *, timestamp: int | None = None
-) -> dict[str, str]:
+def sign(secret: str, method: str, path: str, body: bytes = b"", *, timestamp: int | None = None) -> dict[str, str]:
     """调用方（Java 网关 / 测试）生成两个请求头。"""
     issued_at = str(int(time.time()) if timestamp is None else timestamp)
-    digest = hmac.new(
-        secret.encode("utf-8"), canonical(method, path, issued_at, body), hashlib.sha256
-    ).hexdigest()
+    digest = hmac.new(secret.encode("utf-8"), canonical(method, path, issued_at, body), hashlib.sha256).hexdigest()
     return {TIMESTAMP_HEADER: issued_at, SIGNATURE_HEADER: digest}
 
 
@@ -56,7 +53,5 @@ def verify(
     current = time.time() if now is None else now
     if abs(current - issued_at) > MAX_SKEW_SECONDS:
         return False
-    expected = hmac.new(
-        secret.encode("utf-8"), canonical(method, path, timestamp, body), hashlib.sha256
-    ).hexdigest()
+    expected = hmac.new(secret.encode("utf-8"), canonical(method, path, timestamp, body), hashlib.sha256).hexdigest()
     return bool(signature) and hmac.compare_digest(signature, expected)

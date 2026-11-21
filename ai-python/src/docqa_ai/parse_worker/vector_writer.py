@@ -224,9 +224,7 @@ class InMemoryVectorWriter:
         keys = [
             key
             for key in self._store
-            if key[0] == document_id
-            and key[2] == tenant
-            and (index_version is None or key[1] == index_version)
+            if key[0] == document_id and key[2] == tenant and (index_version is None or key[1] == index_version)
         ]
         for key in keys:
             del self._store[key]

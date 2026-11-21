@@ -21,6 +21,7 @@
 
 DSN 从 ``DOCQA_AI_PG_DSN`` 或 ``--dsn`` 取得。所有 SQL 参数绑定，表名来自固定白名单。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -75,10 +76,7 @@ def update_sql(table: str) -> str:
 def scan_sql(table: str) -> str:
     if table not in VECTOR_TABLES:
         raise BackfillError(f"unexpected table: {table}")
-    return (
-        f"SELECT document_id, COUNT(*) FROM {table} "
-        "WHERE tenant_id = '' GROUP BY document_id ORDER BY document_id"
-    )
+    return f"SELECT document_id, COUNT(*) FROM {table} WHERE tenant_id = '' GROUP BY document_id ORDER BY document_id"
 
 
 def build_plan(

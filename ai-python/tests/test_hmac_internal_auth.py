@@ -1,4 +1,5 @@
 """方案 4.2 步 3：HMAC 内部鉴权 + /metrics 独立内网端口的回归用例。"""
+
 from __future__ import annotations
 
 import json
@@ -41,32 +42,48 @@ def _client(app: object) -> httpx.AsyncClient:
 def test_sign_verify_roundtrip() -> None:
     headers = sign(SECRET, "POST", "/agent/ask", b'{"question":"x"}')
     assert verify(
-        SECRET, "POST", "/agent/ask", b'{"question":"x"}',
-        headers[TIMESTAMP_HEADER], headers[SIGNATURE_HEADER],
+        SECRET,
+        "POST",
+        "/agent/ask",
+        b'{"question":"x"}',
+        headers[TIMESTAMP_HEADER],
+        headers[SIGNATURE_HEADER],
     )
 
 
 def test_verify_rejects_stale_timestamp() -> None:
     stale = sign(SECRET, "GET", "/openapi.json", timestamp=int(time.time()) - MAX_SKEW_SECONDS - 10)
     assert not verify(
-        SECRET, "GET", "/openapi.json", b"",
-        stale[TIMESTAMP_HEADER], stale[SIGNATURE_HEADER],
+        SECRET,
+        "GET",
+        "/openapi.json",
+        b"",
+        stale[TIMESTAMP_HEADER],
+        stale[SIGNATURE_HEADER],
     )
 
 
 def test_verify_rejects_tampered_body() -> None:
     headers = sign(SECRET, "POST", "/agent/ask", b'{"amount":1}')
     assert not verify(
-        SECRET, "POST", "/agent/ask", b'{"amount":2}',
-        headers[TIMESTAMP_HEADER], headers[SIGNATURE_HEADER],
+        SECRET,
+        "POST",
+        "/agent/ask",
+        b'{"amount":2}',
+        headers[TIMESTAMP_HEADER],
+        headers[SIGNATURE_HEADER],
     )
 
 
 def test_signature_covers_method_and_path() -> None:
     headers = sign(SECRET, "GET", "/docs")
     assert not verify(
-        SECRET, "GET", "/openapi.json", b"",
-        headers[TIMESTAMP_HEADER], headers[SIGNATURE_HEADER],
+        SECRET,
+        "GET",
+        "/openapi.json",
+        b"",
+        headers[TIMESTAMP_HEADER],
+        headers[SIGNATURE_HEADER],
     )
 
 

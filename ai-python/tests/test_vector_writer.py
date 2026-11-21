@@ -152,8 +152,7 @@ async def test_replace_counts_the_scope_inside_the_same_transaction(
     )
     assert count_index < commit_index, "the row count must be read before the transaction commits"
     assert count[0] == (
-        "SELECT COUNT(*) FROM chunk_embedding_1024 "
-        "WHERE document_id = %s AND index_version = %s AND tenant_id = %s"
+        "SELECT COUNT(*) FROM chunk_embedding_1024 WHERE document_id = %s AND index_version = %s AND tenant_id = %s"
     )
     assert count[1] == (DOCUMENT_ID, VERSION, TENANT)
 
@@ -186,8 +185,7 @@ async def test_delete_version_scope_is_bound_to_that_version(monkeypatch: pytest
     assert remaining == 4, "a leftover count is reported as-is; Java turns it into DIVERGED"
     delete_sql, delete_params = connection.statements[0]
     assert delete_sql == (
-        "DELETE FROM chunk_embedding_1024 "
-        "WHERE document_id = %s AND index_version = %s AND tenant_id = %s"
+        "DELETE FROM chunk_embedding_1024 WHERE document_id = %s AND index_version = %s AND tenant_id = %s"
     )
     assert delete_params == (DOCUMENT_ID, "v1", TENANT)
 
@@ -316,9 +314,7 @@ async def test_in_memory_writer_deletes_one_version_then_the_whole_document() ->
 async def test_replace_without_tenant_is_rejected_before_connecting(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = install_connection(monkeypatch, FakeConnection())
     with pytest.raises(VectorWriteError, match="tenant_id is required"):
-        await PgVectorWriter("postgresql://db/test", dimensions=1024).replace(
-            DOCUMENT_ID, VERSION, [record(0)]
-        )
+        await PgVectorWriter("postgresql://db/test", dimensions=1024).replace(DOCUMENT_ID, VERSION, [record(0)])
     assert calls == [], "缺租户信封不得产生任何写库动作"
 
 

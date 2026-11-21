@@ -4,6 +4,7 @@
 ``DOCQA_TEST_PG_DSN``，否则「写入带 tenant A → A 命中 / B 0 行 / 漏传抛错」这条门禁
 不会真正运行——这正是 004 回归能穿过全绿 CI 的直接原因。
 """
+
 from __future__ import annotations
 
 import os

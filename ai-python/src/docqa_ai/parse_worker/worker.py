@@ -476,9 +476,7 @@ def main() -> int:
         pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
         if pending:
             try:
-                loop.run_until_complete(
-                    asyncio.wait_for(asyncio.gather(*pending, return_exceptions=True), timeout=10)
-                )
+                loop.run_until_complete(asyncio.wait_for(asyncio.gather(*pending, return_exceptions=True), timeout=10))
             except TimeoutError:
                 LOGGER.warning("Timed out draining %d in-flight parse tasks", len(pending))
         publisher.shutdown()

@@ -1,4 +1,5 @@
 """方案 4.3：OTel 跨进程传播骨架 + 结构化日志统一脱敏的回归用例。"""
+
 from __future__ import annotations
 
 import json

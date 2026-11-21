@@ -72,9 +72,7 @@ async def test_internal_token_guard_uses_a_whitelist_not_a_blacklist() -> None:
         assert (await client.get("/openapi.json")).status_code == 401
         assert (await client.get("/docs")).status_code == 401
         assert (await client.get("/redoc")).status_code == 401
-        assert (
-            await client.get("/openapi.json", headers={"x-internal-token": TOKEN})
-        ).status_code == 200
+        assert (await client.get("/openapi.json", headers={"x-internal-token": TOKEN})).status_code == 200
 
 
 # ── DQ-3：健康检查不再是恒 200 ──────────────────────────────────────────────
@@ -109,9 +107,7 @@ async def test_liveness_stays_up_when_dependencies_are_absent() -> None:
 
 
 def test_repositories_share_one_connection_provider() -> None:
-    vector, lexical = build_repositories(
-        make_settings(pg_dsn="postgresql://study@127.0.0.1:5432/docqa")
-    )
+    vector, lexical = build_repositories(make_settings(pg_dsn="postgresql://study@127.0.0.1:5432/docqa"))
     assert vector._connections is lexical._connections  # type: ignore[attr-defined]
 
 
