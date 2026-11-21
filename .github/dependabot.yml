@@ -78,3 +78,16 @@ updates:
       actions:
         patterns:
           - "*"
+
+  # 仓库当前没有任何 Dockerfile（G17 待办）；以 "/" 作为占位目录。
+  # ops/docker-compose.infra.yml 的镜像版本目前由人工维护（G16 计划改 digest 固定），
+  # 待新增 Dockerfile 后此生态会自动纳入版本跟踪，届时按实际路径调整 directory。
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "build(docker)"
+    labels:
+      - "dependencies"

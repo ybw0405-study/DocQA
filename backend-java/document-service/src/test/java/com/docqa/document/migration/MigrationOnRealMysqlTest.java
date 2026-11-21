@@ -168,24 +168,27 @@ class MigrationOnRealMysqlTest {
     }
 
     @Test
-    @DisplayName("V1→V10 在真库上全量执行，账本无失败记录")
+    @DisplayName("V1→V11 在真库上全量执行，账本无失败记录")
     void appliesAllMigrationsOnRealMysql() throws SQLException {
         assertThat(appliedMigrations)
-                .as("V1–V10 共 10 份脚本，执行数不等于 10 说明 Flyway 跳过了或重复执行了某些脚本")
-                .isEqualTo(10);
+                .as("V1–V11 共 11 份脚本，执行数不等于 11 说明 Flyway 跳过了或重复执行了某些脚本")
+                .isEqualTo(11);
         assertThat(queryAsRoot("SELECT version FROM flyway_schema_history WHERE success = 0"))
                 .as("账本里出现 success=0 就是半迁移态，必须人工介入，绝不能被测试放过")
                 .isEmpty();
         assertThat(queryAsRoot("SELECT version FROM flyway_schema_history "
                 + "WHERE type = 'SQL' ORDER BY installed_rank"))
-                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
     }
 
     @Test
     @DisplayName("14 张业务表都加了 tenant_id：NOT NULL 且默认值指向默认租户")
     void everyBusinessTableCarriesTenantId() throws SQLException {
+        // V11 的 vector_cleanup_task 是运行期显式写入的 outbox，tenant_id 刻意不设默认
+        // 租户兜底（见 vectorCleanupOutboxRequiresExplicitTenant），不在这份存量表清单里。
         assertThat(queryAsRoot("SELECT table_name FROM information_schema.columns "
                 + "WHERE table_schema = '" + DATABASE + "' AND column_name = 'tenant_id' "
+                + "AND table_name <> 'vector_cleanup_task' "
                 + "ORDER BY table_name"))
                 .containsExactlyInAnyOrderElementsOf(TENANT_TABLES);
 
@@ -200,6 +203,19 @@ class MigrationOnRealMysqlTest {
                     .as("%s.tenant_id 允许 NULL 就等于允许一条无归属的行", table)
                     .isEqualTo("NO");
         }
+    }
+
+    @Test
+    @DisplayName("V11 outbox 的 tenant_id 必须显式写入，不靠默认租户兜底")
+    void vectorCleanupOutboxRequiresExplicitTenant() throws SQLException {
+        String where = "WHERE table_schema = '" + DATABASE + "' AND table_name = 'vector_cleanup_task' "
+                + "AND column_name = 'tenant_id'";
+        assertThat(single(queryAsRoot("SELECT is_nullable FROM information_schema.columns " + where)))
+                .as("outbox 行不允许无归属的租户")
+                .isEqualTo("NO");
+        assertThat(single(queryAsRoot("SELECT column_default FROM information_schema.columns " + where)))
+                .as("给默认租户兜底会掩盖运行期漏传 tenantId；enqueue 必须显式传值")
+                .isNull();
     }
 
     @Test

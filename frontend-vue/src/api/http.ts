@@ -214,8 +214,13 @@ export function post<T>(path: string, body?: unknown, idempotencyKey?: string): 
   return request<T>({ method: 'post', url: path, data: body, headers: keyHeaders(idempotencyKey) });
 }
 
-export function postWithTrace<T>(path: string, body?: unknown, idempotencyKey?: string): Promise<Traced<T>> {
-  return requestWithTrace<T>({ method: 'post', url: path, data: body, headers: keyHeaders(idempotencyKey) });
+export function postWithTrace<T>(
+  path: string,
+  body?: unknown,
+  idempotencyKey?: string,
+  signal?: AbortSignal,
+): Promise<Traced<T>> {
+  return requestWithTrace<T>({ method: 'post', url: path, data: body, headers: keyHeaders(idempotencyKey), signal });
 }
 
 /**

@@ -24,6 +24,8 @@ from pydantic import ValidationError
 from redis.asyncio import Redis
 
 from docqa_ai.agent.service import AgentAskService
+from docqa_ai.api.internal_auth import SIGNATURE_HEADER, TIMESTAMP_HEADER
+from docqa_ai.api.internal_auth import verify as verify_internal_signature
 from docqa_ai.business_metrics import BusinessMetrics
 from docqa_ai.config import Settings
 from docqa_ai.governance.budget import Deadline, RedisBudgetStore
@@ -60,6 +62,7 @@ from docqa_ai.rag.lexical_repository import (
     PgLexicalRepository,
     UnavailableLexicalRepository,
 )
+from docqa_ai.rag.pg_connection import PgConnectionProvider, build_pg_provider
 from docqa_ai.rag.repository import (
     PgVectorRepository,
     UnavailableVectorRepository,
@@ -83,15 +86,27 @@ _MAX_ERRORS = 20
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
 _INTERNAL_TOKEN_HEADER = "x-internal-token"
 _PRODUCTION_ENV_NAMES = ("DOCQA_ENV", "APP_ENV", "SPRING_PROFILES_ACTIVE", "DOCQA_AI_ENVIRONMENT")
+_NON_PRODUCTION_VALUES = frozenset({"dev", "local", "test", "development", "testing", "ci"})
+# 中间件白名单只留 /health*：探针族必须无需凭据可达；其余路径（含 /docs /openapi.json
+# /redoc 与已迁走的 /metrics）一律校验，新增路由默认落在受保护一侧。
+_PUBLIC_PATHS = frozenset({"/health", "/health/live", "/health/ready"})
+
+
+def _is_public_path(path: str) -> bool:
+    return path in _PUBLIC_PATHS or path.startswith("/health/")
 
 
 def _runs_in_production() -> bool:
-    """任一环境信号含 prod/production 即视为生产；内部 token 不得为空。"""
+    """默认最严：只有显式声明 dev/local/test 才放宽，未设置任何信号一律按生产处理。
+
+    反转前是「含 prod 才算生产」，而全仓没有任何地方设置这四个环境变量，
+    导致按仓库自带配置启动时 8000 端口对所有网卡零鉴权。
+    """
     for name in _PRODUCTION_ENV_NAMES:
         raw = os.getenv(name, "")
-        if any(part.strip().lower() in {"prod", "production"} for part in raw.split(",")):
-            return True
-    return False
+        if raw and any(part.strip().lower() in _NON_PRODUCTION_VALUES for part in raw.split(",")):
+            return False
+    return True
 
 
 def _payload_too_large() -> AgentError:
@@ -118,22 +133,31 @@ def _sse_frame(event: str, data: str) -> bytes:
     return f"event: {event}\ndata: {data}\n\n".encode()
 
 
-def build_repositories(settings: Settings) -> tuple[VectorRepository, LexicalRepository]:
-    """两路仓库共用同一个 DSN 与同一个表名：同一条授权谓词的前提是同一份数据面（D-87）。"""
+def build_repositories(
+    settings: Settings,
+    pg_provider: PgConnectionProvider | None = None,
+) -> tuple[VectorRepository, LexicalRepository]:
+    """两路仓库共用同一个 DSN 与同一个表名：同一条授权谓词的前提是同一份数据面（D-87）。
+
+    连接池由组装根注入，两路仓库共享同一个 provider；未注入时才各自直连（仅测试/离线路径）。
+    """
 
     if not settings.pg_dsn:
         return UnavailableVectorRepository(), UnavailableLexicalRepository()
+    provider = pg_provider or build_pg_provider(settings.pg_dsn, settings.pg_connect_timeout_s)
     return (
         PgVectorRepository(
             settings.pg_dsn,
             settings.pg_table,
             settings.pg_connect_timeout_s,
             settings.embedding_dimensions,
+            connection_provider=provider,
         ),
         PgLexicalRepository(
             settings.pg_dsn,
             settings.pg_table,
             settings.pg_connect_timeout_s,
+            connection_provider=provider,
         ),
     )
 
@@ -267,6 +291,8 @@ def build_default_service(
     tracer: Tracer,
     metrics: ToolMetrics | None = None,
     business: BusinessMetrics | None = None,
+    *,
+    pg_provider: PgConnectionProvider | None = None,
 ) -> tuple[AgentAskService, Redis]:
     redis_client = Redis.from_url(
         settings.redis_url,
@@ -290,7 +316,11 @@ def build_default_service(
             settings.llm_api_key.get_secret_value(),
             settings.llm_model,
         )
-    repository, lexical_repository = build_repositories(settings)
+    # 单一组装根：进程内只建一次连接池，读侧两路仓库与 AgentAskService 的关闭钩子共用它。
+    pg_provider = pg_provider or (
+        build_pg_provider(settings.pg_dsn, settings.pg_connect_timeout_s) if settings.pg_dsn else None
+    )
+    repository, lexical_repository = build_repositories(settings, pg_provider)
     retrieval = RetrievalService(
         repository,
         embedder,
@@ -308,6 +338,8 @@ def build_default_service(
         tracer=tracer,
         business=business,
         vector_collection=settings.pg_table,
+        # 有真实数据面时强制租户信封：缺 tenantId 直接 fail-closed，不再静默退回 scope 隔离。
+        require_tenant_id=bool(settings.pg_dsn),
     )
     web = build_web_toolset(settings, metrics=metrics)
     builtin_tools = [
@@ -340,6 +372,7 @@ def build_default_service(
         rate_limiter=rate_limiter,
         metrics=metrics,
         business=business,
+        pg_provider=pg_provider,
     )
     log_event(
         LOGGER,
@@ -384,10 +417,14 @@ def create_app(
     span_exporter: SpanExporter | None = None,
     business_metrics: BusinessMetrics | None = None,
 ) -> FastAPI:
+    # 显式注入 settings 的是测试/嵌入式调用方，由调用方负责配置；生产入口必须走无参 create_app()。
+    explicit_settings = settings is not None
     settings = settings or Settings()
     expected_token = settings.internal_token.get_secret_value()
-    if _runs_in_production() and not expected_token:
-        raise RuntimeError(
+    hmac_secret = settings.internal_hmac_secret.get_secret_value()
+    startup_guard_error: str | None = None
+    if not explicit_settings and _runs_in_production() and not expected_token:
+        startup_guard_error = (
             "DOCQA_AI_INTERNAL_TOKEN must be configured in production: "
             "the data plane otherwise accepts unauthenticated identity fields"
         )
@@ -400,6 +437,10 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         configure_logging(settings.log_level, settings.service_name)
+        if app.state.startup_guard_error is not None:
+            # 模块级 app = create_app() 在导入期不能抛错（ASGI server 要能加载模块），
+            # 所以 fail-fast 落到启动阶段：生产缺内部令牌时进程直接起不来，而不是裸奔监听。
+            raise RuntimeError(app.state.startup_guard_error)
         if app.state.owns_service:
             service, redis_client = build_default_service(
                 settings, app.state.tracer, app.state.metrics, app.state.business_metrics
@@ -432,6 +473,7 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.startup_guard_error = startup_guard_error
     app.state.agent_service = agent_service
     app.state.owns_service = agent_service is None
     app.state.redis_client = None
@@ -449,22 +491,43 @@ def create_app(
         )
     app.add_middleware(TraceContextMiddleware, tracer=tracer)
 
-    if expected_token:
+    if expected_token or hmac_secret:
 
         @app.middleware("http")
         async def internal_token_guard(request: Request, call_next):
-            """网关 → 数据面共享密钥：配置后 /agent/* 与 /metrics 必须带 X-Internal-Token。
+            """网关 → 数据面：默认拦截全部路径，白名单只留 /health*（方案 4.2 步 3）。
 
-            未配置时保持本地 dev / 现有测试零改动；身份字段仍由 Java 网关给出，
-            这是纵深防御的一层，不能替代网络隔离。
+            配置了 internal_hmac_secret 时以 HMAC 签名（时间戳 + body）为唯一凭据，静态
+            X-Internal-Token 头不再单独放行；未配置时沿用上一轮的静态 token 兼容期
+            （Java WebClient 尚未接入签名，属跨服务业务边界，本轮不硬改）。
             """
-            if request.url.path.startswith("/agent/") or request.url.path == "/metrics":
-                supplied = request.headers.get(_INTERNAL_TOKEN_HEADER, "")
-                if not hmac.compare_digest(supplied, expected_token):
+            path = request.url.path
+            if _is_public_path(path):
+                return await call_next(request)
+            if hmac_secret:
+                body = await request.body()
+                if len(body) > _MAX_BODY_BYTES:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"code": "AGT-AUTH-002", "detail": "signed body too large"},
+                    )
+                if not verify_internal_signature(
+                    hmac_secret,
+                    request.method,
+                    path,
+                    body,
+                    request.headers.get(TIMESTAMP_HEADER, ""),
+                    request.headers.get(SIGNATURE_HEADER, ""),
+                ):
                     return JSONResponse(
                         status_code=401,
-                        content={"code": "AGT-AUTH-001", "detail": "internal token missing or invalid"},
+                        content={"code": "AGT-AUTH-002", "detail": "internal signature missing or invalid"},
                     )
+            elif not hmac.compare_digest(request.headers.get(_INTERNAL_TOKEN_HEADER, ""), expected_token):
+                return JSONResponse(
+                    status_code=401,
+                    content={"code": "AGT-AUTH-001", "detail": "internal token missing or invalid"},
+                )
             return await call_next(request)
 
     @app.exception_handler(AgentError)
@@ -488,27 +551,47 @@ def create_app(
 
     @app.get("/health")
     async def health() -> dict[str, str]:
+        """兼容旧调用方：等价于 liveness。编排器请改用 /health/ready。"""
         return {
             "status": "ok",
             "service": settings.service_name,
             "protocolVersion": PROTOCOL_VERSION,
         }
 
-    if settings.metrics_exposed:
+    @app.get("/health/live", include_in_schema=False)
+    async def liveness() -> dict[str, str]:
+        return {"status": "ok", "service": settings.service_name}
 
-        @app.get("/metrics", include_in_schema=False)
-        async def prometheus_metrics() -> Response:
-            """Prometheus 文本格式导出（§4.2 的 Python 侧 9 项）。
-
-            配置 `DOCQA_AI_INTERNAL_TOKEN` 后 /metrics 与 /agent/* 一并受校验；
-            序列里没有 PII、没有用户维度，但仍要求网络层只允许内网 scrape。
-            真正的边界始终是「Python 端口不对公网开放」（前端不直连 Python）。
-            """
-
-            return Response(
-                content=app.state.business_metrics.render(),
-                media_type="text/plain; version=0.0.4; charset=utf-8",
-            )
+    @app.get("/health/ready", include_in_schema=False)
+    async def readiness() -> Response:
+        """readiness 探真实依赖：任一依赖 down 返回 503，让编排器摘除实例（DQ-3）。"""
+        checks: dict[str, str] = {}
+        redis_client = getattr(app.state, "redis_client", None)
+        if redis_client is None:
+            checks["redis"] = "unconfigured"
+        else:
+            try:
+                await asyncio.wait_for(redis_client.ping(), timeout=0.5)
+                checks["redis"] = "ok"
+            except Exception:  # noqa: BLE001 - 探针只关心可达性，异常细节不进响应
+                checks["redis"] = "down"
+        service = getattr(app.state, "agent_service", None)
+        pg_provider = getattr(service, "pg_provider", None)
+        if pg_provider is None:
+            checks["pg"] = "unconfigured"
+        else:
+            try:
+                async with pg_provider.connection() as connection:
+                    async with connection.cursor() as cursor:
+                        await asyncio.wait_for(cursor.execute("SELECT 1"), timeout=0.5)
+                checks["pg"] = "ok"
+            except Exception:  # noqa: BLE001 - 同上，不把驱动细节暴露给 LB
+                checks["pg"] = "down"
+        degraded = any(value == "down" for value in checks.values())
+        return JSONResponse(
+            status_code=503 if degraded else 200,
+            content={"status": "unavailable" if degraded else "ok", "checks": checks},
+        )
 
     async def _read_ask_request(request: Request, instance: str) -> tuple[AgentAskRequest, str | None]:
         """两个问答端点共享的请求体现状（S8-3 抽出，行为与抽出前逐字节一致）。
@@ -635,20 +718,63 @@ def create_app(
     return app
 
 
+def build_metrics_app(business: BusinessMetrics) -> FastAPI:
+    """方案 4.2 步 3：/metrics 从业务端口移到独立内网端口。
+
+    主 app 不再注册任何指标端点；这个最小 app 只监听 metrics_host:metrics_port（默认
+    loopback 9090），由 main() 在 metrics_exposed=True 时与主 server 一起起。生产默认
+    metrics_exposed=False，因此默认零暴露面不变。
+    """
+    metrics_app = FastAPI(title="docqa-ai-metrics", docs_url=None, redoc_url=None, openapi_url=None)
+
+    @metrics_app.get("/metrics", include_in_schema=False)
+    async def prometheus_metrics() -> Response:
+        return Response(
+            content=business.render(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
+
+    return metrics_app
+
+
 app = create_app()
 
 
 def main() -> None:
     settings = Settings()
     configure_logging(settings.log_level, settings.service_name)
+    if _runs_in_production() and not settings.internal_token.get_secret_value():
+        raise RuntimeError(
+            "DOCQA_AI_INTERNAL_TOKEN must be configured in production: "
+            "the data plane otherwise accepts unauthenticated identity fields"
+        )
     if sys.platform == "win32":
-        # uvicorn 在 Windows 上硬编码 ProactorEventLoop 并绕过全局策略，而 psycopg 异步连接会直接拒绝它，
-        # 因此这里自建 Server 并用 Selector 循环驱动，否则 PGVector 检索恒定 503。
+        # uvicorn 在 Windows 上硬编码 ProactorEventLoop 并绕过全局策略，而 psycopg 异步连接
+        # 会直接拒绝它，因此自建 Server 并用 Selector 循环驱动，否则 PGVector 检索恒定 503。
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        config = uvicorn.Config(app, host=settings.api_host, port=settings.api_port, log_config=None)
-        asyncio.run(uvicorn.Server(config).serve())
-        return
-    uvicorn.run(app, host=settings.api_host, port=settings.api_port, log_config=None)
+    asyncio.run(_serve(settings))
+
+
+async def _serve(settings: Settings) -> None:
+    """主业务端口 +（可选）独立内网 metrics 端口；后者只在 metrics_exposed=True 时监听。"""
+    servers: list[uvicorn.Server] = [
+        uvicorn.Server(
+            uvicorn.Config(app, host=settings.api_host, port=settings.api_port, log_config=None)
+        )
+    ]
+    if settings.metrics_exposed:
+        metrics_app = build_metrics_app(app.state.business_metrics)
+        servers.append(
+            uvicorn.Server(
+                uvicorn.Config(
+                    metrics_app,
+                    host=settings.metrics_host,
+                    port=settings.metrics_port,
+                    log_config=None,
+                )
+            )
+        )
+    await asyncio.gather(*(server.serve() for server in servers))
 
 
 if __name__ == "__main__":

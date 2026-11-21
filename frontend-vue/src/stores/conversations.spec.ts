@@ -550,6 +550,38 @@ describe('conversations store', () => {
     expect(conversations.pendingKey).toBe(calls[0]?.key);
   });
 
+  it('drops a non-streaming answer that is still in flight when the view is left', async () => {
+    let asked = false;
+    let settle: (value: Response) => void = () => undefined;
+    server.use(
+      mswHttp.post(
+        '/api/v1/conversations/:conversationId/ask',
+        () => new Promise<Response>((resolve) => {
+          settle = resolve;
+          asked = true;
+        }),
+      ),
+    );
+    await openSession(conversations);
+    await conversations.loadPickerFirst();
+    conversations.toggleDocument(INDEXED_ID);
+    conversations.updateQuestion('请解释梯度下降。');
+
+    const pending = conversations.submitQuestion();
+    await vi.waitFor(() => expect(asked).toBe(true));
+
+    // 模拟卸载：abortStream() 现在会取消同步请求并让归属代号失效。
+    conversations.abortStream();
+    settle(HttpResponse.json(envelope(askData()), { status: 201 }));
+    await pending;
+
+    // 无论请求是被 abort 还是稍后才返回，答案都不能落进已经不属于它的 messages，也不当成失败。
+    expect(conversations.messages).toHaveLength(2);
+    expect(conversations.messages.at(-1)?.content).not.toBe(askData().answer);
+    expect(conversations.detail).toBeNull();
+    expect(conversations.question).toBe('请解释梯度下降。');
+  });
+
   it('abandons the in-flight generation when another conversation is opened', async () => {
     stubFetch((call) => sseOpenResponse([sseFrame('meta', askStreamMeta({ messageId: askData().messageId }))], call.signal));
     await openSession(conversations);

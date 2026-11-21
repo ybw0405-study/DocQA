@@ -25,13 +25,34 @@ const BACKENDS: readonly Backend[] = [
 // 预签名分片 PUT 同样只走同源相对路径：前端取 part.url 的 pathname+search，桶名在路径第一段。
 // changeOrigin 必须为 true —— MinIO 签名的 SignedHeaders 只有 host，转发时的 Host 要和签名时一致。
 // 不做 rewrite：MinIO 的 path-style 寻址里桶名本就是路径的一部分。
+// CT-7：dev 代理的桶前缀固定为本地默认桶；生产桶名来自运行时 config.js，客户端产物
+// 对 VITE_MINIO_BUCKET 零引用（由 tests/redlines.spec.ts 机检），绝不烘焙进产物。
 const MINIO_BUCKET = 'docqa-documents';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
-  const bucket = env.VITE_MINIO_BUCKET ?? MINIO_BUCKET;
+  // CT-8：Vite 的 base 只能在构建期确定，因此采用「相对 base + 可覆盖 env」：
+  // 默认 './' 让 dist 以相对路径引用 assets，可挂在任意子路径而无需重新构建；
+  // 需要绝对前缀时由部署环境在 build 时注入 VITE_APP_BASE。运行时配置由 config.js 提供。
+  const base = env.VITE_APP_BASE ?? './';
   return {
+    base,
     plugins: [vue()],
+    build: {
+      rollupOptions: {
+        output: {
+          // 框架与运行时收敛到单一 vendor chunk：懒加载的每个路由只带自己的业务代码，
+          // 不各自复制一份 vue/pinia；首屏 chunk 也因此明显变小。
+          // Vite 8 / Rollup 的这一版类型只接受函数式 manualChunks，故不用对象写法。
+          manualChunks(id: string): string | undefined {
+            if (/node_modules[/\\](vue|vue-router|pinia|axios|@vue)[/\\]/.test(id)) {
+              return 'vendor';
+            }
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       proxy: {
@@ -41,7 +62,7 @@ export default defineConfig(({ mode }) => {
             { target: env[envName] ?? fallback, changeOrigin: true },
           ]),
         ),
-        [`/${bucket}`]: { target: env.VITE_MINIO_URL ?? 'http://127.0.0.1:9000', changeOrigin: true },
+        [`/${MINIO_BUCKET}`]: { target: env.VITE_MINIO_URL ?? 'http://127.0.0.1:9000', changeOrigin: true },
       },
     },
     test: {

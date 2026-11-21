@@ -49,7 +49,7 @@ class ParseWorkerProtocolContractTest {
 
     static {
         EXPECTED.put("ParseRequestedEvent", Set.of(
-                "eventId", "traceId", "documentId", "userId", "indexVersion", "objectKey",
+                "eventId", "traceId", "documentId", "userId", "tenantId", "indexVersion", "objectKey",
                 "fileName", "contentType", "sizeBytes", "md5", "retryCount", "occurredAt"));
         EXPECTED.put("ParsedChunk", Set.of(
                 "chunkIndex", "vectorId", "contentHash", "tokenCount"));
@@ -60,7 +60,7 @@ class ParseWorkerProtocolContractTest {
                 "eventId", "traceId", "documentId", "indexVersion", "errorCode",
                 "errorMessage", "retryable", "occurredAt"));
         EXPECTED.put("VectorChangeRequestedEvent", Set.of(
-                "eventId", "traceId", "documentId", "userId", "operation",
+                "eventId", "traceId", "documentId", "userId", "tenantId", "operation",
                 "indexVersion", "occurredAt"));
         EXPECTED.put("VectorChangeCompletedEvent", Set.of(
                 "eventId", "requestEventId", "traceId", "documentId", "operation",
@@ -85,19 +85,22 @@ class ParseWorkerProtocolContractTest {
     }
 
     /**
-     * parse_worker 消息刻意不带 tenantId：租户边界由 documentId 全局唯一 + 消费侧反查归属租户
-     * 保证（§5.12），消息体不携带租户字段。若有人为「加租户维度」往这里塞 tenantId，
-     * 会因双端 extra="forbid" 变成破坏性发布，本用例先把它钉住。
+     * 004 迁移后数据面的读与写都强制 {@code tenant_id} 谓词，写侧无法再靠 documentId 反查归属
+     * 租户（旧 §5.12 前提已被推翻）：parse.requested 与 vector-change-requested 两条写路径必须
+     * 携带租户信封，缺字段时 Python 侧拒收而不是落空串。其余四条结果/确认消息不携带租户字段。
      */
     @Test
-    void parseWorkerMessagesStayTenantAgnostic() throws IOException {
+    void writePathMessagesCarryTenantEnvelope() throws IOException {
+        Set<String> writePaths = Set.of("ParseRequestedEvent", "VectorChangeRequestedEvent");
         for (Map.Entry<Class<?>, String> pair : MESSAGE_PAIRS.entrySet()) {
-            assertThat(EXPECTED.get(pair.getValue()))
-                    .as("%s 不应携带 tenantId（靠 documentId 反查租户，§5.12）", pair.getValue())
-                    .doesNotContain("tenantId");
-            assertThat(pythonFieldsOf(pair.getValue()))
-                    .as("%s Python 侧不应出现 tenantId", pair.getValue())
-                    .doesNotContain("tenantId");
+            String name = pair.getValue();
+            boolean expected = writePaths.contains(name);
+            assertThat(EXPECTED.get(name).contains("tenantId"))
+                    .as("%s Java 侧租户信封", name)
+                    .isEqualTo(expected);
+            assertThat(pythonFieldsOf(name).contains("tenantId"))
+                    .as("%s Python 侧租户信封", name)
+                    .isEqualTo(expected);
         }
     }
 

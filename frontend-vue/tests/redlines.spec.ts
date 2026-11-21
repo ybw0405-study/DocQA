@@ -200,11 +200,18 @@ describe('红线扫描', () => {
     expect(inline).toEqual([]);
 
     const tags = [...html.matchAll(/<script\b([^>]*)>/g)].map((match) => match[1] ?? '');
-    expect(tags.length).toBeGreaterThanOrEqual(2);
-    for (const attrs of tags) {
-      expect(attrs).toContain('type="module"');
+    // CT-7：config.js 是唯一允许的非 module 脚本（运行时配置必须在应用代码之前注入），
+    // 且用相对地址引用，才能随相对 base 挂在任意子路径。它不执行任何内联代码，
+    // 只设置 window.__APP_CONFIG__，因此不违反「禁止内联脚本 / script-src 'self'」这两条红线。
+    const runtimeTags = tags.filter((attrs) => !attrs.includes('type="module"'));
+    expect(runtimeTags).toHaveLength(1);
+    expect(runtimeTags[0]).toMatch(/src="\.\/config\.js"/);
+    const moduleTags = tags.filter((attrs) => attrs.includes('type="module"'));
+    expect(moduleTags.length).toBeGreaterThanOrEqual(2);
+    for (const attrs of moduleTags) {
       expect(attrs).toMatch(/src="\/src\/[\w./-]+"/);
     }
+    expect(html.indexOf('config.js')).toBeLessThan(html.indexOf('src/main.ts'));
     expect(/src="\/src\/theme-bootstrap\.ts"/.test(html)).toBe(true);
     expect(html.indexOf('theme-bootstrap.ts')).toBeLessThan(html.indexOf('src/main.ts'));
 
@@ -212,6 +219,40 @@ describe('红线扫描', () => {
     const csp = /content="([^"]*)"/.exec(cspMeta)?.[1] ?? '';
     expect(csp).toContain("script-src 'self'");
     expect(/script-src[^;]*unsafe-inline/.test(csp)).toBe(false);
+    // CT-5：style-src 的 unsafe-inline 与 connect-src 的两个 dev HMR websocket 白名单已移除。
+    expect(/style-src[^;]*unsafe-inline/.test(csp)).toBe(false);
+    expect(/connect-src[^;]*ws:/.test(csp)).toBe(false);
+  });
+
+  it('delegates frame-ancestors, nosniff and HSTS to the hosting layer (CT-5)', () => {
+    // meta 形式不支持 frame-ancestors / HSTS，必须由响应头下发；这里对账样例的实际内容，
+    // 而不是只断言文件存在——否则「加了空文件」也能骗过这条红线。
+    const sample = readFileSync(join(ROOT, 'nginx.conf.example'), 'utf8');
+    const headers = readFileSync(join(ROOT, 'security-headers.conf.example'), 'utf8');
+    const hosting = `${sample}\n${headers}`;
+    expect(hosting).toContain("frame-ancestors 'none'");
+    expect(hosting).toContain('X-Content-Type-Options');
+    expect(hosting).toContain('nosniff');
+    expect(hosting).toContain('Strict-Transport-Security');
+  });
+
+  it('keeps the storage bucket out of build-time constants (CT-7)', () => {
+    const documents = readFileSync(join(ROOT, 'src/api/documents.ts'), 'utf8');
+    expect(documents).not.toContain('import.meta.env.VITE_MINIO_BUCKET');
+    const runtime = readFileSync(join(ROOT, 'src/config/runtime.ts'), 'utf8');
+    expect(runtime).toContain('__APP_CONFIG__');
+    expect(runtime).toContain('storagePrefix');
+    expect(readFileSync(join(ROOT, 'public/config.js'), 'utf8')).toContain('storageBucket');
+  });
+
+  it('injects build.base and pins the no-store / immutable hosting policy (CT-8)', () => {
+    const config = readFileSync(join(ROOT, 'vite.config.ts'), 'utf8');
+    expect(config).toContain('VITE_APP_BASE');
+    const sample = readFileSync(join(ROOT, 'nginx.conf.example'), 'utf8');
+    expect(sample).toContain('no-store');
+    expect(sample).toContain('immutable');
+    expect(sample).toContain('config.js');
+    expect(sample).toContain('/assets/');
   });
 
   it('keeps the dev proxy pointed only at the four Java services and the object storage', () => {
@@ -237,16 +278,22 @@ describe('红线扫描', () => {
     expect(contexts).toEqual(used);
   });
 
-  it('keeps the rewrite prefix and the proxy key on the same bucket', () => {
+  it('keeps the dev proxy, runtime default and shipped config on the same bucket', () => {
+    // CT-7：默认桶名不再烘焙进产物，改为「运行时配置 + dev 代理」两处声明。
+    // 三方（vite dev 代理 / runtime.ts 默认 / public/config.js 默认值）必须逐字一致，
+    // 否则本地开发的分片 PUT 会被白名单判为非法、而生产却正常——这类偏差只会在 dev 暴露。
     const config = readFileSync(join(ROOT, 'vite.config.ts'), 'utf8');
-    const api = readFileSync(join(ROOT, 'src/api/documents.ts'), 'utf8');
+    const runtime = readFileSync(join(ROOT, 'src/config/runtime.ts'), 'utf8');
+    const shipped = readFileSync(join(ROOT, 'public/config.js'), 'utf8');
     const proxyBucket = /MINIO_BUCKET = '([^']+)';/.exec(config)?.[1];
-    const prefixBucket = /VITE_MINIO_BUCKET \?\? '([^']+)'/
-      .exec(api)?.[1];
+    const defaultBucket = /DEFAULT_BUCKET = '([^']+)';/.exec(runtime)?.[1];
+    const shippedBucket = /storageBucket: '([^']+)'/.exec(shipped)?.[1];
 
     expect(proxyBucket).toBeDefined();
-    expect(prefixBucket).toBeDefined();
-    expect(prefixBucket).toBe(proxyBucket);
+    expect(defaultBucket).toBeDefined();
+    expect(shippedBucket).toBeDefined();
+    expect(defaultBucket).toBe(proxyBucket);
+    expect(shippedBucket).toBe(proxyBucket);
   });
 
   it.each(SINGLE_SOURCE)('keeps the literal %s in exactly one place', ({ token, owners }) => {

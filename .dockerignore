@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.pytest_cache
+.ruff_cache
+.artifacts
+**/.venv
+**/node_modules
+**/target
+**/dist
+**/__pycache__
+**/*.pyc
+logs
+ops/backup

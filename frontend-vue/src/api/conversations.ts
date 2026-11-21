@@ -38,11 +38,13 @@ export function askConversation(
   conversationId: string,
   request: AskRequest,
   idempotencyKey: string,
+  signal?: AbortSignal,
 ): Promise<Traced<AskData>> {
   return postWithTrace<AskData>(
     `/conversations/${encodeURIComponent(conversationId)}/ask`,
     request,
     idempotencyKey,
+    signal,
   );
 }
 

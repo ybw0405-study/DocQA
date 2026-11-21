@@ -1,0 +1,49 @@
+# DocQA 前端静态托管样例（CT-5 响应头安全策略 / CT-8 缓存分层 / 运行时 base）
+#
+# 用法：把 `vite build` 产物放到 root，按环境替换 dist/config.js 的内容，
+# 本文件与 security-headers.conf.example 一起放进站点的 conf.d/。本仓库不把托管配置
+# 塞进 ops/（运维仓），这里只给一份可逐行复核、可被 tests/redlines.spec.ts 机检的样例。
+#
+# base：vite.config.ts 用 `base: env.VITE_APP_BASE ?? './'`，默认相对 base 让 dist 以相对
+# 路径引用 assets，因此可挂在任意子路径；运行时桶名 / API 前缀由 config.js 注入，两者都
+# 不需要重新构建。若部署在子路径，把下面的 location 前缀按实际挂载点调整即可
+# （相对 base 下 assets 与 config.js 都随 index.html 所在目录解析）。
+
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # server 级基线：location / 没有自己的 add_header，会继承这里。
+    include security-headers.conf.example;
+
+    # ── CT-8：入口 HTML 与运行时配置绝不缓存 ──────────────────────────
+    # 发版后旧 HTML 会引用已删除的 hash chunk 直接白屏；config.js 承载运行时桶名，
+    # 一旦被缓存就等于把上一环境的桶名钉死在浏览器里。
+    location = /index.html {
+        include security-headers.conf.example;
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+    }
+
+    location = /config.js {
+        include security-headers.conf.example;
+        default_type application/javascript;
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+    }
+
+    # ── CT-8：带内容 hash 的构建产物长期不可变缓存 ────────────────────
+    location /assets/ {
+        include security-headers.conf.example;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    # SPA history fallback；index.html 本身走上面的 no-store 分支。
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

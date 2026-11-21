@@ -79,3 +79,12 @@ class PgConnectionProvider:
         if self._pool is not None and self._opened:
             await self._pool.close()
             self._opened = False
+
+
+def build_pg_provider(dsn: str, connect_timeout_s: int = 3) -> PgConnectionProvider:
+    """单一组装根入口：API 进程与 worker 进程各自只调一次，把同一个 provider 注入下游。
+
+    `open_pool()` 此前全仓零调用点，导致每次问答都新建直连。这里把它真正接上；
+    psycopg_pool 未安装时 `open_pool` 返回 None，自动退化为逐次直连（离线/CI 仍可用）。
+    """
+    return PgConnectionProvider(dsn, connect_timeout_s, pool=open_pool(dsn, connect_timeout_s))

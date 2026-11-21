@@ -62,25 +62,35 @@ export const useAdminQuotasStore = defineStore('adminQuotas', {
       this.traceId = null;
     },
 
+    /**
+     * 首次加载不设 `loading` 守卫：写后刷新与在途翻页并发时，新请求必须真正发出，
+     * 由 `fetchFirstPage` 递增 `listSeq` 把旧的在途响应丢弃，而不是被守卫直接挡掉导致刚改的配额不上屏。
+     */
     async loadFirst(): Promise<void> {
-      if (this.loading) {
-        return;
-      }
       await this.fetchFirstPage();
     },
 
     async fetchFirstPage(): Promise<void> {
+      const seq = ++this.listSeq;
       this.loading = true;
       try {
         const data = await listAiQuotas({ limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = data.items;
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         applyFailure(this, error);
       } finally {
-        this.loading = false;
-        this.loaded = true;
+        if (seq === this.listSeq) {
+          this.loading = false;
+          this.loaded = true;
+        }
       }
     },
 
@@ -89,13 +99,20 @@ export const useAdminQuotasStore = defineStore('adminQuotas', {
       if (!this.canLoadMore || cursor === null) {
         return;
       }
+      const seq = this.listSeq;
       this.loading = true;
       try {
         const data = await listAiQuotas({ cursor, limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = [...this.items, ...data.items];
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         if (isStaleCursor(error)) {
           // keyset 游标锚定 `updated_at DESC, user_id DESC`，两次翻页之间有人改过配额就会让锚点失效；
           // 停在坏游标上只会让人永远看不到剩余的行，所以回第一页。
@@ -107,7 +124,9 @@ export const useAdminQuotasStore = defineStore('adminQuotas', {
         }
         applyFailure(this, error);
       } finally {
-        this.loading = false;
+        if (seq === this.listSeq) {
+          this.loading = false;
+        }
       }
     },
 

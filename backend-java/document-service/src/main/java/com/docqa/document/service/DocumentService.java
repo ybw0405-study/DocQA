@@ -237,7 +237,8 @@ public class DocumentService {
                 return Boolean.TRUE;
             });
             publishVectorChangeQuietly(VectorChangeRequestedEvent.deleteDocument(
-                    TraceIdContext.currentOrCreate(), document.id(), userId, now));
+                    TraceIdContext.currentOrCreate(), document.id(), userId,
+                    TenantContext.require(), now));
             return DELETED_MARKER;
         });
     }
@@ -814,6 +815,7 @@ public class DocumentService {
                 TraceIdContext.currentOrCreate(),
                 document.id(),
                 document.userId(),
+                TenantContext.require(),
                 indexVersion,
                 document.objectKey(),
                 document.fileName(),

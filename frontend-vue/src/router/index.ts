@@ -1,16 +1,4 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import HomeView from '../views/HomeView.vue';
-import LoginView from '../views/LoginView.vue';
-import DocumentsView from '../views/DocumentsView.vue';
-import AskView from '../views/AskView.vue';
-import RemindersView from '../views/RemindersView.vue';
-import NotFoundView from '../views/NotFoundView.vue';
-import AdminControlsView from '../views/admin/AdminControlsView.vue';
-import AdminTenantControlsView from '../views/admin/AdminTenantControlsView.vue';
-import AdminQuotasView from '../views/admin/AdminQuotasView.vue';
-import AdminAuditView from '../views/admin/AdminAuditView.vue';
-import AdminUsageView from '../views/admin/AdminUsageView.vue';
-import AdminUsersView from '../views/admin/AdminUsersView.vue';
 import { useAuthStore } from '../stores/auth';
 
 declare module 'vue-router' {
@@ -22,20 +10,24 @@ declare module 'vue-router' {
   }
 }
 
+/**
+ * 视图全部懒加载：打开 /login 只下载登录页与其依赖，ADMIN 页面按路由切分，
+ * 不再把全部 12 个视图塞进首屏单 chunk。
+ */
 export const routes: RouteRecordRaw[] = [
-  { path: '/', name: 'home', component: HomeView },
-  { path: '/documents', name: 'documents', component: DocumentsView },
-  { path: '/ask', name: 'ask', component: AskView },
-  { path: '/reminders', name: 'reminders', component: RemindersView },
+  { path: '/', name: 'home', component: () => import('../views/HomeView.vue') },
+  { path: '/documents', name: 'documents', component: () => import('../views/DocumentsView.vue') },
+  { path: '/ask', name: 'ask', component: () => import('../views/AskView.vue') },
+  { path: '/reminders', name: 'reminders', component: () => import('../views/RemindersView.vue') },
   // 管理端页面各自一个 URL：审计查询的游标与用量窗口要能进 query，塞进一个 /admin 的 tab 就做不到（D-195）。
-  { path: '/admin/ai-controls', name: 'admin-ai-controls', component: AdminControlsView, meta: { requiresAdmin: true } },
-  { path: '/admin/tenant-controls', name: 'admin-tenant-controls', component: AdminTenantControlsView, meta: { requiresAdmin: true } },
-  { path: '/admin/quotas', name: 'admin-quotas', component: AdminQuotasView, meta: { requiresAdmin: true } },
-  { path: '/admin/audit', name: 'admin-audit', component: AdminAuditView, meta: { requiresAdmin: true } },
-  { path: '/admin/usage', name: 'admin-usage', component: AdminUsageView, meta: { requiresAdmin: true } },
-  { path: '/admin/users', name: 'admin-users', component: AdminUsersView, meta: { requiresAdmin: true } },
-  { path: '/login', name: 'login', component: LoginView, meta: { requiresAuth: false } },
-  { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView },
+  { path: '/admin/ai-controls', name: 'admin-ai-controls', component: () => import('../views/admin/AdminControlsView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/tenant-controls', name: 'admin-tenant-controls', component: () => import('../views/admin/AdminTenantControlsView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/quotas', name: 'admin-quotas', component: () => import('../views/admin/AdminQuotasView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/audit', name: 'admin-audit', component: () => import('../views/admin/AdminAuditView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/usage', name: 'admin-usage', component: () => import('../views/admin/AdminUsageView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/users', name: 'admin-users', component: () => import('../views/admin/AdminUsersView.vue'), meta: { requiresAdmin: true } },
+  { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { requiresAuth: false } },
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue') },
 ];
 
 export const router = createRouter({

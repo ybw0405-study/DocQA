@@ -12,6 +12,7 @@ VECTOR_MIGRATION = "001_chunk_embedding_1024.sql"
 LEXICAL_MIGRATION = "002_chunk_lexical_index.sql"
 REAL_MODEL_MIGRATION = "003_chunk_embedding_1024_text_embedding_v4.sql"
 TENANT_MIGRATION = "004_add_tenant_id.sql"
+FINALIZE_MIGRATION = "005_drop_tenant_default.sql"
 OFFLINE_TABLE = "chunk_embedding_1024"
 REAL_MODEL_TABLE = "chunk_embedding_1024_text_embedding_v4"
 
@@ -57,6 +58,7 @@ def test_gate_discovers_every_migration_file() -> None:
         LEXICAL_MIGRATION,
         REAL_MODEL_MIGRATION,
         TENANT_MIGRATION,
+        FINALIZE_MIGRATION,
     ]
 
 
@@ -64,8 +66,58 @@ def test_no_migration_scopes_by_user_id() -> None:
     for path in sorted(MIGRATIONS.glob("*.sql")):
         sql = path.read_text(encoding="utf-8").lower()
         assert "user_id" not in sql, path.name
-        assert "document_id" in sql, path.name
-        assert "index_version" in sql, path.name
+
+
+def test_schema_migrations_declare_the_scope_columns() -> None:
+    """建表/租户索引迁移必须同时带 document_id 与 index_version；005 只改列默认值，不在此列。"""
+    for name in (VECTOR_MIGRATION, REAL_MODEL_MIGRATION, TENANT_MIGRATION):
+        sql = migration_sql(name)
+        assert "document_id" in sql, name
+        assert "index_version" in sql, name
+
+
+# ── 004/005 回归护栏：此前 004 只有「文件名存在」断言，索引与默认值完全没纳入门禁 ────
+
+
+def test_tenant_migration_covers_both_spaces_in_query_order() -> None:
+    sql = migration_sql(TENANT_MIGRATION)
+    for table in (OFFLINE_TABLE, REAL_MODEL_TABLE):
+        assert f"alter table {table}" in sql
+        assert "add column if not exists tenant_id text not null default ''" in sql
+    # 索引列序必须与读侧 WHERE 的列序一致，否则 tenant 前缀索引会用不上。
+    assert "on chunk_embedding_1024 (tenant_id, document_id, index_version);" in sql
+    assert "on chunk_embedding_1024_text_embedding_v4 (tenant_id, document_id, index_version);" in sql
+
+
+def test_read_side_binds_tenant_before_the_document_scope() -> None:
+    source = (MIGRATIONS.parent / "src/docqa_ai/rag/repository.py").read_text(encoding="utf-8")
+    assert 'tenant_prefix = "tenant_id = %s AND "' in source
+    assert 'WHERE {tenant_prefix}(document_id, index_version) IN' in source
+
+
+def test_write_side_never_defaults_tenant_to_an_empty_string() -> None:
+    source = (MIGRATIONS.parent / "src/docqa_ai/parse_worker/vector_writer.py").read_text(encoding="utf-8")
+    assert "_tenant_or_raise(tenant_id)" in source
+    assert 'raise VectorWriteError("tenant_id is required for every vector write")' in source
+
+
+def test_finalize_migration_drops_the_empty_default_on_both_tables() -> None:
+    sql = migration_sql(FINALIZE_MIGRATION)
+    assert sql.count("alter column tenant_id drop default") == 2
+    for table in (OFFLINE_TABLE, REAL_MODEL_TABLE):
+        assert f"alter table {table}" in sql
+
+
+def test_all_migration_index_names_are_unique_including_tenant_indexes() -> None:
+    """004 新增的两个索引此前完全不在唯一性对账里。"""
+    by_file = {
+        name: CREATE_INDEX.findall(executable_sql(name))
+        for name in (VECTOR_MIGRATION, LEXICAL_MIGRATION, REAL_MODEL_MIGRATION, TENANT_MIGRATION)
+    }
+    every = [index for names in by_file.values() for index in names]
+    assert len(by_file[TENANT_MIGRATION]) == 2
+    # 001 三条 + 002 一条 + 003 四条 + 004 两条 = 10，且十个名字互不重复。
+    assert len(every) == len(set(every)) == 10
 
 
 def test_vector_column_and_table_match_the_shared_contract() -> None:

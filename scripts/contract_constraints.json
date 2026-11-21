@@ -1,0 +1,3526 @@
+{
+  "contract": "docs/02-design/openapi-java.yaml",
+  "keywords": [
+    "nullable",
+    "minimum",
+    "maximum",
+    "minLength",
+    "maxLength",
+    "pattern",
+    "enum",
+    "format",
+    "minItems",
+    "maxItems",
+    "uniqueItems",
+    "additionalProperties"
+  ],
+  "entries": [
+    {
+      "line": 3048,
+      "keyword": "minLength",
+      "value": 8,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3049,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3050,
+      "keyword": "pattern",
+      "value": "^[A-Za-z0-9._:-]+$",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3065,
+      "keyword": "minLength",
+      "value": 8,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3066,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3067,
+      "keyword": "pattern",
+      "value": "^[A-Za-z0-9._:-]+$",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3076,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3085,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3096,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3108,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3121,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3122,
+      "keyword": "maximum",
+      "value": 100,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3138,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3139,
+      "keyword": "pattern",
+      "value": "^[A-Za-z0-9_-]+$",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3160,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3161,
+      "keyword": "maxLength",
+      "value": 120,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3175,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3176,
+      "keyword": "maxLength",
+      "value": 24,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3209,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3238,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3239,
+      "keyword": "maximum",
+      "value": 200,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3251,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3252,
+      "keyword": "maximum",
+      "value": 500,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3263,
+      "keyword": "pattern",
+      "value": "^[0-9a-f]{32}$",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3272,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3281,
+      "keyword": "pattern",
+      "value": "^[A-Z][A-Z0-9_]{0,63}$",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3292,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3303,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3314,
+      "keyword": "enum",
+      "value": "",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3328,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3329,
+      "keyword": "maximum",
+      "value": 50,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3342,
+      "keyword": "enum",
+      "value": "",
+      "schema": "ApiEnvelope",
+      "field": "code"
+    },
+    {
+      "line": 3347,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "ApiEnvelope",
+      "field": "msg"
+    },
+    {
+      "line": 3348,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "ApiEnvelope",
+      "field": "msg"
+    },
+    {
+      "line": 3355,
+      "keyword": "pattern",
+      "value": "^[0-9a-f]{32}$",
+      "schema": "ApiEnvelope",
+      "field": "traceId"
+    },
+    {
+      "line": 3361,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "LoginRequest",
+      "field": ""
+    },
+    {
+      "line": 3368,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "LoginRequest",
+      "field": "username"
+    },
+    {
+      "line": 3369,
+      "keyword": "maxLength",
+      "value": 100,
+      "schema": "LoginRequest",
+      "field": "username"
+    },
+    {
+      "line": 3374,
+      "keyword": "format",
+      "value": "password",
+      "schema": "LoginRequest",
+      "field": "password"
+    },
+    {
+      "line": 3375,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "LoginRequest",
+      "field": "password"
+    },
+    {
+      "line": 3376,
+      "keyword": "maxLength",
+      "value": 72,
+      "schema": "LoginRequest",
+      "field": "password"
+    },
+    {
+      "line": 3393,
+      "keyword": "pattern",
+      "value": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$",
+      "schema": "LoginData",
+      "field": "accessToken"
+    },
+    {
+      "line": 3399,
+      "keyword": "enum",
+      "value": "",
+      "schema": "LoginData",
+      "field": "tokenType"
+    },
+    {
+      "line": 3404,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "LoginData",
+      "field": "expiresIn"
+    },
+    {
+      "line": 3405,
+      "keyword": "maximum",
+      "value": 900,
+      "schema": "LoginData",
+      "field": "expiresIn"
+    },
+    {
+      "line": 3431,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "CurrentUserData",
+      "field": "userId"
+    },
+    {
+      "line": 3436,
+      "keyword": "minLength",
+      "value": 3,
+      "schema": "CurrentUserData",
+      "field": "username"
+    },
+    {
+      "line": 3437,
+      "keyword": "maxLength",
+      "value": 32,
+      "schema": "CurrentUserData",
+      "field": "username"
+    },
+    {
+      "line": 3446,
+      "keyword": "minItems",
+      "value": 1,
+      "schema": "CurrentUserData",
+      "field": "roles"
+    },
+    {
+      "line": 3447,
+      "keyword": "maxItems",
+      "value": 2,
+      "schema": "CurrentUserData",
+      "field": "roles"
+    },
+    {
+      "line": 3448,
+      "keyword": "uniqueItems",
+      "value": true,
+      "schema": "CurrentUserData",
+      "field": "roles"
+    },
+    {
+      "line": 3456,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "CurrentUserData",
+      "field": "accessTokenExpiresIn"
+    },
+    {
+      "line": 3457,
+      "keyword": "maximum",
+      "value": 900,
+      "schema": "CurrentUserData",
+      "field": "accessTokenExpiresIn"
+    },
+    {
+      "line": 3476,
+      "keyword": "enum",
+      "value": "",
+      "schema": "UserRole",
+      "field": ""
+    },
+    {
+      "line": 3484,
+      "keyword": "enum",
+      "value": "",
+      "schema": "UserStatus",
+      "field": ""
+    },
+    {
+      "line": 3491,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "RegisterRequest",
+      "field": ""
+    },
+    {
+      "line": 3498,
+      "keyword": "minLength",
+      "value": 3,
+      "schema": "RegisterRequest",
+      "field": "username"
+    },
+    {
+      "line": 3499,
+      "keyword": "maxLength",
+      "value": 32,
+      "schema": "RegisterRequest",
+      "field": "username"
+    },
+    {
+      "line": 3500,
+      "keyword": "pattern",
+      "value": "^[A-Za-z0-9_.-]{3,32}$",
+      "schema": "RegisterRequest",
+      "field": "username"
+    },
+    {
+      "line": 3507,
+      "keyword": "format",
+      "value": "password",
+      "schema": "RegisterRequest",
+      "field": "password"
+    },
+    {
+      "line": 3509,
+      "keyword": "minLength",
+      "value": 10,
+      "schema": "RegisterRequest",
+      "field": "password"
+    },
+    {
+      "line": 3510,
+      "keyword": "maxLength",
+      "value": 72,
+      "schema": "RegisterRequest",
+      "field": "password"
+    },
+    {
+      "line": 3511,
+      "keyword": "pattern",
+      "value": "^(?=.*[A-Za-z])(?=.*\\d).{10,72}$",
+      "schema": "RegisterRequest",
+      "field": "password"
+    },
+    {
+      "line": 3520,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "ChangePasswordRequest",
+      "field": ""
+    },
+    {
+      "line": 3527,
+      "keyword": "format",
+      "value": "password",
+      "schema": "ChangePasswordRequest",
+      "field": "currentPassword"
+    },
+    {
+      "line": 3529,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "ChangePasswordRequest",
+      "field": "currentPassword"
+    },
+    {
+      "line": 3530,
+      "keyword": "maxLength",
+      "value": 72,
+      "schema": "ChangePasswordRequest",
+      "field": "currentPassword"
+    },
+    {
+      "line": 3535,
+      "keyword": "format",
+      "value": "password",
+      "schema": "ChangePasswordRequest",
+      "field": "newPassword"
+    },
+    {
+      "line": 3537,
+      "keyword": "minLength",
+      "value": 10,
+      "schema": "ChangePasswordRequest",
+      "field": "newPassword"
+    },
+    {
+      "line": 3538,
+      "keyword": "maxLength",
+      "value": 72,
+      "schema": "ChangePasswordRequest",
+      "field": "newPassword"
+    },
+    {
+      "line": 3539,
+      "keyword": "pattern",
+      "value": "^(?=.*[A-Za-z])(?=.*\\d).{10,72}$",
+      "schema": "ChangePasswordRequest",
+      "field": "newPassword"
+    },
+    {
+      "line": 3545,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "UserRolesUpdateRequest",
+      "field": ""
+    },
+    {
+      "line": 3551,
+      "keyword": "maxItems",
+      "value": 2,
+      "schema": "UserRolesUpdateRequest",
+      "field": "roles"
+    },
+    {
+      "line": 3552,
+      "keyword": "uniqueItems",
+      "value": true,
+      "schema": "UserRolesUpdateRequest",
+      "field": "roles"
+    },
+    {
+      "line": 3565,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "UserStatusUpdateRequest",
+      "field": ""
+    },
+    {
+      "line": 3587,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "UserSummaryData",
+      "field": "userId"
+    },
+    {
+      "line": 3591,
+      "keyword": "minLength",
+      "value": 3,
+      "schema": "UserSummaryData",
+      "field": "username"
+    },
+    {
+      "line": 3592,
+      "keyword": "maxLength",
+      "value": 32,
+      "schema": "UserSummaryData",
+      "field": "username"
+    },
+    {
+      "line": 3598,
+      "keyword": "minItems",
+      "value": 1,
+      "schema": "UserSummaryData",
+      "field": "roles"
+    },
+    {
+      "line": 3599,
+      "keyword": "maxItems",
+      "value": 2,
+      "schema": "UserSummaryData",
+      "field": "roles"
+    },
+    {
+      "line": 3600,
+      "keyword": "uniqueItems",
+      "value": true,
+      "schema": "UserSummaryData",
+      "field": "roles"
+    },
+    {
+      "line": 3605,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "UserSummaryData",
+      "field": "createdAt"
+    },
+    {
+      "line": 3609,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "UserSummaryData",
+      "field": "lastLoginAt"
+    },
+    {
+      "line": 3610,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "UserSummaryData",
+      "field": "lastLoginAt"
+    },
+    {
+      "line": 3634,
+      "keyword": "maxItems",
+      "value": 100,
+      "schema": "UserListData",
+      "field": "items"
+    },
+    {
+      "line": 3639,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "UserListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 3640,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "UserListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 3645,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "UserListData",
+      "field": "limit"
+    },
+    {
+      "line": 3646,
+      "keyword": "maximum",
+      "value": 100,
+      "schema": "UserListData",
+      "field": "limit"
+    },
+    {
+      "line": 3662,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "UploadInitRequest",
+      "field": ""
+    },
+    {
+      "line": 3671,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "UploadInitRequest",
+      "field": "fileName"
+    },
+    {
+      "line": 3672,
+      "keyword": "maxLength",
+      "value": 255,
+      "schema": "UploadInitRequest",
+      "field": "fileName"
+    },
+    {
+      "line": 3673,
+      "keyword": "pattern",
+      "value": "^[^/\\\\\\u0000-\\u001F]+$",
+      "schema": "UploadInitRequest",
+      "field": "fileName"
+    },
+    {
+      "line": 3678,
+      "keyword": "format",
+      "value": "int64",
+      "schema": "UploadInitRequest",
+      "field": "sizeBytes"
+    },
+    {
+      "line": 3679,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "UploadInitRequest",
+      "field": "sizeBytes"
+    },
+    {
+      "line": 3680,
+      "keyword": "maximum",
+      "value": 52428800,
+      "schema": "UploadInitRequest",
+      "field": "sizeBytes"
+    },
+    {
+      "line": 3685,
+      "keyword": "enum",
+      "value": "",
+      "schema": "UploadInitRequest",
+      "field": "contentType"
+    },
+    {
+      "line": 3694,
+      "keyword": "pattern",
+      "value": "^[a-f0-9]{32}$",
+      "schema": "UploadInitRequest",
+      "field": "md5"
+    },
+    {
+      "line": 3707,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "PresignedPart",
+      "field": "partNumber"
+    },
+    {
+      "line": 3708,
+      "keyword": "maximum",
+      "value": 10000,
+      "schema": "PresignedPart",
+      "field": "partNumber"
+    },
+    {
+      "line": 3712,
+      "keyword": "format",
+      "value": "uri",
+      "schema": "PresignedPart",
+      "field": "url"
+    },
+    {
+      "line": 3713,
+      "keyword": "maxLength",
+      "value": 2048,
+      "schema": "PresignedPart",
+      "field": "url"
+    },
+    {
+      "line": 3718,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "PresignedPart",
+      "field": "expiresAt"
+    },
+    {
+      "line": 3736,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "UploadInitData",
+      "field": "documentId"
+    },
+    {
+      "line": 3740,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "UploadInitData",
+      "field": "uploadId"
+    },
+    {
+      "line": 3751,
+      "keyword": "minimum",
+      "value": 5242880,
+      "schema": "UploadInitData",
+      "field": "partSize"
+    },
+    {
+      "line": 3752,
+      "keyword": "maximum",
+      "value": 5242880,
+      "schema": "UploadInitData",
+      "field": "partSize"
+    },
+    {
+      "line": 3757,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UploadInitData",
+      "field": "partCount"
+    },
+    {
+      "line": 3758,
+      "keyword": "maximum",
+      "value": 10,
+      "schema": "UploadInitData",
+      "field": "partCount"
+    },
+    {
+      "line": 3763,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "UploadInitData",
+      "field": "expiresAt"
+    },
+    {
+      "line": 3764,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "UploadInitData",
+      "field": "expiresAt"
+    },
+    {
+      "line": 3769,
+      "keyword": "maxItems",
+      "value": 10,
+      "schema": "UploadInitData",
+      "field": "parts"
+    },
+    {
+      "line": 3789,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "CompleteUploadRequest",
+      "field": ""
+    },
+    {
+      "line": 3795,
+      "keyword": "minItems",
+      "value": 1,
+      "schema": "CompleteUploadRequest",
+      "field": "parts"
+    },
+    {
+      "line": 3796,
+      "keyword": "maxItems",
+      "value": 10,
+      "schema": "CompleteUploadRequest",
+      "field": "parts"
+    },
+    {
+      "line": 3803,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "CompletedPart",
+      "field": ""
+    },
+    {
+      "line": 3810,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "CompletedPart",
+      "field": "partNumber"
+    },
+    {
+      "line": 3811,
+      "keyword": "maximum",
+      "value": 10000,
+      "schema": "CompletedPart",
+      "field": "partNumber"
+    },
+    {
+      "line": 3815,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "CompletedPart",
+      "field": "etag"
+    },
+    {
+      "line": 3816,
+      "keyword": "maxLength",
+      "value": 128,
+      "schema": "CompletedPart",
+      "field": "etag"
+    },
+    {
+      "line": 3832,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "CompleteUploadData",
+      "field": "documentId"
+    },
+    {
+      "line": 3835,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "CompleteUploadData",
+      "field": "uploadId"
+    },
+    {
+      "line": 3840,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "CompleteUploadData",
+      "field": "parseRequestedAt"
+    },
+    {
+      "line": 3844,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "CompleteUploadData",
+      "field": "retryCount"
+    },
+    {
+      "line": 3845,
+      "keyword": "maximum",
+      "value": 3,
+      "schema": "CompleteUploadData",
+      "field": "retryCount"
+    },
+    {
+      "line": 3861,
+      "keyword": "enum",
+      "value": "",
+      "schema": "DocumentStatus",
+      "field": ""
+    },
+    {
+      "line": 3887,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "DocumentStatusData",
+      "field": "documentId"
+    },
+    {
+      "line": 3890,
+      "keyword": "maxLength",
+      "value": 255,
+      "schema": "DocumentStatusData",
+      "field": "fileName"
+    },
+    {
+      "line": 3894,
+      "keyword": "maxLength",
+      "value": 120,
+      "schema": "DocumentStatusData",
+      "field": "title"
+    },
+    {
+      "line": 3895,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentStatusData",
+      "field": "title"
+    },
+    {
+      "line": 3899,
+      "keyword": "maxItems",
+      "value": 20,
+      "schema": "DocumentStatusData",
+      "field": "tags"
+    },
+    {
+      "line": 3902,
+      "keyword": "maxLength",
+      "value": 24,
+      "schema": "DocumentStatusData",
+      "field": "tags"
+    },
+    {
+      "line": 3910,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "DocumentStatusData",
+      "field": "retryCount"
+    },
+    {
+      "line": 3911,
+      "keyword": "maximum",
+      "value": 3,
+      "schema": "DocumentStatusData",
+      "field": "retryCount"
+    },
+    {
+      "line": 3914,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "DocumentStatusData",
+      "field": "maxRetry"
+    },
+    {
+      "line": 3915,
+      "keyword": "maximum",
+      "value": 10,
+      "schema": "DocumentStatusData",
+      "field": "maxRetry"
+    },
+    {
+      "line": 3918,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "DocumentStatusData",
+      "field": "errorCode"
+    },
+    {
+      "line": 3919,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentStatusData",
+      "field": "errorCode"
+    },
+    {
+      "line": 3921,
+      "keyword": "pattern",
+      "value": "^[A-Z]{2,4}-[A-Z_]+-[0-9]{3}$",
+      "schema": "DocumentStatusData",
+      "field": "errorCode"
+    },
+    {
+      "line": 3924,
+      "keyword": "maxLength",
+      "value": 512,
+      "schema": "DocumentStatusData",
+      "field": "errorMessage"
+    },
+    {
+      "line": 3925,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentStatusData",
+      "field": "errorMessage"
+    },
+    {
+      "line": 3929,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "DocumentStatusData",
+      "field": "indexVersion"
+    },
+    {
+      "line": 3930,
+      "keyword": "maxLength",
+      "value": 32,
+      "schema": "DocumentStatusData",
+      "field": "indexVersion"
+    },
+    {
+      "line": 3935,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "DocumentStatusData",
+      "field": "pendingIndexVersion"
+    },
+    {
+      "line": 3936,
+      "keyword": "maxLength",
+      "value": 32,
+      "schema": "DocumentStatusData",
+      "field": "pendingIndexVersion"
+    },
+    {
+      "line": 3937,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentStatusData",
+      "field": "pendingIndexVersion"
+    },
+    {
+      "line": 3942,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "DocumentStatusData",
+      "field": "chunkCount"
+    },
+    {
+      "line": 3946,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "DocumentStatusData",
+      "field": "vectorRows"
+    },
+    {
+      "line": 3947,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentStatusData",
+      "field": "vectorRows"
+    },
+    {
+      "line": 3953,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "DocumentStatusData",
+      "field": "vectorConfirmedAt"
+    },
+    {
+      "line": 3954,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentStatusData",
+      "field": "vectorConfirmedAt"
+    },
+    {
+      "line": 3960,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "DocumentStatusData",
+      "field": "indexedAt"
+    },
+    {
+      "line": 3961,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentStatusData",
+      "field": "indexedAt"
+    },
+    {
+      "line": 3964,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "DocumentStatusData",
+      "field": "createdAt"
+    },
+    {
+      "line": 3967,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "DocumentStatusData",
+      "field": "updatedAt"
+    },
+    {
+      "line": 3971,
+      "keyword": "enum",
+      "value": "",
+      "schema": "VectorConsistency",
+      "field": ""
+    },
+    {
+      "line": 3994,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "DocumentRenameRequest",
+      "field": ""
+    },
+    {
+      "line": 4000,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "DocumentRenameRequest",
+      "field": "title"
+    },
+    {
+      "line": 4001,
+      "keyword": "maxLength",
+      "value": 120,
+      "schema": "DocumentRenameRequest",
+      "field": "title"
+    },
+    {
+      "line": 4012,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "DocumentTagsUpdateRequest",
+      "field": ""
+    },
+    {
+      "line": 4018,
+      "keyword": "maxItems",
+      "value": 20,
+      "schema": "DocumentTagsUpdateRequest",
+      "field": "tags"
+    },
+    {
+      "line": 4027,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "DocumentTagsUpdateRequest",
+      "field": "tags"
+    },
+    {
+      "line": 4028,
+      "keyword": "maxLength",
+      "value": 24,
+      "schema": "DocumentTagsUpdateRequest",
+      "field": "tags"
+    },
+    {
+      "line": 4035,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "AskRequest",
+      "field": ""
+    },
+    {
+      "line": 4042,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "AskRequest",
+      "field": "question"
+    },
+    {
+      "line": 4043,
+      "keyword": "maxLength",
+      "value": 4000,
+      "schema": "AskRequest",
+      "field": "question"
+    },
+    {
+      "line": 4048,
+      "keyword": "minItems",
+      "value": 1,
+      "schema": "AskRequest",
+      "field": "documentIds"
+    },
+    {
+      "line": 4049,
+      "keyword": "maxItems",
+      "value": 20,
+      "schema": "AskRequest",
+      "field": "documentIds"
+    },
+    {
+      "line": 4050,
+      "keyword": "uniqueItems",
+      "value": true,
+      "schema": "AskRequest",
+      "field": "documentIds"
+    },
+    {
+      "line": 4057,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "AskRequest",
+      "field": "documentIds"
+    },
+    {
+      "line": 4069,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "Citation",
+      "field": "documentId"
+    },
+    {
+      "line": 4072,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "Citation",
+      "field": "chunkIndex"
+    },
+    {
+      "line": 4075,
+      "keyword": "format",
+      "value": "double",
+      "schema": "Citation",
+      "field": "score"
+    },
+    {
+      "line": 4076,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "Citation",
+      "field": "score"
+    },
+    {
+      "line": 4077,
+      "keyword": "maximum",
+      "value": 1,
+      "schema": "Citation",
+      "field": "score"
+    },
+    {
+      "line": 4080,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "Citation",
+      "field": "snippet"
+    },
+    {
+      "line": 4084,
+      "keyword": "maxLength",
+      "value": 255,
+      "schema": "Citation",
+      "field": "fileName"
+    },
+    {
+      "line": 4089,
+      "keyword": "enum",
+      "value": "",
+      "schema": "BudgetStatus",
+      "field": ""
+    },
+    {
+      "line": 4115,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "AskData",
+      "field": "conversationId"
+    },
+    {
+      "line": 4118,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "AskData",
+      "field": "messageId"
+    },
+    {
+      "line": 4121,
+      "keyword": "maxLength",
+      "value": 8000,
+      "schema": "AskData",
+      "field": "answer"
+    },
+    {
+      "line": 4125,
+      "keyword": "maxItems",
+      "value": 20,
+      "schema": "AskData",
+      "field": "citations"
+    },
+    {
+      "line": 4130,
+      "keyword": "format",
+      "value": "double",
+      "schema": "AskData",
+      "field": "confidence"
+    },
+    {
+      "line": 4131,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "AskData",
+      "field": "confidence"
+    },
+    {
+      "line": 4132,
+      "keyword": "maximum",
+      "value": 1,
+      "schema": "AskData",
+      "field": "confidence"
+    },
+    {
+      "line": 4138,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "AskData",
+      "field": "tokenUsed"
+    },
+    {
+      "line": 4139,
+      "keyword": "maximum",
+      "value": 8000,
+      "schema": "AskData",
+      "field": "tokenUsed"
+    },
+    {
+      "line": 4142,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "AskData",
+      "field": "toolCallsMade"
+    },
+    {
+      "line": 4143,
+      "keyword": "maximum",
+      "value": 3,
+      "schema": "AskData",
+      "field": "toolCallsMade"
+    },
+    {
+      "line": 4146,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "AskData",
+      "field": "roundsUsed"
+    },
+    {
+      "line": 4147,
+      "keyword": "maximum",
+      "value": 3,
+      "schema": "AskData",
+      "field": "roundsUsed"
+    },
+    {
+      "line": 4156,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "AskData",
+      "field": "createdAt"
+    },
+    {
+      "line": 4178,
+      "keyword": "enum",
+      "value": "",
+      "schema": "AskStreamMeta",
+      "field": "event"
+    },
+    {
+      "line": 4190,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "AskStreamMeta",
+      "field": "data"
+    },
+    {
+      "line": 4193,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "AskStreamMeta",
+      "field": "data"
+    },
+    {
+      "line": 4197,
+      "keyword": "pattern",
+      "value": "^[0-9a-f]{32}$",
+      "schema": "AskStreamMeta",
+      "field": "data"
+    },
+    {
+      "line": 4211,
+      "keyword": "enum",
+      "value": "",
+      "schema": "AskStreamDelta",
+      "field": "event"
+    },
+    {
+      "line": 4233,
+      "keyword": "enum",
+      "value": "",
+      "schema": "AskStreamDone",
+      "field": "event"
+    },
+    {
+      "line": 4244,
+      "keyword": "pattern",
+      "value": "^[0-9a-f]{32}$",
+      "schema": "AskStreamDone",
+      "field": "data"
+    },
+    {
+      "line": 4258,
+      "keyword": "enum",
+      "value": "",
+      "schema": "AskStreamError",
+      "field": "event"
+    },
+    {
+      "line": 4265,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "CreateConversationRequest",
+      "field": ""
+    },
+    {
+      "line": 4269,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "CreateConversationRequest",
+      "field": "title"
+    },
+    {
+      "line": 4270,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "CreateConversationRequest",
+      "field": "title"
+    },
+    {
+      "line": 4275,
+      "keyword": "maxItems",
+      "value": 20,
+      "schema": "CreateConversationRequest",
+      "field": "documentScopeIds"
+    },
+    {
+      "line": 4276,
+      "keyword": "uniqueItems",
+      "value": true,
+      "schema": "CreateConversationRequest",
+      "field": "documentScopeIds"
+    },
+    {
+      "line": 4280,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "CreateConversationRequest",
+      "field": "documentScopeIds"
+    },
+    {
+      "line": 4293,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "ConversationData",
+      "field": "conversationId"
+    },
+    {
+      "line": 4296,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "ConversationData",
+      "field": "title"
+    },
+    {
+      "line": 4297,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "ConversationData",
+      "field": "title"
+    },
+    {
+      "line": 4300,
+      "keyword": "maxItems",
+      "value": 20,
+      "schema": "ConversationData",
+      "field": "documentScopeIds"
+    },
+    {
+      "line": 4303,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "ConversationData",
+      "field": "documentScopeIds"
+    },
+    {
+      "line": 4309,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ConversationData",
+      "field": "createdAt"
+    },
+    {
+      "line": 4333,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "DeadlineReminderCreateRequest",
+      "field": ""
+    },
+    {
+      "line": 4342,
+      "keyword": "enum",
+      "value": "",
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "kind"
+    },
+    {
+      "line": 4346,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "title"
+    },
+    {
+      "line": 4347,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "title"
+    },
+    {
+      "line": 4351,
+      "keyword": "maxLength",
+      "value": 1000,
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "description"
+    },
+    {
+      "line": 4352,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "description"
+    },
+    {
+      "line": 4355,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "timezone"
+    },
+    {
+      "line": 4356,
+      "keyword": "pattern",
+      "value": "^UTC$|^[A-Za-z]+(?:/[A-Za-z0-9_+\\-]+)+$",
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "timezone"
+    },
+    {
+      "line": 4361,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "dueAt"
+    },
+    {
+      "line": 4366,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 4367,
+      "keyword": "maximum",
+      "value": 10080,
+      "schema": "DeadlineReminderCreateRequest",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 4374,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "CustomReminderCreateRequest",
+      "field": ""
+    },
+    {
+      "line": 4384,
+      "keyword": "enum",
+      "value": "",
+      "schema": "CustomReminderCreateRequest",
+      "field": "kind"
+    },
+    {
+      "line": 4388,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "CustomReminderCreateRequest",
+      "field": "title"
+    },
+    {
+      "line": 4389,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "CustomReminderCreateRequest",
+      "field": "title"
+    },
+    {
+      "line": 4392,
+      "keyword": "maxLength",
+      "value": 1000,
+      "schema": "CustomReminderCreateRequest",
+      "field": "description"
+    },
+    {
+      "line": 4393,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "CustomReminderCreateRequest",
+      "field": "description"
+    },
+    {
+      "line": 4396,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "CustomReminderCreateRequest",
+      "field": "timezone"
+    },
+    {
+      "line": 4397,
+      "keyword": "pattern",
+      "value": "^UTC$|^[A-Za-z]+(?:/[A-Za-z0-9_+\\-]+)+$",
+      "schema": "CustomReminderCreateRequest",
+      "field": "timezone"
+    },
+    {
+      "line": 4400,
+      "keyword": "minLength",
+      "value": 6,
+      "schema": "CustomReminderCreateRequest",
+      "field": "rrule"
+    },
+    {
+      "line": 4401,
+      "keyword": "maxLength",
+      "value": 1024,
+      "schema": "CustomReminderCreateRequest",
+      "field": "rrule"
+    },
+    {
+      "line": 4402,
+      "keyword": "pattern",
+      "value": "^FREQ=(SECONDLY|MINUTELY|HOURLY|DAILY|WEEKLY|MONTHLY|YEARLY)(;[A-Z]+=[^;\\r\\n]+)*$",
+      "schema": "CustomReminderCreateRequest",
+      "field": "rrule"
+    },
+    {
+      "line": 4407,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "CustomReminderCreateRequest",
+      "field": "dtstart"
+    },
+    {
+      "line": 4412,
+      "keyword": "maxItems",
+      "value": 365,
+      "schema": "CustomReminderCreateRequest",
+      "field": "exdates"
+    },
+    {
+      "line": 4413,
+      "keyword": "uniqueItems",
+      "value": true,
+      "schema": "CustomReminderCreateRequest",
+      "field": "exdates"
+    },
+    {
+      "line": 4417,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "CustomReminderCreateRequest",
+      "field": "exdates"
+    },
+    {
+      "line": 4428,
+      "keyword": "enum",
+      "value": "",
+      "schema": "ReminderKind",
+      "field": ""
+    },
+    {
+      "line": 4435,
+      "keyword": "enum",
+      "value": "",
+      "schema": "ReminderStatus",
+      "field": ""
+    },
+    {
+      "line": 4460,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "ReminderCreateData",
+      "field": "reminderId"
+    },
+    {
+      "line": 4467,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "ReminderCreateData",
+      "field": "title"
+    },
+    {
+      "line": 4470,
+      "keyword": "maxLength",
+      "value": 1024,
+      "schema": "ReminderCreateData",
+      "field": "rrule"
+    },
+    {
+      "line": 4473,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderCreateData",
+      "field": "dtstart"
+    },
+    {
+      "line": 4476,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "ReminderCreateData",
+      "field": "timezone"
+    },
+    {
+      "line": 4479,
+      "keyword": "maxItems",
+      "value": 365,
+      "schema": "ReminderCreateData",
+      "field": "exdates"
+    },
+    {
+      "line": 4482,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderCreateData",
+      "field": "exdates"
+    },
+    {
+      "line": 4485,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderCreateData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 4486,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ReminderCreateData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 4490,
+      "keyword": "format",
+      "value": "int64",
+      "schema": "ReminderCreateData",
+      "field": "version"
+    },
+    {
+      "line": 4491,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ReminderCreateData",
+      "field": "version"
+    },
+    {
+      "line": 4496,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderCreateData",
+      "field": "createdAt"
+    },
+    {
+      "line": 4499,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderCreateData",
+      "field": "updatedAt"
+    },
+    {
+      "line": 4530,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "DocumentListItemData",
+      "field": "documentId"
+    },
+    {
+      "line": 4533,
+      "keyword": "maxLength",
+      "value": 255,
+      "schema": "DocumentListItemData",
+      "field": "fileName"
+    },
+    {
+      "line": 4536,
+      "keyword": "maxLength",
+      "value": 120,
+      "schema": "DocumentListItemData",
+      "field": "title"
+    },
+    {
+      "line": 4537,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentListItemData",
+      "field": "title"
+    },
+    {
+      "line": 4541,
+      "keyword": "maxItems",
+      "value": 20,
+      "schema": "DocumentListItemData",
+      "field": "tags"
+    },
+    {
+      "line": 4544,
+      "keyword": "maxLength",
+      "value": 24,
+      "schema": "DocumentListItemData",
+      "field": "tags"
+    },
+    {
+      "line": 4551,
+      "keyword": "maxLength",
+      "value": 127,
+      "schema": "DocumentListItemData",
+      "field": "contentType"
+    },
+    {
+      "line": 4554,
+      "keyword": "format",
+      "value": "int64",
+      "schema": "DocumentListItemData",
+      "field": "sizeBytes"
+    },
+    {
+      "line": 4555,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "DocumentListItemData",
+      "field": "sizeBytes"
+    },
+    {
+      "line": 4556,
+      "keyword": "maximum",
+      "value": 52428800,
+      "schema": "DocumentListItemData",
+      "field": "sizeBytes"
+    },
+    {
+      "line": 4561,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "DocumentListItemData",
+      "field": "retryCount"
+    },
+    {
+      "line": 4562,
+      "keyword": "maximum",
+      "value": 3,
+      "schema": "DocumentListItemData",
+      "field": "retryCount"
+    },
+    {
+      "line": 4565,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "DocumentListItemData",
+      "field": "maxRetry"
+    },
+    {
+      "line": 4566,
+      "keyword": "maximum",
+      "value": 10,
+      "schema": "DocumentListItemData",
+      "field": "maxRetry"
+    },
+    {
+      "line": 4569,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "DocumentListItemData",
+      "field": "errorCode"
+    },
+    {
+      "line": 4570,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentListItemData",
+      "field": "errorCode"
+    },
+    {
+      "line": 4571,
+      "keyword": "pattern",
+      "value": "^[A-Z]{2,4}-[A-Z_]+-[0-9]{3}$",
+      "schema": "DocumentListItemData",
+      "field": "errorCode"
+    },
+    {
+      "line": 4575,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "DocumentListItemData",
+      "field": "indexVersion"
+    },
+    {
+      "line": 4576,
+      "keyword": "maxLength",
+      "value": 32,
+      "schema": "DocumentListItemData",
+      "field": "indexVersion"
+    },
+    {
+      "line": 4581,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "DocumentListItemData",
+      "field": "chunkCount"
+    },
+    {
+      "line": 4585,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "DocumentListItemData",
+      "field": "indexedAt"
+    },
+    {
+      "line": 4586,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentListItemData",
+      "field": "indexedAt"
+    },
+    {
+      "line": 4589,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "DocumentListItemData",
+      "field": "createdAt"
+    },
+    {
+      "line": 4593,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "DocumentListItemData",
+      "field": "updatedAt"
+    },
+    {
+      "line": 4603,
+      "keyword": "maxItems",
+      "value": 100,
+      "schema": "DocumentListData",
+      "field": "items"
+    },
+    {
+      "line": 4608,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "DocumentListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 4609,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "DocumentListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 4613,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "DocumentListData",
+      "field": "limit"
+    },
+    {
+      "line": 4614,
+      "keyword": "maximum",
+      "value": 100,
+      "schema": "DocumentListData",
+      "field": "limit"
+    },
+    {
+      "line": 4645,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "ReminderListItemData",
+      "field": "reminderId"
+    },
+    {
+      "line": 4652,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "ReminderListItemData",
+      "field": "title"
+    },
+    {
+      "line": 4655,
+      "keyword": "maxLength",
+      "value": 1000,
+      "schema": "ReminderListItemData",
+      "field": "description"
+    },
+    {
+      "line": 4656,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ReminderListItemData",
+      "field": "description"
+    },
+    {
+      "line": 4659,
+      "keyword": "maxLength",
+      "value": 1024,
+      "schema": "ReminderListItemData",
+      "field": "rrule"
+    },
+    {
+      "line": 4662,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderListItemData",
+      "field": "dtstart"
+    },
+    {
+      "line": 4665,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "ReminderListItemData",
+      "field": "timezone"
+    },
+    {
+      "line": 4668,
+      "keyword": "maxItems",
+      "value": 365,
+      "schema": "ReminderListItemData",
+      "field": "exdates"
+    },
+    {
+      "line": 4671,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderListItemData",
+      "field": "exdates"
+    },
+    {
+      "line": 4675,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ReminderListItemData",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 4676,
+      "keyword": "maximum",
+      "value": 10080,
+      "schema": "ReminderListItemData",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 4688,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderListItemData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 4689,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ReminderListItemData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 4695,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderListItemData",
+      "field": "lastTriggeredAt"
+    },
+    {
+      "line": 4696,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ReminderListItemData",
+      "field": "lastTriggeredAt"
+    },
+    {
+      "line": 4699,
+      "keyword": "format",
+      "value": "int64",
+      "schema": "ReminderListItemData",
+      "field": "version"
+    },
+    {
+      "line": 4700,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ReminderListItemData",
+      "field": "version"
+    },
+    {
+      "line": 4704,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderListItemData",
+      "field": "createdAt"
+    },
+    {
+      "line": 4707,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderListItemData",
+      "field": "updatedAt"
+    },
+    {
+      "line": 4717,
+      "keyword": "maxItems",
+      "value": 100,
+      "schema": "ReminderListData",
+      "field": "items"
+    },
+    {
+      "line": 4722,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "ReminderListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 4723,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ReminderListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 4729,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "ReminderListData",
+      "field": "limit"
+    },
+    {
+      "line": 4730,
+      "keyword": "maximum",
+      "value": 100,
+      "schema": "ReminderListData",
+      "field": "limit"
+    },
+    {
+      "line": 4744,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "ReminderStatusUpdateRequest",
+      "field": ""
+    },
+    {
+      "line": 4753,
+      "keyword": "format",
+      "value": "int64",
+      "schema": "ReminderStatusUpdateRequest",
+      "field": "version"
+    },
+    {
+      "line": 4754,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ReminderStatusUpdateRequest",
+      "field": "version"
+    },
+    {
+      "line": 4773,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "ReminderStatusUpdateData",
+      "field": "reminderId"
+    },
+    {
+      "line": 4778,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderStatusUpdateData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 4779,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ReminderStatusUpdateData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 4788,
+      "keyword": "format",
+      "value": "int64",
+      "schema": "ReminderStatusUpdateData",
+      "field": "version"
+    },
+    {
+      "line": 4789,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ReminderStatusUpdateData",
+      "field": "version"
+    },
+    {
+      "line": 4796,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ReminderStatusUpdateData",
+      "field": "updatedAt"
+    },
+    {
+      "line": 4826,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "NotificationData",
+      "field": "notificationId"
+    },
+    {
+      "line": 4829,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "NotificationData",
+      "field": "reminderId"
+    },
+    {
+      "line": 4838,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "NotificationData",
+      "field": "title"
+    },
+    {
+      "line": 4842,
+      "keyword": "maxLength",
+      "value": 1000,
+      "schema": "NotificationData",
+      "field": "description"
+    },
+    {
+      "line": 4843,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "NotificationData",
+      "field": "description"
+    },
+    {
+      "line": 4846,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "NotificationData",
+      "field": "plannedTriggerAt"
+    },
+    {
+      "line": 4860,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "NotificationData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 4861,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "NotificationData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 4867,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "NotificationData",
+      "field": "deliveredAt"
+    },
+    {
+      "line": 4873,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "NotificationData",
+      "field": "readAt"
+    },
+    {
+      "line": 4874,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "NotificationData",
+      "field": "readAt"
+    },
+    {
+      "line": 4878,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "NotificationData",
+      "field": "createdAt"
+    },
+    {
+      "line": 4888,
+      "keyword": "maxItems",
+      "value": 100,
+      "schema": "NotificationListData",
+      "field": "items"
+    },
+    {
+      "line": 4893,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "NotificationListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 4894,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "NotificationListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 4898,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "NotificationListData",
+      "field": "limit"
+    },
+    {
+      "line": 4899,
+      "keyword": "maximum",
+      "value": 100,
+      "schema": "NotificationListData",
+      "field": "limit"
+    },
+    {
+      "line": 4913,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "NotificationReadRequest",
+      "field": ""
+    },
+    {
+      "line": 4925,
+      "keyword": "minItems",
+      "value": 1,
+      "schema": "NotificationReadRequest",
+      "field": "ids"
+    },
+    {
+      "line": 4926,
+      "keyword": "maxItems",
+      "value": 500,
+      "schema": "NotificationReadRequest",
+      "field": "ids"
+    },
+    {
+      "line": 4927,
+      "keyword": "uniqueItems",
+      "value": true,
+      "schema": "NotificationReadRequest",
+      "field": "ids"
+    },
+    {
+      "line": 4930,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "NotificationReadRequest",
+      "field": "ids"
+    },
+    {
+      "line": 4943,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "NotificationReadData",
+      "field": "updated"
+    },
+    {
+      "line": 4963,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "ScheduleImportRequest",
+      "field": ""
+    },
+    {
+      "line": 4986,
+      "keyword": "format",
+      "value": "binary",
+      "schema": "ScheduleImportRequest",
+      "field": "file"
+    },
+    {
+      "line": 5000,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "ScheduleImportRequest",
+      "field": "fallbackTimezone"
+    },
+    {
+      "line": 5001,
+      "keyword": "pattern",
+      "value": "^UTC$|^[A-Za-z]+(?:/[A-Za-z0-9_+\\-]+)+$",
+      "schema": "ScheduleImportRequest",
+      "field": "fallbackTimezone"
+    },
+    {
+      "line": 5009,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ScheduleImportRequest",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 5010,
+      "keyword": "maximum",
+      "value": 10080,
+      "schema": "ScheduleImportRequest",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 5030,
+      "keyword": "enum",
+      "value": "",
+      "schema": "ScheduleImportAction",
+      "field": ""
+    },
+    {
+      "line": 5055,
+      "keyword": "maxLength",
+      "value": 255,
+      "schema": "ScheduleImportItemData",
+      "field": "uid"
+    },
+    {
+      "line": 5060,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "ScheduleImportItemData",
+      "field": "summary"
+    },
+    {
+      "line": 5065,
+      "keyword": "format",
+      "value": "int32",
+      "schema": "ScheduleImportItemData",
+      "field": "sequence"
+    },
+    {
+      "line": 5066,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ScheduleImportItemData",
+      "field": "sequence"
+    },
+    {
+      "line": 5071,
+      "keyword": "format",
+      "value": "int32",
+      "schema": "ScheduleImportItemData",
+      "field": "currentSequence"
+    },
+    {
+      "line": 5072,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ScheduleImportItemData",
+      "field": "currentSequence"
+    },
+    {
+      "line": 5073,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ScheduleImportItemData",
+      "field": "currentSequence"
+    },
+    {
+      "line": 5080,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ScheduleImportItemData",
+      "field": "dtstart"
+    },
+    {
+      "line": 5087,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "ScheduleImportItemData",
+      "field": "timezone"
+    },
+    {
+      "line": 5094,
+      "keyword": "maxLength",
+      "value": 1024,
+      "schema": "ScheduleImportItemData",
+      "field": "rrule"
+    },
+    {
+      "line": 5099,
+      "keyword": "maxItems",
+      "value": 365,
+      "schema": "ScheduleImportItemData",
+      "field": "exdates"
+    },
+    {
+      "line": 5107,
+      "keyword": "pattern",
+      "value": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}Z)?$",
+      "schema": "ScheduleImportItemData",
+      "field": "exdates"
+    },
+    {
+      "line": 5113,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ScheduleImportItemData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 5114,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ScheduleImportItemData",
+      "field": "nextTriggerAt"
+    },
+    {
+      "line": 5118,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ScheduleImportItemData",
+      "field": "followingTriggerAt"
+    },
+    {
+      "line": 5119,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ScheduleImportItemData",
+      "field": "followingTriggerAt"
+    },
+    {
+      "line": 5125,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "ScheduleImportItemData",
+      "field": "reminderId"
+    },
+    {
+      "line": 5126,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ScheduleImportItemData",
+      "field": "reminderId"
+    },
+    {
+      "line": 5132,
+      "keyword": "maxLength",
+      "value": 1000,
+      "schema": "ScheduleImportItemData",
+      "field": "description"
+    },
+    {
+      "line": 5133,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ScheduleImportItemData",
+      "field": "description"
+    },
+    {
+      "line": 5153,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "itemCount"
+    },
+    {
+      "line": 5154,
+      "keyword": "maximum",
+      "value": 500,
+      "schema": "SchedulePreviewData",
+      "field": "itemCount"
+    },
+    {
+      "line": 5158,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "createCount"
+    },
+    {
+      "line": 5161,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "updateCount"
+    },
+    {
+      "line": 5164,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "unchangedCount"
+    },
+    {
+      "line": 5167,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "staleCount"
+    },
+    {
+      "line": 5171,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "SchedulePreviewData",
+      "field": "fallbackTimezone"
+    },
+    {
+      "line": 5175,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 5176,
+      "keyword": "maximum",
+      "value": 10080,
+      "schema": "SchedulePreviewData",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 5179,
+      "keyword": "maxItems",
+      "value": 500,
+      "schema": "SchedulePreviewData",
+      "field": "items"
+    },
+    {
+      "line": 5208,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ScheduleImportData",
+      "field": "itemCount"
+    },
+    {
+      "line": 5209,
+      "keyword": "maximum",
+      "value": 500,
+      "schema": "ScheduleImportData",
+      "field": "itemCount"
+    },
+    {
+      "line": 5212,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ScheduleImportData",
+      "field": "createCount"
+    },
+    {
+      "line": 5216,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ScheduleImportData",
+      "field": "updateCount"
+    },
+    {
+      "line": 5219,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ScheduleImportData",
+      "field": "unchangedCount"
+    },
+    {
+      "line": 5222,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ScheduleImportData",
+      "field": "staleCount"
+    },
+    {
+      "line": 5230,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "ScheduleImportData",
+      "field": "fallbackTimezone"
+    },
+    {
+      "line": 5233,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ScheduleImportData",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 5234,
+      "keyword": "maximum",
+      "value": 10080,
+      "schema": "ScheduleImportData",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 5237,
+      "keyword": "maxItems",
+      "value": 500,
+      "schema": "ScheduleImportData",
+      "field": "items"
+    },
+    {
+      "line": 5264,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "MessageHistoryItemData",
+      "field": "messageId"
+    },
+    {
+      "line": 5267,
+      "keyword": "enum",
+      "value": "",
+      "schema": "MessageHistoryItemData",
+      "field": "role"
+    },
+    {
+      "line": 5277,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "MessageHistoryItemData",
+      "field": "tokenCount"
+    },
+    {
+      "line": 5280,
+      "keyword": "pattern",
+      "value": "^[0-9a-f]{32}$",
+      "schema": "MessageHistoryItemData",
+      "field": "traceId"
+    },
+    {
+      "line": 5284,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "MessageHistoryItemData",
+      "field": "createdAt"
+    },
+    {
+      "line": 5296,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "MessageHistoryData",
+      "field": "conversationId"
+    },
+    {
+      "line": 5299,
+      "keyword": "maxItems",
+      "value": 100,
+      "schema": "MessageHistoryData",
+      "field": "items"
+    },
+    {
+      "line": 5304,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "MessageHistoryData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 5305,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "MessageHistoryData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 5309,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "MessageHistoryData",
+      "field": "limit"
+    },
+    {
+      "line": 5310,
+      "keyword": "maximum",
+      "value": 100,
+      "schema": "MessageHistoryData",
+      "field": "limit"
+    },
+    {
+      "line": 5333,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "ConversationListItemData",
+      "field": "conversationId"
+    },
+    {
+      "line": 5336,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "ConversationListItemData",
+      "field": "title"
+    },
+    {
+      "line": 5340,
+      "keyword": "maxItems",
+      "value": 20,
+      "schema": "ConversationListItemData",
+      "field": "documentScopeIds"
+    },
+    {
+      "line": 5346,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "ConversationListItemData",
+      "field": "documentScopeIds"
+    },
+    {
+      "line": 5349,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ConversationListItemData",
+      "field": "lastMessageAt"
+    },
+    {
+      "line": 5350,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ConversationListItemData",
+      "field": "lastMessageAt"
+    },
+    {
+      "line": 5356,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "ConversationListItemData",
+      "field": "createdAt"
+    },
+    {
+      "line": 5366,
+      "keyword": "maxItems",
+      "value": 100,
+      "schema": "ConversationListData",
+      "field": "items"
+    },
+    {
+      "line": 5371,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "ConversationListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 5372,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ConversationListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 5376,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "ConversationListData",
+      "field": "limit"
+    },
+    {
+      "line": 5377,
+      "keyword": "maximum",
+      "value": 100,
+      "schema": "ConversationListData",
+      "field": "limit"
+    },
+    {
+      "line": 5414,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "KillSwitchState",
+      "field": "updatedAt"
+    },
+    {
+      "line": 5415,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "KillSwitchState",
+      "field": "updatedAt"
+    },
+    {
+      "line": 5420,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "KillSwitchState",
+      "field": "updatedBy"
+    },
+    {
+      "line": 5421,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "KillSwitchState",
+      "field": "updatedBy"
+    },
+    {
+      "line": 5437,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ExperimentBudgetState",
+      "field": "callsUsed"
+    },
+    {
+      "line": 5442,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ExperimentBudgetState",
+      "field": "tokensUsed"
+    },
+    {
+      "line": 5447,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ExperimentBudgetState",
+      "field": "callLimit"
+    },
+    {
+      "line": 5448,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ExperimentBudgetState",
+      "field": "callLimit"
+    },
+    {
+      "line": 5453,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "ExperimentBudgetState",
+      "field": "tokenLimit"
+    },
+    {
+      "line": 5454,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "ExperimentBudgetState",
+      "field": "tokenLimit"
+    },
+    {
+      "line": 5464,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "UpdateAiControlsRequest",
+      "field": ""
+    },
+    {
+      "line": 5490,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "AiQuota",
+      "field": "userId"
+    },
+    {
+      "line": 5494,
+      "keyword": "maxLength",
+      "value": 100,
+      "schema": "AiQuota",
+      "field": "username"
+    },
+    {
+      "line": 5495,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "AiQuota",
+      "field": "username"
+    },
+    {
+      "line": 5500,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "AiQuota",
+      "field": "dailyQuestionLimit"
+    },
+    {
+      "line": 5501,
+      "keyword": "maximum",
+      "value": 4294967295,
+      "schema": "AiQuota",
+      "field": "dailyQuestionLimit"
+    },
+    {
+      "line": 5502,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "AiQuota",
+      "field": "dailyQuestionLimit"
+    },
+    {
+      "line": 5507,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "AiQuota",
+      "field": "dailyTokenLimit"
+    },
+    {
+      "line": 5508,
+      "keyword": "maximum",
+      "value": 4294967295,
+      "schema": "AiQuota",
+      "field": "dailyTokenLimit"
+    },
+    {
+      "line": 5509,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "AiQuota",
+      "field": "dailyTokenLimit"
+    },
+    {
+      "line": 5514,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "AiQuota",
+      "field": "updatedAt"
+    },
+    {
+      "line": 5518,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "AiQuota",
+      "field": "updatedBy"
+    },
+    {
+      "line": 5519,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "AiQuota",
+      "field": "updatedBy"
+    },
+    {
+      "line": 5525,
+      "keyword": "additionalProperties",
+      "value": false,
+      "schema": "UpdateAiQuotaRequest",
+      "field": ""
+    },
+    {
+      "line": 5535,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "UpdateAiQuotaRequest",
+      "field": "dailyQuestionLimit"
+    },
+    {
+      "line": 5536,
+      "keyword": "maximum",
+      "value": 4294967295,
+      "schema": "UpdateAiQuotaRequest",
+      "field": "dailyQuestionLimit"
+    },
+    {
+      "line": 5537,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "UpdateAiQuotaRequest",
+      "field": "dailyQuestionLimit"
+    },
+    {
+      "line": 5541,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "UpdateAiQuotaRequest",
+      "field": "dailyTokenLimit"
+    },
+    {
+      "line": 5542,
+      "keyword": "maximum",
+      "value": 4294967295,
+      "schema": "UpdateAiQuotaRequest",
+      "field": "dailyTokenLimit"
+    },
+    {
+      "line": 5543,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "UpdateAiQuotaRequest",
+      "field": "dailyTokenLimit"
+    },
+    {
+      "line": 5563,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "AuditEventItem",
+      "field": "eventId"
+    },
+    {
+      "line": 5567,
+      "keyword": "pattern",
+      "value": "^[0-9a-f]{32}$",
+      "schema": "AuditEventItem",
+      "field": "traceId"
+    },
+    {
+      "line": 5571,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "AuditEventItem",
+      "field": "userId"
+    },
+    {
+      "line": 5576,
+      "keyword": "pattern",
+      "value": "^[A-Z][A-Z0-9_]{0,63}$",
+      "schema": "AuditEventItem",
+      "field": "eventType"
+    },
+    {
+      "line": 5580,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "AuditEventItem",
+      "field": "agentName"
+    },
+    {
+      "line": 5581,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "AuditEventItem",
+      "field": "agentName"
+    },
+    {
+      "line": 5585,
+      "keyword": "enum",
+      "value": "",
+      "schema": "AuditEventItem",
+      "field": "source"
+    },
+    {
+      "line": 5591,
+      "keyword": "enum",
+      "value": "",
+      "schema": "AuditEventItem",
+      "field": "severity"
+    },
+    {
+      "line": 5598,
+      "keyword": "additionalProperties",
+      "value": true,
+      "schema": "AuditEventItem",
+      "field": "payload"
+    },
+    {
+      "line": 5606,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "AuditEventItem",
+      "field": "occurredAt"
+    },
+    {
+      "line": 5624,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTotals",
+      "field": "questions"
+    },
+    {
+      "line": 5629,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTotals",
+      "field": "success"
+    },
+    {
+      "line": 5633,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTotals",
+      "field": "budgetExhausted"
+    },
+    {
+      "line": 5638,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTotals",
+      "field": "failed"
+    },
+    {
+      "line": 5643,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTotals",
+      "field": "tokens"
+    },
+    {
+      "line": 5648,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTotals",
+      "field": "toolCalls"
+    },
+    {
+      "line": 5653,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTotals",
+      "field": "rounds"
+    },
+    {
+      "line": 5658,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTotals",
+      "field": "cacheHits"
+    },
+    {
+      "line": 5662,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTotals",
+      "field": "avgLatencyMs"
+    },
+    {
+      "line": 5663,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "UsageTotals",
+      "field": "avgLatencyMs"
+    },
+    {
+      "line": 5677,
+      "keyword": "pattern",
+      "value": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "schema": "UsageDayPoint",
+      "field": "date"
+    },
+    {
+      "line": 5682,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageDayPoint",
+      "field": "questions"
+    },
+    {
+      "line": 5686,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageDayPoint",
+      "field": "tokens"
+    },
+    {
+      "line": 5690,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageDayPoint",
+      "field": "failed"
+    },
+    {
+      "line": 5701,
+      "keyword": "enum",
+      "value": "",
+      "schema": "UsageStatusCount",
+      "field": "status"
+    },
+    {
+      "line": 5709,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageStatusCount",
+      "field": "count"
+    },
+    {
+      "line": 5721,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "UsageTopUser",
+      "field": "userId"
+    },
+    {
+      "line": 5725,
+      "keyword": "maxLength",
+      "value": 100,
+      "schema": "UsageTopUser",
+      "field": "username"
+    },
+    {
+      "line": 5726,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "UsageTopUser",
+      "field": "username"
+    },
+    {
+      "line": 5730,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTopUser",
+      "field": "questions"
+    },
+    {
+      "line": 5734,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "UsageTopUser",
+      "field": "tokens"
+    },
+    {
+      "line": 5751,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "UsageSummary",
+      "field": "from"
+    },
+    {
+      "line": 5755,
+      "keyword": "format",
+      "value": "date-time",
+      "schema": "UsageSummary",
+      "field": "to"
+    },
+    {
+      "line": 5759,
+      "keyword": "enum",
+      "value": "",
+      "schema": "UsageSummary",
+      "field": "bucket"
+    },
+    {
+      "line": 5766,
+      "keyword": "maxItems",
+      "value": 32,
+      "schema": "UsageSummary",
+      "field": "byDay"
+    },
+    {
+      "line": 5771,
+      "keyword": "maxItems",
+      "value": 4,
+      "schema": "UsageSummary",
+      "field": "byStatus"
+    },
+    {
+      "line": 5776,
+      "keyword": "maxItems",
+      "value": 50,
+      "schema": "UsageSummary",
+      "field": "topUsers"
+    },
+    {
+      "line": 5820,
+      "keyword": "maxItems",
+      "value": 200,
+      "schema": "AiQuotaListData",
+      "field": "items"
+    },
+    {
+      "line": 5825,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "AiQuotaListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 5826,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "AiQuotaListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 5831,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "AiQuotaListData",
+      "field": "limit"
+    },
+    {
+      "line": 5832,
+      "keyword": "maximum",
+      "value": 200,
+      "schema": "AiQuotaListData",
+      "field": "limit"
+    },
+    {
+      "line": 5855,
+      "keyword": "maxItems",
+      "value": 500,
+      "schema": "AuditEventListData",
+      "field": "items"
+    },
+    {
+      "line": 5860,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "AuditEventListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 5861,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "AuditEventListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 5866,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "AuditEventListData",
+      "field": "limit"
+    },
+    {
+      "line": 5867,
+      "keyword": "maximum",
+      "value": 500,
+      "schema": "AuditEventListData",
+      "field": "limit"
+    },
+    {
+      "line": 5905,
+      "keyword": "format",
+      "value": "uri",
+      "schema": "ProblemDetail",
+      "field": "type"
+    },
+    {
+      "line": 5910,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "ProblemDetail",
+      "field": "title"
+    },
+    {
+      "line": 5911,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "ProblemDetail",
+      "field": "title"
+    },
+    {
+      "line": 5915,
+      "keyword": "minimum",
+      "value": 400,
+      "schema": "ProblemDetail",
+      "field": "status"
+    },
+    {
+      "line": 5916,
+      "keyword": "maximum",
+      "value": 599,
+      "schema": "ProblemDetail",
+      "field": "status"
+    },
+    {
+      "line": 5921,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "ProblemDetail",
+      "field": "detail"
+    },
+    {
+      "line": 5922,
+      "keyword": "maxLength",
+      "value": 1000,
+      "schema": "ProblemDetail",
+      "field": "detail"
+    },
+    {
+      "line": 5931,
+      "keyword": "pattern",
+      "value": "^[A-Z]{2,4}-[A-Z_]+-[0-9]{3}$",
+      "schema": "ProblemDetail",
+      "field": "code"
+    },
+    {
+      "line": 5949,
+      "keyword": "pattern",
+      "value": "^[0-9a-f]{32}$",
+      "schema": "ProblemDetail",
+      "field": "traceId"
+    },
+    {
+      "line": 5953,
+      "keyword": "maxItems",
+      "value": 20,
+      "schema": "ProblemDetail",
+      "field": "errors"
+    },
+    {
+      "line": 5966,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "FieldError",
+      "field": "field"
+    },
+    {
+      "line": 5967,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "FieldError",
+      "field": "field"
+    },
+    {
+      "line": 5971,
+      "keyword": "minLength",
+      "value": 1,
+      "schema": "FieldError",
+      "field": "message"
+    },
+    {
+      "line": 5972,
+      "keyword": "maxLength",
+      "value": 300,
+      "schema": "FieldError",
+      "field": "message"
+    },
+    {
+      "line": 6565,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 6589,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "",
+      "field": ""
+    }
+  ]
+}

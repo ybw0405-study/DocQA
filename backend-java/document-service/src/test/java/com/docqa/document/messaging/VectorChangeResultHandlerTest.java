@@ -1,5 +1,6 @@
 package com.docqa.document.messaging;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -16,6 +17,7 @@ import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
 import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.DocumentRepository;
+import com.docqa.document.repository.VectorCleanupTaskRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -48,6 +50,8 @@ class VectorChangeResultHandlerTest {
     private StringRedisTemplate redisTemplate;
     @Mock
     private ValueOperations<String, String> valueOperations;
+    @Mock
+    private VectorCleanupTaskRepository cleanupTasks;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private VectorChangeResultHandler handler;
@@ -60,7 +64,8 @@ class VectorChangeResultHandlerTest {
                 documentRepository,
                 new MqIdempotencyMarker(redisTemplate, properties),
                 objectMapper,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                cleanupTasks);
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
     }
@@ -95,12 +100,16 @@ class VectorChangeResultHandlerTest {
     }
 
     @Test
-    void aFailedVectorChangeKeepsTheBusinessStateAndWritesNothing() throws Exception {
+    void aFailedVectorChangeIsNotAckedAndIsReturnedToTheBroker() throws Exception {
         givenDocument(document(true));
 
-        handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "FAILED", null, "VEC-DELETE-001"));
+        assertThrows(IllegalStateException.class,
+                () -> handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "FAILED", null, "VEC-DELETE-001")));
 
+        // 失败的删除确认不得写幂等标记，否则 MQ 永远不会再给一次机会。
+        verify(valueOperations, never()).set(anyString(), anyString(), any(Duration.class));
         verify(documentRepository, never()).recordVectorConfirmation(eq(TENANT_ID), any(), anyLong(), any());
+        verify(cleanupTasks, never()).remove(any(), any(), anyString(), anyString());
     }
 
     @Test
@@ -122,12 +131,25 @@ class VectorChangeResultHandlerTest {
     }
 
     @Test
-    void aVersionCleanupConfirmationOnlyLogs() throws Exception {
+    void aSuccessfulVersionCleanupRemovesTheOutboxRow() throws Exception {
         givenDocument(document(false));
 
         handler.handle(MESSAGE_ID, bytes("DELETE_VERSION", "v1", "COMPLETED", 0L, null));
 
         verify(documentRepository, never()).recordVectorConfirmation(eq(TENANT_ID), any(), anyLong(), any());
+        // DQ-1：只有成功确认才出队，之后不再重投。
+        verify(cleanupTasks).remove(TENANT_ID, DOCUMENT_ID, "v1", "DELETE_VERSION");
+    }
+
+    @Test
+    void aFailedVersionCleanupKeepsTheOutboxRowForRepublishing() throws Exception {
+        givenDocument(document(false));
+
+        assertThrows(IllegalStateException.class,
+                () -> handler.handle(MESSAGE_ID, bytes("DELETE_VERSION", "v1", "FAILED", null, "VEC-DELETE-001")));
+
+        verify(cleanupTasks, never()).remove(any(), any(), anyString(), anyString());
+        verify(valueOperations, never()).set(anyString(), anyString(), any(Duration.class));
     }
 
     @Test

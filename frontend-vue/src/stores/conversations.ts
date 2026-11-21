@@ -35,6 +35,14 @@ const applyFailure = makeApplyFailure('问答页请求失败，请稍后重试�
  * 而需要它的只有本 store 自己（切换会话与视图卸载都要复用同一个句柄）。
  */
 let streamController: AbortController | null = null;
+/** 非流式回退请求的中止控制器；两条通道不会同时在途，但视图卸载时都必须能断。 */
+let syncController: AbortController | null = null;
+/**
+ * 回答归属代号：发起新一轮提问、停止生成、离开问答页都会递增它。
+ * 在途的同步回答返回时若代号已变（或会话已切），说明它属于上一会话，整条丢弃，
+ * 绝不把答案追加进当前全局 `messages`。
+ */
+let requestSeq = 0;
 
 function abortActiveStream(): void {
   streamController?.abort();
@@ -434,9 +442,14 @@ export const useConversationsStore = defineStore('conversations', {
       this.pendingKey = null;
     },
 
-    /** 「停止生成」：断开事件流并丢弃本地半行；问题文本与幂等键保留，由用户决定是否再问。 */
+    /**
+     * 「停止生成」/离开问答页：断开在途事件流与非流式回退请求，并让在途回答整体失效。
+     * 问题文本与幂等键保留，由用户决定是否再问。
+     */
     abortStream(): void {
+      requestSeq += 1;
       abortActiveStream();
+      syncController?.abort();
     },
 
     /**
@@ -525,15 +538,44 @@ export const useConversationsStore = defineStore('conversations', {
       }
     },
 
+    /**
+     * 非流式回退同样要可中断、可归属校验：早期实现既不带 signal，又把结果直接追加到全局
+     * `messages`，视图卸载或切会话后在途的答案会落到别处的列表里。
+     */
     async runSync(
       conversationId: string,
       question: string,
       documentIds: string[],
       key: string,
     ): Promise<boolean> {
-      const result = await askConversation(conversationId, { question, documentIds }, key);
-      this.messages = [...this.messages, ...toLocalRows(question, key, result)];
-      return true;
+      const controller = new AbortController();
+      syncController = controller;
+      const seq = requestSeq;
+      try {
+        const result = await askConversation(
+          conversationId,
+          { question, documentIds },
+          key,
+          controller.signal,
+        );
+        // 归属校验：停止生成 / 离开问答页 / 切换会话都会改变代号或 currentId，
+        // 此时答案属于上一会话，整条丢弃而不是写进当前 messages。
+        if (seq !== requestSeq || controller.signal.aborted || this.currentId !== conversationId) {
+          return false;
+        }
+        this.messages = [...this.messages, ...toLocalRows(question, key, result)];
+        return true;
+      } catch (error) {
+        // 主动断开（卸载/切会话导致的 abort）不是失败：不写 detail，回到空闲态。
+        if (controller.signal.aborted) {
+          return false;
+        }
+        throw error;
+      } finally {
+        if (syncController === controller) {
+          syncController = null;
+        }
+      }
     },
 
     /**

@@ -388,6 +388,33 @@ describe('documents api', () => {
     expect(error.detail).not.toContain('docqa-documents');
   });
 
+  it('reads the bucket prefix from the runtime config, not a baked constant (CT-7)', async () => {
+    // 运行时把桶名改成 tenant-runtime-bucket：白名单必须随之变化，且默认桶前缀不再放行。
+    window.__APP_CONFIG__ = { storageBucket: 'tenant-runtime-bucket' };
+    try {
+      server.use(
+        mswHttp.put('/tenant-runtime-bucket/documents/owner/doc/source', () =>
+          new HttpResponse(null, { status: 200, headers: { ETag: '"runtime-etag"' } }),
+        ),
+      );
+      const etag = await uploadPart(
+        `http://127.0.0.1:9000/tenant-runtime-bucket/documents/owner/doc/source?partNumber=1`,
+        new Blob(['bytes']),
+      );
+      expect(etag).toBe('"runtime-etag"');
+
+      const rejected = await expectApiError(
+        uploadPart(
+          `http://127.0.0.1:9000/docqa-documents/documents/owner/doc/source?partNumber=1`,
+          new Blob(['bytes']),
+        ),
+      );
+      expect(rejected.code).toBe('CLIENT-UPLOAD-TARGET-001');
+    } finally {
+      delete window.__APP_CONFIG__;
+    }
+  });
+
   it('surfaces the service ProblemDetail for a rejected init', async () => {
     server.use(
       mswHttp.post('/api/v1/documents/upload/init', () =>

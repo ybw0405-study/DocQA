@@ -197,6 +197,11 @@ class AgentAskService:
         self._business = business
         self._pg_provider = pg_provider
 
+    @property
+    def pg_provider(self) -> PgConnectionProvider | None:
+        """供 readiness 探针复用同一个连接池，不另开连接。"""
+        return self._pg_provider
+
     async def publish_experiment_limits(self) -> None:
         """启动时把实验额度上限发布到账本，供管理面回显（S9-5e）。
 

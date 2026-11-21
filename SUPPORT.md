@@ -26,3 +26,6 @@
 
 本项目由维护者在业余时间维护，不承诺固定 SLA。一般会在 3 个工作日内回复 Issue；
 安全问题的响应时间见 [SECURITY.md](SECURITY.md)。
+
+本项目为单人维护仓库，物理上不存在「第二人复核」条件；分支保护与评审门槛的如实现状、
+以及需要维护者在 GitHub 远端手动启用的动作，见 [CONTRIBUTING.md](CONTRIBUTING.md)。

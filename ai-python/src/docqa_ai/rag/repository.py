@@ -110,10 +110,15 @@ class PgVectorRepository:
         vector = vector_literal(embedding)
         tenant_value = str(tenant_id) if tenant_id is not None else None
         # 纵深防御：租户谓词与授权 IN 谓词同时成立，不能只靠 document scope。
-        # 谓词置于 WHERE 最前，绑定参数也置于列表最前，占位符与参数逐位对齐（MAINT-1 对账）。
+        # 绑定参数必须严格按 SQL 里 %s 出现的顺序排列：
+        #   SELECT 的相似度向量 → WHERE tenant_id → IN 的各 (id, version) → ORDER BY 向量 → LIMIT。
+        # 旧实现把 tenant_value 放在列表首位，真实 PG 会把 UUID 字符串当 vector 解析
+        # （InvalidTextRepresentation）；内存替身不解析 SQL，所以 736 个单测全绿也没发现。
         tenant_prefix = "tenant_id = %s AND " if tenant_value is not None else ""
         placeholders = ", ".join("(%s::uuid, %s::text)" for _ in scopes)
-        params: list[object] = [vector] if tenant_value is None else [tenant_value, vector]
+        params: list[object] = [vector]
+        if tenant_value is not None:
+            params.append(tenant_value)
         for scope in scopes:
             params.extend([str(scope.document_id), scope.index_version])
         params.extend([vector, top_k])
@@ -181,8 +186,9 @@ class InMemoryVectorRepository:
         tenant = str(tenant_id) if tenant_id is not None else None
         scored: list[tuple[float, ChunkRecord]] = []
         for chunk in self._chunks:
-            # 已标注租户的块必须匹配；未标注（空串）的存量/替身行不参与租户过滤。
-            if tenant is not None and chunk.tenant_id and chunk.tenant_id != tenant:
+            # B3：真实 SQL 是 WHERE tenant_id = %s，空串同样不匹配。
+            # 旧替身因 `and chunk.tenant_id` 短路放行空串行，语义与实现相反，把 P0 回归固化成"正确断言"。
+            if tenant is not None and (chunk.tenant_id or "") != tenant:
                 continue
             version = str(chunk.metadata.get("index_version", ""))
             if (chunk.document_id, version) not in allowed:

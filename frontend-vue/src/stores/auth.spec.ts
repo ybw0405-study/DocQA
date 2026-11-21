@@ -75,6 +75,42 @@ describe('auth store', () => {
     expect(auth.resolved).toBe(true);
   });
 
+  it('keeps a transient /auth/me failure unresolved instead of faking a session', async () => {
+    server.use(
+      refreshHandler(),
+      mswHttp.get('/api/v1/auth/me', () => HttpResponse.error()),
+    );
+    const auth = useAuthStore();
+    await auth.hydrate();
+
+    // 网络抖动不能留下「token 在、user/roles 全空」却判定已登录的伪会话，也不能当结论定死。
+    expect(auth.token).toBeNull();
+    expect(auth.userId).toBeNull();
+    expect(auth.roles).toEqual([]);
+    expect(auth.isAuthenticated).toBe(false);
+    expect(auth.resolved).toBe(false);
+  });
+
+  it('retries hydration on the next attempt after a transient /auth/me failure', async () => {
+    let attempts = 0;
+    server.use(
+      refreshHandler(),
+      mswHttp.get('/api/v1/auth/me', () => {
+        attempts += 1;
+        return attempts === 1 ? HttpResponse.error() : HttpResponse.json(envelope(DEMO_USER));
+      }),
+    );
+    const auth = useAuthStore();
+    await auth.hydrate();
+    expect(auth.resolved).toBe(false);
+
+    // 守卫在 !resolved 时会再次水合：网络恢复后同一实例应能补齐 user/roles。
+    await auth.hydrate();
+    expect(auth.resolved).toBe(true);
+    expect(auth.userId).toBe(DEMO_USER.userId);
+    expect(auth.isAuthenticated).toBe(true);
+  });
+
   it('shares a single refresh request across concurrent callers', async () => {
     let calls = 0;
     server.use(

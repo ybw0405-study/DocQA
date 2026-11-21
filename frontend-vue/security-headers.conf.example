@@ -1,0 +1,16 @@
+# CT-5：由托管层 / 网关下发的第二层安全响应头。
+#
+# 以 include 方式引入每个 location：nginx 的 add_header 继承规则是「当前 level 一旦声明了
+# 自己的 add_header，就丢弃上级全部同类头」，而 include 属于同一 level，因此本片段的安全头
+# 与 location 自己的 Cache-Control 可以共存。
+#
+# meta 形式的 CSP 不支持 frame-ancestors、report-uri，也不支持 HSTS 与 nosniff，
+# 所以真正的点击劫持与传输层加固只在这里下发；index.html 的 meta 只是最小同源纵深防御。
+# style-src 不含 unsafe-inline，connect-src 不含 dev HMR 的 websocket 白名单。
+
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "no-referrer" always;
+add_header X-Frame-Options "DENY" always;
+# HSTS 只在 HTTPS 站点有意义；纯 HTTP 内网调试请注释掉下一行。
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;

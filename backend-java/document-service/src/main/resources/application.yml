@@ -87,9 +87,11 @@ management:
     health:
       probes:
         enabled: true
-      # liveness 只看进程自身；readiness 纳入 db/redis，下游不可用时如实摘流（D-163）
+      # liveness 只看进程自身；readiness 探真实依赖 db/redis/mq/minio，下游不可用时如实摘流
+      # （D-163 / DQ-3 后半）。mq 与 minio 由 DependencyHealthConfiguration 注册，短超时 500ms
+      # 与 Python 侧 /health/ready 的 wait_for 对齐；未启用时返回 UP+disabled，不建连。
       group:
         liveness:
           include: livenessState,ping
         readiness:
-          include: readinessState,db,redis
+          include: readinessState,db,redis,mq,minio

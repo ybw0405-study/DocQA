@@ -170,6 +170,7 @@ class RetrievalService:
         business: BusinessMetrics | None = None,
         vector_collection: str = "",
         embedding_dimensions: int = 1024,
+        require_tenant_id: bool = False,
     ) -> None:
         self._repository = repository
         self._embedder = embedder
@@ -191,6 +192,21 @@ class RetrievalService:
         self._embedding_dimensions = embedding_dimensions
         self._vector_tenant_aware = _accepts_tenant_id(repository)
         self._lexical_tenant_aware = _accepts_tenant_id(lexical_repository) if lexical_repository is not None else False
+        self._require_tenant_id = require_tenant_id
+        # J3：组装层显式开启严格模式时，仓库必须真的支持 tenant 谓词，否则拒绝启动，
+        # 而不是在每次请求里静默退回「仅 document scope 隔离」（原 duck-typing 软开关）。
+        if require_tenant_id and not self._vector_tenant_aware:
+            raise ValueError("vector repository is not tenant-aware; refusing to build RetrievalService")
+        if require_tenant_id and self._lexical_enabled and not self._lexical_tenant_aware:
+            raise ValueError("lexical repository is not tenant-aware; refusing to build RetrievalService")
+
+    def _assert_tenant_ready(self, tenant_id: object | None, tenant_aware: bool, channel: str) -> None:
+        if not self._require_tenant_id:
+            return
+        if tenant_id is None:
+            raise RetrievalUnavailable(f"tenant_id is required for {channel} retrieval")
+        if not tenant_aware:
+            raise RetrievalUnavailable(f"{channel} repository is not tenant-aware; refusing to query")
 
     async def retrieve(
         self,
@@ -315,6 +331,7 @@ class RetrievalService:
         candidate_limit: int,
         tenant_id: object | None = None,
     ) -> list[VectorHit]:
+        self._assert_tenant_ready(tenant_id, self._vector_tenant_aware, "vector")
         with self._tracer.start_as_current_span("vector.query") as query_span:
             started_at = time.perf_counter()
             try:
@@ -353,6 +370,7 @@ class RetrievalService:
         repository = self._lexical_repository
         if not self._lexical_enabled or repository is None:
             return _LexicalChannel()
+        self._assert_tenant_ready(tenant_id, self._lexical_tenant_aware, "lexical")
         phrases = extract_phrases(question)
         surfaces = tuple(phrase.surface for phrase in phrases)
         with self._tracer.start_as_current_span("lexical.query") as span:

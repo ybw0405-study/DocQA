@@ -16,6 +16,7 @@ import com.docqa.document.domain.DocumentRow;
 import com.docqa.document.domain.DocumentStatus;
 import com.docqa.document.domain.TenantDocument;
 import com.docqa.document.repository.DocumentRepository;
+import com.docqa.document.repository.VectorCleanupTaskRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,6 +43,8 @@ class DocumentReconciliationJobTest {
     private DocumentRepository documentRepository;
     @Mock
     private DocumentEventPublisher documentEventPublisher;
+    @Mock
+    private VectorCleanupTaskRepository cleanupTasks;
 
     private DocumentProperties properties;
     private DocumentReconciliationJob job;
@@ -53,7 +56,8 @@ class DocumentReconciliationJobTest {
                 documentRepository,
                 documentEventPublisher,
                 properties,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                cleanupTasks);
     }
 
     @Test
@@ -133,6 +137,70 @@ class DocumentReconciliationJobTest {
         verify(documentRepository, never()).markDead(eq(TENANT_ID), any(), any(), any());
         verify(documentRepository, never()).incrementRetryAndMarkParsing(eq(TENANT_ID), any(), any());
         verifyNoInteractions(documentEventPublisher);
+    }
+
+    @Test
+    void timedOutRebuildAlsoClearsThePendingVersionOnTheVectorSide() {
+        when(documentRepository.findStaleReindex(any(Instant.class), eq(50)))
+                .thenReturn(List.of(tenantDocument(rebuilding())));
+        when(documentRepository.abortReindex(eq(TENANT_ID), eq(DOCUMENT_ID), eq("v2"), any(), any()))
+                .thenReturn(1);
+
+        job.abortStaleReindex();
+
+        ArgumentCaptor<VectorChangeRequestedEvent> event =
+                ArgumentCaptor.forClass(VectorChangeRequestedEvent.class);
+        verify(documentEventPublisher).publishVectorChangeRequested(event.capture());
+        assertThat(event.getValue().operation()).isEqualTo("DELETE_VERSION");
+        assertThat(event.getValue().indexVersion()).isEqualTo("v2");
+        assertThat(event.getValue().tenantId()).isEqualTo(TENANT_ID);
+    }
+
+    @Test
+    void timedOutRebuildPersistsTheCleanupTaskBeforePublishing() {
+        when(documentRepository.findStaleReindex(any(Instant.class), eq(50)))
+                .thenReturn(List.of(tenantDocument(rebuilding())));
+        when(documentRepository.abortReindex(eq(TENANT_ID), eq(DOCUMENT_ID), eq("v2"), any(), any()))
+                .thenReturn(1);
+
+        job.abortStaleReindex();
+
+        // DQ-1：先落 outbox 再发消息，发布失败不会让旧版本向量永久残留。
+        verify(cleanupTasks).enqueue(TENANT_ID, DOCUMENT_ID, USER_ID, "v2", "DELETE_VERSION", NOW);
+    }
+
+    @Test
+    void pendingCleanupTasksAreRepublishedAndMarkedAttempted() {
+        var task = new VectorCleanupTaskRepository.Task(
+                7L, TENANT_ID, DOCUMENT_ID, USER_ID, "v2", "DELETE_VERSION", 1);
+        when(cleanupTasks.findPending(any(Instant.class), eq(50))).thenReturn(List.of(task));
+
+        job.republishPendingVectorCleanups();
+
+        ArgumentCaptor<VectorChangeRequestedEvent> event =
+                ArgumentCaptor.forClass(VectorChangeRequestedEvent.class);
+        verify(documentEventPublisher).publishVectorChangeRequested(event.capture());
+        assertThat(event.getValue().operation()).isEqualTo("DELETE_VERSION");
+        assertThat(event.getValue().indexVersion()).isEqualTo("v2");
+        assertThat(event.getValue().tenantId()).isEqualTo(TENANT_ID);
+        assertThat(event.getValue().userId()).isEqualTo(USER_ID);
+        verify(cleanupTasks).markAttempted(7L, NOW);
+        verify(cleanupTasks, never()).remove(any(), any(), any(), any());
+    }
+
+    @Test
+    void failedCleanupRepublishStillMarksTheAttemptAndKeepsTheRow() {
+        var task = new VectorCleanupTaskRepository.Task(
+                7L, TENANT_ID, DOCUMENT_ID, USER_ID, "v2", "DELETE_VERSION", 1);
+        when(cleanupTasks.findPending(any(Instant.class), eq(50))).thenReturn(List.of(task));
+        doThrow(new IllegalStateException("mq down"))
+                .when(documentEventPublisher)
+                .publishVectorChangeRequested(any(VectorChangeRequestedEvent.class));
+
+        job.republishPendingVectorCleanups();
+
+        verify(cleanupTasks).markAttempted(7L, NOW);
+        verify(cleanupTasks, never()).remove(any(), any(), any(), any());
     }
 
     @Test

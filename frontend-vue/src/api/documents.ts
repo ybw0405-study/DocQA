@@ -18,12 +18,14 @@ import {
   UNKNOWN_ERROR_CODE,
 } from './errors';
 import { deleteNoContent, get, patch, post, put } from './http';
+import { storagePrefix } from '../config/runtime';
 
 /**
  * 预签名分片地址的桶前缀。分片 PUT 必须走同源相对路径，才能同时保住
  * `connect-src 'self'`、「前端只用同源相对路径」这条红线，并免掉对象存储的 CORS 与 ETag 暴露配置。
+ * CT-7：桶名改由运行时 window.__APP_CONFIG__ 提供（config.js，no-store），不再烘焙进产物；
+ * storagePrefix() 内部按 S3 桶名规则白名单校验，保持下面的 startsWith 校验语义不变。
  */
-const OBJECT_STORAGE_PREFIX: string = `/${import.meta.env.VITE_MINIO_BUCKET ?? 'docqa-documents'}`;
 
 /** 单个分片上限 5MiB，10 片串行也远超业务请求的 20s 预算，因此分片通道单独放宽。 */
 const PART_TIMEOUT_MS = 120_000;
@@ -119,7 +121,8 @@ function sameOriginTarget(presignedUrl: string): string {
     throw new ApiError(0, UPLOAD_TARGET_ERROR_CODE, '分片地址无法解析，已停止上传。', null);
   }
   const target = `${parsed.pathname}${parsed.search}`;
-  if (!target.startsWith(`${OBJECT_STORAGE_PREFIX}/`)) {
+  const prefix = storagePrefix();
+  if (!target.startsWith(`${prefix}/`)) {
     throw new ApiError(0, UPLOAD_TARGET_ERROR_CODE, '分片地址不在约定的对象存储桶前缀内，已停止上传。', null);
   }
   return target;

@@ -2,8 +2,14 @@ name: Release
 
 # Publishing a Release is a tag-driven side effect, deliberately separate from
 # ci.yml: the latter's `push` only watches `main`, so pushing a tag does not
-# re-run the three gates. The tag must already point at a merged, green main
-# commit (enforced by --verify-tag and the CHANGELOG guard below).
+# re-run the three gates. The tag must already point at a commit that is an
+# ancestor of main: enforced by `git merge-base --is-ancestor`, plus tag
+# existence / strict vX.Y.Z format checks, --verify-tag and the CHANGELOG guard.
+# workflow_dispatch 的 tag 输入同样走这一整套校验，不会因手工填错而发错版本。
+# G14：新增 images job，构建多阶段镜像、推送 GHCR，并把
+# repo:tag@sha256:<digest> 写入 digests.txt 挂到 Release 与 artifact，
+# 让 rollback-runbook 的「按 digest 部署上一版本」真正可执行。
+
 on:
   push:
     tags:
@@ -11,24 +17,35 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing tag to publish (e.g. v2.1.0)'
+        description: 'Existing vX.Y.Z tag already merged into main (e.g. v2.1.0); validated before publish'
         required: true
         type: string
 
+# 默认最小权限；只有 publish / images 需要写权限时各自单独提升
 permissions:
-  contents: write
+  contents: read
+
+# 按 ref（tag）隔离并发组：不同 tag 互不阻塞，同一 tag 的重跑取代在途运行
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   publish:
     name: Publish GitHub Release from CHANGELOG
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.notes.outputs.tag }}
+      version: ${{ steps.notes.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
-      - name: Resolve tag and extract its CHANGELOG section
+      - name: Validate tag & extract its CHANGELOG section
         id: notes
         env:
           INPUT_TAG: ${{ inputs.tag }}
@@ -45,10 +62,29 @@ jobs:
             echo "::error::No tag resolved (neither GITHUB_REF_NAME nor inputs.tag)."
             exit 1
           fi
-          case "$TAG" in
-            v[0-9]*.[0-9]*.[0-9]*) ;;
-            *) echo "::error::Tag '$TAG' is not a vX.Y.Z release tag."; exit 1 ;;
-          esac
+          # 严格格式校验：对 workflow_dispatch 的手工输入尤其重要，挡住任意字符串 / 分支名。
+          # 只允许 vX.Y.Z 或带 -rc.1 / +build 之类后缀，且不允许空格与 shell 元字符。
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+            echo "::error::Tag '$TAG' is not a valid vX.Y.Z release tag."
+            exit 1
+          fi
+          # tag 必须真实存在并能剥离出 commit；拒绝用不存在的 tag 或普通 ref 发版。
+          if ! git rev-parse --verify "refs/tags/${TAG}^{commit}" >/dev/null 2>&1; then
+            echo "::error::Tag '$TAG' does not exist in this repository."
+            exit 1
+          fi
+          TAG_COMMIT="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+          # fetch-depth: 0 已拉全 refs；万一 origin/main 不在本地则显式补拉，不用恒真兜底掩盖。
+          if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+            git fetch origin +refs/heads/main:refs/remotes/origin/main
+          fi
+          MAIN_COMMIT="$(git rev-parse origin/main)"
+          # 核心校验：tag 指向的 commit 必须是 main 的祖先（即已合入 main），否则拒绝发布。
+          if ! git merge-base --is-ancestor "$TAG_COMMIT" "$MAIN_COMMIT"; then
+            echo "::error::Tag $TAG ($TAG_COMMIT) is NOT an ancestor of origin/main ($MAIN_COMMIT); refusing to publish."
+            exit 1
+          fi
+          echo "Tag $TAG -> $TAG_COMMIT is an ancestor of main ($MAIN_COMMIT)."
           VERSION="${TAG#v}"
 
           # Print the section for exactly this version, stopping at the next
@@ -91,3 +127,79 @@ jobs:
               --notes-file release-notes.md
           fi
           gh release view "$TAG" --json tagName,name,isDraft,isPrerelease,url
+
+  images:
+    name: Build & push images (digest-pinned)
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: 确认 Buildx 可用
+        run: docker buildx version
+
+      - name: 登录 GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+
+      - name: 构建并按真实 digest 推送镜像
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          set -euo pipefail
+          REPO_LOWER="$(printf '%s' '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          BASE="${REGISTRY}/${REPO_LOWER}"
+          : > digests.txt
+          build_one() {
+            local target="$1" jar="$2" name="$3"
+            local image="${BASE}-${name}:${VERSION}"
+            local meta="/tmp/${name}-meta.json"
+            local -a args=(--target "$target" --tag "$image" --metadata-file "$meta" --push .)
+            if [ -n "$jar" ]; then
+              args=(--build-arg "JAR_PATH=/out/${jar}.jar" "${args[@]}")
+            fi
+            echo "==> building ${image} (target=${target})"
+            docker buildx build "${args[@]}"
+            local digest
+            digest="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["containerimage.digest"])' "$meta")"
+            case "$digest" in
+              sha256:*) ;;
+              *) echo "镜像 digest 非法或缺失: ${digest}" >&2; exit 1 ;;
+            esac
+            echo "${image}@${digest}" | tee -a digests.txt
+          }
+          build_one java-service user-service      user-service
+          build_one java-service document-service document-service
+          build_one java-service reminder-service reminder-service
+          build_one java-service audit-service    audit-service
+          build_one java-service agent-gateway    agent-gateway
+          build_one ai-python     ""              ai-python
+          build_one frontend      ""              frontend
+          test -s digests.txt
+          {
+            echo '### 镜像 digest 清单'
+            echo '```'
+            cat digests.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 把 digests.txt 挂到 Release（按 digest 部署上一版本）
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.publish.outputs.tag }}
+        run: gh release upload "$TAG" digests.txt --clobber
+
+      - name: 上传 digests artifact（可下载）
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: image-digests-${{ needs.publish.outputs.tag }}
+          path: digests.txt
+          if-no-files-found: error
+          retention-days: 90

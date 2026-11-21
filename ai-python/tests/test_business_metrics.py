@@ -11,7 +11,7 @@ import uuid
 import httpx
 import pytest
 
-from docqa_ai.api.main import create_app
+from docqa_ai.api.main import build_metrics_app, create_app
 from docqa_ai.business_metrics import BusinessMetrics
 from docqa_ai.protocol.models import DocumentScope
 from docqa_ai.providers.embeddings import OfflineEmbeddingProvider
@@ -240,11 +240,13 @@ async def test_tool_round_records_tool_call_and_round_number() -> None:
 
 
 async def test_metrics_endpoint_serves_prometheus_text_from_process_registry() -> None:
+    # 方案 4.2 步 3：/metrics 已移到独立内网端口的最小 app，主业务端口不再暴露它。
+    # 序列名 / 标签契约与监听位置无关，这里直接驱动那个最小 app 验证导出文本。
     business = BusinessMetrics()
     business.pii_blocked("input", "phone")
-    app = create_app(make_settings(), agent_service=object(), business_metrics=business)  # type: ignore[arg-type]
+    metrics_app = build_metrics_app(business)
 
-    async with client_for(app) as client:
+    async with client_for(metrics_app) as client:
         response = await client.get("/metrics")
 
     assert response.status_code == 200
@@ -252,8 +254,9 @@ async def test_metrics_endpoint_serves_prometheus_text_from_process_registry() -
     assert value_of(response.text, "docqa_pii_blocked_total", stage="input", category="phone") == 1.0
 
 
-async def test_metrics_endpoint_is_absent_when_exposure_is_disabled() -> None:
-    app = create_app(make_settings(metrics_exposed=False), agent_service=object())  # type: ignore[arg-type]
+async def test_business_port_never_exposes_metrics_even_when_enabled() -> None:
+    # 主端口无论 metrics_exposed 取值都不再有 /metrics（方案 4.2 步 3 的隔离语义）。
+    app = create_app(make_settings(metrics_exposed=True), agent_service=object())  # type: ignore[arg-type]
 
     async with client_for(app) as client:
         response = await client.get("/metrics")

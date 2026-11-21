@@ -5,6 +5,22 @@
 
 ## [Unreleased]
 
+### Fixed（第二轮）
+
+- **P0：真实 PG 上的租户检索恒失败**。`PgVectorRepository.search()` 把 `tenant_value` 放在绑定参数
+  首位，而 SQL 第一个 `%s` 是相似度向量；带租户的查询在 PostgreSQL 上报
+  `InvalidTextRepresentation`。736 个用内存替身的 Green 测试从未触发。已按占位符顺序重排并新增
+  不依赖 PG 的 `test_pg_parameter_alignment.py` 护栏；本机 `pgvector/pgvector:pg16` 容器真跑
+  `test_pg_contract.py` → 3 passed。
+- **DQ-1 持久化对账**：新增 `V11__vector_cleanup_outbox.sql` 与 `VectorCleanupTaskRepository`，
+  旧版本向量删除在发布失败 / FAILED / 重启 / 消息丢失四种情况下不再永久残留；只有成功确认才出队。
+- **CI 真库门禁**：`ci.yml` 接 pgvector service + junit 断言（3 条用例必须是 passed 而非 skipped），
+  不再让 P0 回归穿过全绿 CI。
+- **G6**：workflow action 固定到联网核实的 40 位 SHA；修掉不存在的
+  `dependency-review-action@v4` 引用。远端 secret scanning / push protection / Dependabot 安全更新
+  已启用；PR #26 打 `do-not-merge` 标注。
+- Windows 开发机在 `tests/conftest.py` 切 SelectorEventLoop，使 psycopg 异步真库用例可复现。
+
 ### Added
 
 - **本地双租户 HTTP 演练**：新增 `scripts/e2e-dual-tenant-drill.sh`（22 步硬断言、时间戳后缀可重复运行）
@@ -26,6 +42,27 @@
 - **历史背景如实说明**：本仓库首个提交是一次性导入的完整成品（840 文件 / 约 11.5 万行），
   其后若干提交用于对外发布前的改名与内部研发文档清理。因此 `git log` 不能作为团队渐进迭代史采信；
   分支保护与 PR 流程自公开起生效，此后所有变更以 PR 为最小评审单元。
+
+- **工程化 / 治理文件校准（本轮，仅治理文件，未 bump 版本，仍 `2.1.0`）**：
+  - `.github/dependabot.yml` 补 `docker` 生态（仓库暂无 Dockerfile，以 `/` 占位并注明）；
+  - 新增 `.github/workflows/security.yml`（G9）：`dependency-review-action`、
+    `npm audit --omit=dev --audit-level=high`（`frontend-vue/`）、CodeQL
+    `java-kotlin` / `javascript-typescript` / `python` matrix；`ci.yml` / `release.yml`
+    最小 `permissions` 与 `timeout-minutes`（G7）；
+  - `release.yml`（G14）新增 `concurrency`、严格 tag 格式 / 存在性校验、
+    `git merge-base --is-ancestor` 判定 tag 必须是 `main` 祖先、`workflow_dispatch` 输入校验；
+  - `CONTRIBUTING.md` 新增第 10 节「治理现状与评审边界」，如实写明分支保护已启用但
+    `required_approving_review_count=0` / `require_code_owner_reviews=false`、CODEOWNERS 不强制、
+    单人仓库无法第二人复核；`SECURITY.md` 更正 Code Scanning 现状；`SUPPORT.md` 补单人维护说明；
+  - `ops/env/local.env.example`（G11）补 7 个缺失键（`DOCQA_REDIS_DATABASE` /
+    `DOCQA_ROCKETMQ_ENABLED` / `DOCQA_AUDIT_ENABLED` / `DOCQA_DEMO_USERNAME` /
+    `DOCQA_DEMO_USER_ID` / `DOCQA_SELF_REGISTRATION_ENABLED` / `DOCQA_MINIO_ENABLED`），
+    并新增 `DOCQA_ENV`（生产判据，默认 prod）、`DOCQA_AI_ENVIRONMENT`、
+    `DOCQA_AI_INTERNAL_TOKEN`（明显占位符）；
+  - 新增 `scripts/check_env_contract.py`（G11）：断言 `application*.yml` 的 `${VAR}` ⊆
+    env.example 键集合，显式区分 `${PID:- }` 等框架占位符，缺键即非零退出。
+- **版本号未 bump**：本轮不改动 `2.1.0`（`backend-java/pom.xml` / `frontend-vue/package.json`），
+  是否并入 `2.1.1` / `2.2.0` 待维护者决策，避免与现有 tag 不一致。
 
 ### Fixed
 

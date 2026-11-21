@@ -14,11 +14,87 @@
 ## 1. 应用版本回退
 
 1. 网关摘流量；停机顺序：网关 → user / document / reminder → ai-python → parse-worker。
-2. 部署上一个 tag 的镜像（**按 digest，不用 latest**）。环境变量沿用当前值，但必须逐项比对新版本引入的变量。
+2. 部署上一个 tag 的镜像（**按 digest，不用 latest**），完整可执行步骤见 §1.1。环境变量沿用当前值，但必须逐项比对新版本引入的变量。
 3. 跑 `flyway validate`：若报「已应用但本地缺失的迁移」，说明库结构比目标版本新，按第 2 节判断兼容性。
    **禁止 `flyway clean`、禁止删改 `schema_history` 行**。
 4. 反向启动：中间件 → ai-python / worker → Java 服务 → 网关。
 5. 冒烟：登录与刷新、文档列表、一次同步问答、一次 SSE 流式、`/health`、`/metrics`（仅内网）、审计写入。
+
+## 1.1 按 digest 部署上一版本（可执行，G17）
+
+前置事实（G14/G17 已落地，缺一不可）：
+
+- 每个 Release 的 `images` job 把本次全部镜像的
+  `ghcr.io/<owner>/<repo>-<service>:<version>@sha256:<digest>` 写入 `digests.txt`，
+  作为 Release asset 与 `image-digests-<tag>` artifact 归档（`.github/workflows/release.yml`）。
+- 根目录多阶段 `Dockerfile` 产出这些镜像，运行阶段非 root，
+  `HEALTHCHECK` 指向 readiness（Java `/actuator/health/readiness`、Python `/health/ready`）。
+
+**禁止用 `latest` / 浮动 tag 回退，禁止手写或猜测 sha256**；只使用 `digests.txt` 里记录过的值。
+
+### 1.1.1 取回上一版本的 digest 清单
+
+```bash
+export PREV_TAG=v2.1.0
+export OWNER=ybw0405-study
+export REPO=DocQA
+
+mkdir -p rollback
+gh release download "$PREV_TAG" --repo "$OWNER/$REPO" \
+  --pattern 'digests.txt' --dir ./rollback
+cat ./rollback/digests.txt
+```
+
+每行形如 `ghcr.io/ybw0405-study/docqa-document-service:2.1.0@sha256:0123...`。
+也可从 Actions 的 `image-digests-<tag>` artifact 下载同一文件。
+
+### 1.1.2 按 digest 拉取并逐个核对
+
+```bash
+for image in $(awk -F'@' '{print $1"@"$2}' ./rollback/digests.txt); do
+  docker pull "$image"
+done
+
+# 权威核对：docker image inspect 的 RepoDigests 必须与清单一致
+for image in $(awk -F'@' '{print $1"@"$2}' ./rollback/digests.txt); do
+  got="$(docker image inspect "$image" --format '{{index .RepoDigests 0}}')"
+  printf '%s -> %s\n' "$image" "$got"
+  case "$got" in *@sha256:*) ;; *) echo "digest 缺失或不符: $image" >&2; exit 1 ;; esac
+done
+```
+
+`ops/docker-compose.infra.yml` 固定基础设施镜像用的也是这套口径
+（`docker image inspect --format '{{json .RepoDigests}}'`）。
+
+### 1.1.3 把部署清单切到该 digest
+
+每个服务的 `image` 改成 `digests.txt` 里的 `repo:tag@sha256:...` 全串，**不要去掉 `@sha256:`**。
+生成覆盖文件（从真实清单抄值，不编造 digest）：
+
+```bash
+python - <<'PY' > ops/rollback/prev-version.override.yml
+from pathlib import Path
+lines = [l.strip() for l in Path('rollback/digests.txt').read_text().splitlines() if '@sha256:' in l]
+print('services:')
+for line in lines:
+    name = line.split('/')[-1].split(':')[0].removeprefix('docqa-')
+    print(f'  {name}:\n    image: {line}')
+PY
+
+docker compose -f <生产编排文件> -f ops/rollback/prev-version.override.yml up -d
+```
+
+切换期间 readiness 未 200 不接流量：
+
+```bash
+curl -fsS http://127.0.0.1:18080/actuator/health/readiness  # Java，依赖 down 应 503
+curl -fsS http://127.0.0.1:18000/health/ready               # Python，探 PG + Redis
+```
+
+### 1.1.4 回退后必须记录
+
+把 `PREV_TAG`、`digests.txt` 全文、各服务 `RepoDigests` 核对输出、切换时间点写入复盘，
+并按第 5 节清单逐项打勾。
 
 ## 2. 数据库 / Flyway 兼容
 

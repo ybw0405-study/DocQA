@@ -41,7 +41,8 @@ onMounted(() => {
   void conversations.loadPickerFirst();
 });
 
-// 离开页面即断开在途事件流：连接继续挂着既占服务端资源，也没有任何视图再消费它。
+// 离开页面即断开在途请求：abortStream() 现在同时取消事件流与非流式回退，并让在途回答
+// 的归属代号失效——否则同步答案会在返回时追加进已经不属于它的全局 messages。
 onBeforeUnmount(() => {
   conversations.abortStream();
 });

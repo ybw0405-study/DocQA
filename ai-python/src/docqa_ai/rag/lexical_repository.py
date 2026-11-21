@@ -202,8 +202,8 @@ class InMemoryLexicalRepository:
         tenant = str(tenant_id) if tenant_id is not None else None
         ranked: list[tuple[int, LexicalHit]] = []
         for chunk in self._chunks:
-            # 已标注租户的块必须匹配；未标注（空串）的存量/替身行不参与租户过滤。
-            if tenant is not None and chunk.tenant_id and chunk.tenant_id != tenant:
+            # B3：与向量替身同形修正——真实 SQL 的 tenant_id = %s 不会命中空串行。
+            if tenant is not None and (chunk.tenant_id or "") != tenant:
                 continue
             version = str(chunk.metadata.get("index_version", ""))
             if (chunk.document_id, version) not in allowed:

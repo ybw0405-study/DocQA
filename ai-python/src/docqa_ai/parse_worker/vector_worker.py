@@ -19,6 +19,7 @@ from docqa_ai.parse_worker.idempotency import (
 from docqa_ai.parse_worker.models import (
     VectorChangeCompletedEvent,
     VectorChangeRequestedEvent,
+    require_tenant_id,
 )
 from docqa_ai.parse_worker.publisher import VectorChangePublisher
 from docqa_ai.parse_worker.vector_writer import VectorWriteError, VectorWriter
@@ -99,6 +100,22 @@ class VectorChangeWorker:
                 await self._finish(message_id)
                 return HandleOutcome.INVALID
 
+            # J1：删除同样必须带租户信封，避免无租户范围地清空向量。
+            try:
+                require_tenant_id(event.tenant_id)
+            except ValueError:
+                span.set_attribute("vector_change.status", "REJECTED_NO_TENANT")
+                log_event(
+                    LOGGER,
+                    logging.ERROR,
+                    "Rejected vector-change-requested event without tenantId",
+                    step="vector-change",
+                    errorCode="DOC-TENANT-001",
+                )
+                await self._finish(message_id)
+                return HandleOutcome.INVALID
+
+            span.set_attribute("document.tenant_id", str(event.tenant_id))
             span.set_attribute("document.id", str(event.document_id))
             span.set_attribute("vector.operation", event.operation)
             span.set_attribute("document.index_version", event.index_version or "")
@@ -158,7 +175,11 @@ class VectorChangeWorker:
     async def _run(self, event: VectorChangeRequestedEvent) -> VectorChangeCompletedEvent:
         scope = self._scope(event)
         try:
-            remaining_rows = await self._writer.delete(event.document_id, scope)
+            remaining_rows = await self._writer.delete(
+                event.document_id,
+                scope,
+                tenant_id=require_tenant_id(event.tenant_id),
+            )
         except VectorWriteError as exc:
             raise VectorChangeError(INTERNAL, _DELETE_FAILED) from exc
         return self._completed(event, remaining_rows)
