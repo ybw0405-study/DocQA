@@ -32,6 +32,25 @@
 - [安全](#安全)
 - [许可证](#许可证)
 
+> ## ⚠️ 关于「智能问答」的真实状态（必读）
+>
+> 本项目的 RAG **工程架构是完整真实的**（异步解析 → 分块 → 向量索引 → 混合检索 → 引用溯源），
+> 但**开箱默认运行在 `offline` 占位模式**，并非真实语义检索：
+>
+> | 组件 | 默认 provider | 默认行为 |
+> |---|---|---|
+> | 向量化 | `offline`（`offline-hashing-1024`） | 特征哈希，**非语义向量** |
+> | 问答生成 | `offline`（`offline-extractive`） | 抽取原文片段，**非生成式** |
+> | 重排 | `offline`（`noop`） | **不做重排** |
+>
+> 因此**默认配置下「检索质量数字不存在」**——命中率、精度、`LOW_CONFIDENCE` 误判率都尚未被测过，
+> 真实 embedding / LLM / rerank **一次也未发出过请求**。
+>
+> 要获得真实的语义检索 + 生成式回答，需把 `DOCQA_EMBEDDING_PROVIDER` / `DOCQA_LLM_PROVIDER` /
+> `DOCQA_RERANK_PROVIDER` 切到真实 provider（`openai` / `dashscope`）并配置 `DOCQA_EXPERIMENT_BUDGET > 0`
+> （详见 [`docs/02-design/cross-language-protocol.md`](docs/02-design/cross-language-protocol.md) 的 S6 里程碑）。
+> 这不是缺陷，而是当前**明确未完成的边界**，请勿把「CI 全绿」误读为「已具备语义问答能力」。
+
 ## 为什么是 DocQA
 
 - **答案有出处**：回答附带引用溯源，能定位到具体文档与片段，而不是凭空生成。

@@ -18,6 +18,7 @@ from docqa_ai.parse_worker.errors import (
     UNSUPPORTED_TYPE,
     ParseJobError,
 )
+from docqa_ai.parse_worker.ocr import NoopOcrProvider, OcrProvider
 
 PDF = "application/pdf"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -49,10 +50,17 @@ class ParsedDocument:
 class DocumentParser:
     """PDF/PPTX/DOCX/TXT text extraction with sanitized, contract-ready failures."""
 
-    def __init__(self, *, max_chars: int = 2_000_000, max_pages: int = 500) -> None:
+    def __init__(
+        self,
+        *,
+        max_chars: int = 2_000_000,
+        max_pages: int = 500,
+        ocr: OcrProvider | None = None,
+    ) -> None:
         self._max_chars = max_chars
         self._max_pages = max_pages
         self._max_uncompressed_bytes = 100 * 1024 * 1024
+        self._ocr = ocr or NoopOcrProvider()
 
     def parse(self, data: bytes, content_type: str, file_name: str) -> ParsedDocument:
         if not data:
@@ -104,7 +112,29 @@ class DocumentParser:
             total += len(text)
             self._check_size(total)
             pages.append(ParsedPage(text=text, page_no=page_no))
+
+        # 扫描件 / 图片型 PDF：文本层为空时走 OCR 兜底（默认 Noop，行为与旧版一致）。
+        if not any(page.text.strip() for page in pages) and self._ocr.enabled:
+            pages = self._ocr_pdf(data, page_count=len(pages))
         return ParsedDocument(pages=tuple(pages))
+
+    def _ocr_pdf(self, data: bytes, *, page_count: int) -> list[ParsedPage]:
+        """文本层全空时，把整份 PDF 交给 OCR provider 识别，逐页重建 ParsedPage。"""
+        try:
+            recognized = self._ocr.recognize(data)
+        except Exception as exc:  # noqa: BLE001 - OCR 引擎异常不得外泄为解析契约
+            raise ParseJobError(INVALID_DOCUMENT, _EMPTY, retryable=False) from exc
+        if not isinstance(recognized, list) or len(recognized) != page_count:
+            # OCR 返回页数与 PDF 实际页数不一致视为识别失败，退回「无文本」。
+            return [ParsedPage(text="", page_no=i) for i in range(1, page_count + 1)]
+        total = 0
+        pages: list[ParsedPage] = []
+        for page_no, text in enumerate(recognized, start=1):
+            text = text or ""
+            total += len(text)
+            self._check_size(total)
+            pages.append(ParsedPage(text=text, page_no=page_no))
+        return pages
 
     def _parse_docx(self, data: bytes) -> ParsedDocument:
         self._check_zip(data)

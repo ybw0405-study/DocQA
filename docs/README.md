@@ -32,6 +32,7 @@
 | [cross-language-protocol.md](02-design/cross-language-protocol.md) | Java ↔ Python 跨语言治理协议 |
 | [saas-kernel-upgrade.md](02-design/saas-kernel-upgrade.md) | SaaS 内核升级方案与 P1-B 落地记录（§5.9～§5.21） |
 | [saas-tenant-decisions.md](02-design/saas-tenant-decisions.md) | 多租户遗留决策清单（D1～D6 拍板结论） |
+| [retrieval-eval.md](02-design/retrieval-eval.md) | 检索质量评估 harness（Recall@k / MRR / nDCG@k 离线回归） |
 
 ## 其他
 

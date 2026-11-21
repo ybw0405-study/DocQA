@@ -109,3 +109,53 @@ jobs:
             [ -f "$f" ] || continue
             bash -n "$f" || exit 1
           done
+
+  # 弱凭据泄漏门禁：仓库内不得出现可被直接利用的明文 dev 口令/内部令牌。
+  # 只允许命中「显式标注为占位符/示例」的写法（CHANGE_ME、<...>、$... 环境变量引用），
+  # 一旦有人把真实弱口令写进源码/配置/脚本，本 job 在 PR 阶段即失败。
+  secret-leak-guard:
+    name: dev 弱凭据泄漏门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: 扫描仓库内明文弱凭据
+        run: |
+          python - <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          patterns = [
+              (r'-p\s*(root|password|admin|docqa|123456)\b', '明文 root/弱口令连接命令'),
+          ]
+          exts = {'.sql', '.yml', '.yaml', '.py', '.sh', '.properties', '.java', '.md'}
+          skip_dirs = {'.git', 'target', 'node_modules', '.venv', 'dist', '__pycache__',
+                       '.ruff_cache', '.pytest_cache', '.artifacts'}
+
+          errors = []
+          for path in Path('.').rglob('*'):
+              if not path.is_file():
+                  continue
+              if any(part in skip_dirs for part in path.parts):
+                  continue
+              if path.suffix.lower() not in exts:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8', errors='ignore')
+              except Exception:
+                  continue
+              for pat, label in patterns:
+                  for m in re.finditer(pat, text):
+                      line_no = text[:m.start()].count('\n') + 1
+                      lines = text.splitlines()
+                      line = lines[line_no - 1] if lines else ''
+                      errors.append(f'{path}:{line_no} [{label}] -> {line.strip()[:100]}')
+
+          if errors:
+              print('弱凭据泄漏门禁失败：', file=sys.stderr)
+              for item in errors:
+                  print(f'  - {item}', file=sys.stderr)
+              sys.exit(1)
+          print('弱凭据泄漏门禁通过：未发现可被直接利用的明文弱口令/弱令牌。')
+          PY
