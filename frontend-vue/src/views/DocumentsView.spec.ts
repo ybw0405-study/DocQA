@@ -329,6 +329,32 @@ describe('DocumentsView', () => {
     expect(view.findAll('tbody tr')).toHaveLength(1);
   });
 
+  it('does not reload the list when indexedCount drops (clearFinished)', async () => {
+    const cursors = countingList([documentListItem(1)]);
+    const uploads = useUploadsStore();
+    await mountView();
+    uploads.tasks.push({
+      id: 'task-1',
+      fileName: 'note.pdf',
+      sizeBytes: 2048,
+      phase: 'done',
+      progressBytes: 2048,
+      partsSent: 1,
+      partCount: 1,
+      documentId: FIRST_ID,
+      status: 'INDEXED',
+      errorCode: null,
+      detail: null,
+    });
+    await vi.waitFor(() => expect(cursors).toHaveLength(2));
+
+    // 清理已完成项让计数下降：不应再触发整页重取（C-10）
+    uploads.tasks.splice(0, uploads.tasks.length);
+    await nextTick();
+    await nextTick();
+    expect(cursors).toHaveLength(2);
+  });
+
   it('cancels every in-flight upload when the page is left', async () => {
     const cancelAll = vi.spyOn(useUploadsStore(), 'cancelAll');
     const view = await mountView();

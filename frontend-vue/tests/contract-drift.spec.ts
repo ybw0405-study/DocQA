@@ -1152,13 +1152,17 @@ describe('契约 ↔ 前端类型对账', () => {
     ];
 
     expect(readNumber('default')).toBe(20);
+    // PAGE_LIMIT 已收敛到 failureFields.ts 单一来源；逐个 store 只校验确实从该模块导入，
+    // 避免常量漂移时 6 份副本各改一半（P1-3 竞态修复同时抽掉了样板）。
+    const sharedPageLimit = tsNumberConst('src/stores/failureFields.ts', 'PAGE_LIMIT');
+    expect(sharedPageLimit).toBe(readNumber('default'));
+    expect(sharedPageLimit).toBeGreaterThanOrEqual(readNumber('minimum'));
+    expect(sharedPageLimit).toBeLessThanOrEqual(readNumber('maximum'));
     for (const store of stores) {
-      expect(tsNumberConst(store, 'PAGE_LIMIT'), `${store} 的 PAGE_LIMIT 应等于契约 PageLimit 默认值`).toBe(
-        readNumber('default'),
+      expect(readFileSync(store, 'utf8'), `${store} 应从 failureFields.ts 复用 PAGE_LIMIT`).toMatch(
+        /import\s*\{[^}]*PAGE_LIMIT[^}]*\}\s*from\s*'\.\/failureFields'/,
       );
     }
-    expect(stores.every((store) => tsNumberConst(store, 'PAGE_LIMIT') >= readNumber('minimum'))).toBe(true);
-    expect(stores.every((store) => tsNumberConst(store, 'PAGE_LIMIT') <= readNumber('maximum'))).toBe(true);
 
     /**
      * 管理面两个列表各有**自己的** limit 参数（契约刻意不放宽全局 `PageLimit`，

@@ -22,9 +22,16 @@ import {
   RRULE_PATTERN,
   TIMEZONE_PATTERN,
 } from '../types/reminders';
+import {
+  clearFailureFields,
+  isStaleCursor,
+  makeApplyFailure,
+  PAGE_LIMIT,
+  rejectLocal,
+  type FailureFields as BaseFailureFields,
+} from './failureFields';
 
-/** 契约 `PageLimit` 的默认值；显式发送，与文档页、问答页同口径。 */
-const PAGE_LIMIT = 20;
+const applyFailure = makeApplyFailure('提醒页请求失败，请稍后重试。');
 
 /** 表单模型：`datetime-local` 与 `number` 输入都按字符串保存，避免把非法中间态写进数字字段。 */
 export interface ReminderForm {
@@ -81,10 +88,7 @@ export interface ReminderGroup {
   items: ReminderListItemData[];
 }
 
-interface FailureFields {
-  detail: string | null;
-  code: string | null;
-  traceId: string | null;
+interface FailureFields extends BaseFailureFields {
   retryAfterSeconds: number | null;
 }
 
@@ -93,6 +97,8 @@ export interface RemindersState extends FailureFields {
   nextCursor: string | null;
   listLoading: boolean;
   listLoaded: boolean;
+  /** 列表取数代号：过滤切换与写后刷新递增它，在途翻页的过期响应一律丢弃。 */
+  listSeq: number;
   /** null 表示「全部」，此时根本不发送 `status` 参数（D-9 方案 A）。 */
   statusFilter: ReminderStatus | null;
 
@@ -106,35 +112,6 @@ export interface RemindersState extends FailureFields {
   updatingId: string | null;
   /** 最近一次失败的 PATCH，只有「同一行、同一目标、同一期望版本」的重试才复用它的键。 */
   pendingUpdate: PendingUpdate | null;
-}
-
-function applyFailure(target: FailureFields, error: unknown): void {
-  if (error instanceof ApiError) {
-    target.detail = error.detail;
-    target.code = error.code;
-    target.traceId = error.traceId;
-    target.retryAfterSeconds = error.retryAfterSeconds;
-    return;
-  }
-  target.detail = '提醒页请求失败，请稍后重试。';
-  target.code = null;
-  target.traceId = null;
-  target.retryAfterSeconds = null;
-}
-
-/**
- * 本地预检不通过（创建表单非法、看板已无该行、状态边不合法）：没有服务端响应，也就没有 code 与 traceId。
- * 这三条闸门都在请求发出之前，所以失败态必须显式清空，不能把上一次的 trace 留在屏上当成新结论的依据。
- */
-function rejectLocal(target: FailureFields, message: string): void {
-  target.detail = message;
-  target.code = null;
-  target.traceId = null;
-  target.retryAfterSeconds = null;
-}
-
-function isStaleCursor(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 400;
 }
 
 /**
@@ -261,6 +238,7 @@ export const useRemindersStore = defineStore('reminders', {
     nextCursor: null,
     listLoading: false,
     listLoaded: false,
+    listSeq: 0,
     statusFilter: null,
 
     form: {
@@ -319,27 +297,41 @@ export const useRemindersStore = defineStore('reminders', {
 
   actions: {
     clearFailure(): void {
-      this.detail = null;
-      this.code = null;
-      this.traceId = null;
-      this.retryAfterSeconds = null;
+      clearFailureFields(this);
     },
 
     async loadListFirst(): Promise<void> {
       if (this.listLoading) {
         return;
       }
+      await this.fetchFirstListPage();
+    },
+
+    /**
+     * 取看板第一页，不受 `listLoading` 守卫约束：过滤切换、创建成功、状态冲突后的重读
+     * 都必须真正取回服务端最新结果，被一次在途旧读挤掉就等于白刷；过期响应按代号丢弃。
+     */
+    async fetchFirstListPage(): Promise<void> {
+      const seq = ++this.listSeq;
       this.listLoading = true;
       try {
         const data = await listReminders({ status: this.statusFilter, limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = data.items;
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         applyFailure(this, error);
       } finally {
-        this.listLoading = false;
-        this.listLoaded = true;
+        if (seq === this.listSeq) {
+          this.listLoading = false;
+          this.listLoaded = true;
+        }
       }
     },
 
@@ -348,23 +340,32 @@ export const useRemindersStore = defineStore('reminders', {
       if (!this.canLoadMore || cursor === null) {
         return;
       }
+      const seq = this.listSeq;
       this.listLoading = true;
       try {
         const data = await listReminders({ status: this.statusFilter, cursor, limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = [...this.items, ...data.items];
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         if (isStaleCursor(error)) {
           this.nextCursor = null;
           this.listLoading = false;
-          await this.loadListFirst();
+          await this.fetchFirstListPage();
           this.detail = '提醒翻页游标已失效，看板已回到第一页。';
           return;
         }
         applyFailure(this, error);
       } finally {
-        this.listLoading = false;
+        if (seq === this.listSeq) {
+          this.listLoading = false;
+        }
       }
     },
 
@@ -378,7 +379,7 @@ export const useRemindersStore = defineStore('reminders', {
       this.items = [];
       this.nextCursor = null;
       this.listLoaded = false;
-      await this.loadListFirst();
+      await this.fetchFirstListPage();
     },
 
     /** 契约：同一幂等键对应不同请求体一律 409 `REM-CONFLICT-001`，所以任何实际改动都要弃键。 */
@@ -418,7 +419,7 @@ export const useRemindersStore = defineStore('reminders', {
         this.pendingKey = null;
         this.createdSummary = summarize(result);
         // 新提醒按 next_trigger_at 排序，可能落在首页之外；回第一页只会漏读不会重复。
-        await this.loadListFirst();
+        await this.fetchFirstListPage();
       } catch (error) {
         applyFailure(this, error);
       } finally {
@@ -476,7 +477,7 @@ export const useRemindersStore = defineStore('reminders', {
         if (error instanceof ApiError && error.status === 409) {
           this.pendingUpdate = null;
           const reason = error.detail;
-          await this.loadListFirst();
+          await this.fetchFirstListPage();
           // 后端为「恢复时规则已无未来触发」这类情形给的是英文 detail，且与非法边共用 004，
           // 界面因此补一句固定的中文动作说明，而不是把服务端原文当结论。
           // 中文 detail 本身以「。」结尾，拼接前剥掉它，否则界面上出现两个连续句号。
@@ -502,7 +503,7 @@ export const useRemindersStore = defineStore('reminders', {
         this.items = this.items.map((item) => (item.reminderId === reminderId ? applyStatusToRow(item, data) : item));
         return;
       }
-      await this.loadListFirst();
+      await this.fetchFirstListPage();
     },
   },
 });

@@ -7,7 +7,7 @@ import {
   listConversations,
 } from '../api/conversations';
 import { listDocuments } from '../api/documents';
-import { ApiError, StreamUnavailableError } from '../api/errors';
+import { StreamUnavailableError } from '../api/errors';
 import { newIdempotencyKey, type Traced } from '../api/http';
 import type { DocumentListItemData } from '../types/documents';
 import type {
@@ -19,9 +19,16 @@ import type {
   MessageRole,
 } from '../types/conversations';
 import { DOCUMENT_IDS_MAX, QUESTION_MAX_LENGTH, TITLE_MAX_LENGTH } from '../types/conversations';
+import {
+  clearFailureFields,
+  isStaleCursor,
+  makeApplyFailure,
+  PAGE_LIMIT,
+  rejectLocal,
+  type FailureFields as BaseFailureFields,
+} from './failureFields';
 
-/** 契约 `PageLimit` 的默认值；显式发送，让「每页 20 条」在请求里可见。 */
-const PAGE_LIMIT = 20;
+const applyFailure = makeApplyFailure('问答页请求失败，请稍后重试。');
 
 /**
  * 生成中的中止控制器。它不进 state：`AbortController` 与 `AbortSignal` 都不该被响应式代理，
@@ -47,10 +54,7 @@ export interface MessageRow {
   governance: AskData | null;
 }
 
-interface FailureFields {
-  detail: string | null;
-  code: string | null;
-  traceId: string | null;
+interface FailureFields extends BaseFailureFields {
   retryAfterSeconds: number | null;
 }
 
@@ -59,12 +63,16 @@ export interface ConversationsState extends FailureFields {
   nextCursor: string | null;
   listLoading: boolean;
   listLoaded: boolean;
+  /** 列表取数代号：写后刷新/过滤切换递增它，在途翻页的过期响应一律丢弃。 */
+  listSeq: number;
 
   currentId: string | null;
   messages: MessageRow[];
   historyCursor: string | null;
   historyLoading: boolean;
   historyLoaded: boolean;
+  /** 历史取数代号：每次按会话取最新一页都递增，快速 A→B 切换时在途的 A 响应整体丢弃。 */
+  historySeq: number;
 
   newTitle: string;
   creating: boolean;
@@ -84,32 +92,6 @@ export interface ConversationsState extends FailureFields {
   pickerCursor: string | null;
   pickerLoading: boolean;
   pickerLoaded: boolean;
-}
-
-function applyFailure(target: FailureFields, error: unknown): void {
-  if (error instanceof ApiError) {
-    target.detail = error.detail;
-    target.code = error.code;
-    target.traceId = error.traceId;
-    target.retryAfterSeconds = error.retryAfterSeconds;
-    return;
-  }
-  target.detail = '问答页请求失败，请稍后重试。';
-  target.code = null;
-  target.traceId = null;
-  target.retryAfterSeconds = null;
-}
-
-/** 本地预检不通过：没有服务端响应，也就没有 code 与 traceId。 */
-function rejectLocal(target: FailureFields, message: string): void {
-  target.detail = message;
-  target.code = null;
-  target.traceId = null;
-  target.retryAfterSeconds = null;
-}
-
-function isStaleCursor(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 400;
 }
 
 function toRow(item: MessageHistoryItemData): MessageRow {
@@ -135,12 +117,14 @@ export const useConversationsStore = defineStore('conversations', {
     nextCursor: null,
     listLoading: false,
     listLoaded: false,
+    listSeq: 0,
 
     currentId: null,
     messages: [],
     historyCursor: null,
     historyLoading: false,
     historyLoaded: false,
+    historySeq: 0,
 
     newTitle: '',
     creating: false,
@@ -186,27 +170,41 @@ export const useConversationsStore = defineStore('conversations', {
 
   actions: {
     clearFailure(): void {
-      this.detail = null;
-      this.code = null;
-      this.traceId = null;
-      this.retryAfterSeconds = null;
+      clearFailureFields(this);
     },
 
     async loadListFirst(): Promise<void> {
       if (this.listLoading) {
         return;
       }
+      await this.fetchFirstListPage();
+    },
+
+    /**
+     * 取列表第一页，不受 `listLoading` 守卫约束：提问落地、新建会话后的写后刷新必须真正取回
+     * 服务端最新结果，被一次在途旧读挤掉就等于白刷；过期响应按代号丢弃。
+     */
+    async fetchFirstListPage(): Promise<void> {
+      const seq = ++this.listSeq;
       this.listLoading = true;
       try {
         const data = await listConversations({ limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = data.items;
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         applyFailure(this, error);
       } finally {
-        this.listLoading = false;
-        this.listLoaded = true;
+        if (seq === this.listSeq) {
+          this.listLoading = false;
+          this.listLoaded = true;
+        }
       }
     },
 
@@ -215,23 +213,32 @@ export const useConversationsStore = defineStore('conversations', {
       if (!this.canLoadListMore || cursor === null) {
         return;
       }
+      const seq = this.listSeq;
       this.listLoading = true;
       try {
         const data = await listConversations({ cursor, limit: PAGE_LIMIT });
+        if (seq !== this.listSeq) {
+          return;
+        }
         this.items = [...this.items, ...data.items];
         this.nextCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.listSeq) {
+          return;
+        }
         if (isStaleCursor(error)) {
           this.nextCursor = null;
           this.listLoading = false;
-          await this.loadListFirst();
+          await this.fetchFirstListPage();
           this.detail = '会话翻页游标已失效，列表已回到第一页。';
           return;
         }
         applyFailure(this, error);
       } finally {
-        this.listLoading = false;
+        if (seq === this.listSeq) {
+          this.listLoading = false;
+        }
       }
     },
 
@@ -262,7 +269,7 @@ export const useConversationsStore = defineStore('conversations', {
         this.createKey = null;
         this.newTitle = '';
         await this.openConversation(data.conversationId);
-        await this.loadListFirst();
+        await this.fetchFirstListPage();
       } catch (error) {
         applyFailure(this, error);
       } finally {
@@ -284,25 +291,46 @@ export const useConversationsStore = defineStore('conversations', {
         // 幂等键的作用域是 conversationId + key，换了会话就不该再复用上一次尝试的键。
         this.pendingKey = null;
       }
-      await this.loadHistoryFirst();
+      await this.fetchFirstHistoryPage();
     },
 
     async loadHistoryFirst(): Promise<void> {
-      const conversationId = this.currentId;
-      if (conversationId === null || this.historyLoading) {
+      if (this.historyLoading) {
         return;
       }
+      await this.fetchFirstHistoryPage();
+    },
+
+    /**
+     * 取当前会话最新一页，不受 `historyLoading` 守卫约束：快速 A→B 切换时，在途的 A 请求
+     * 不能挡住 B 的历史。每个在途请求捕获代号，返回后代号不符或 `currentId` 已变就整体丢弃，
+     * 这样 A 的旧页既不会覆盖 B 的消息，也不会把 A 的游标写进 B。
+     */
+    async fetchFirstHistoryPage(): Promise<void> {
+      const conversationId = this.currentId;
+      if (conversationId === null) {
+        return;
+      }
+      const seq = ++this.historySeq;
       this.historyLoading = true;
       try {
         const data = await listConversationMessages(conversationId, { limit: PAGE_LIMIT });
+        if (seq !== this.historySeq || conversationId !== this.currentId) {
+          return;
+        }
         this.messages = toAscending(data.items);
         this.historyCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.historySeq || conversationId !== this.currentId) {
+          return;
+        }
         applyFailure(this, error);
       } finally {
-        this.historyLoading = false;
-        this.historyLoaded = true;
+        if (seq === this.historySeq) {
+          this.historyLoading = false;
+          this.historyLoaded = true;
+        }
       }
     },
 
@@ -312,23 +340,32 @@ export const useConversationsStore = defineStore('conversations', {
       if (conversationId === null || !this.canLoadHistoryMore || cursor === null) {
         return;
       }
+      const seq = this.historySeq;
       this.historyLoading = true;
       try {
         const data = await listConversationMessages(conversationId, { cursor, limit: PAGE_LIMIT });
+        if (seq !== this.historySeq || conversationId !== this.currentId) {
+          return;
+        }
         this.messages = [...toAscending(data.items), ...this.messages];
         this.historyCursor = data.nextCursor;
         this.clearFailure();
       } catch (error) {
+        if (seq !== this.historySeq || conversationId !== this.currentId) {
+          return;
+        }
         if (isStaleCursor(error)) {
           this.historyCursor = null;
           this.historyLoading = false;
-          await this.loadHistoryFirst();
+          await this.fetchFirstHistoryPage();
           this.detail = '消息翻页游标已失效，已回到最新一页。';
           return;
         }
         applyFailure(this, error);
       } finally {
-        this.historyLoading = false;
+        if (seq === this.historySeq) {
+          this.historyLoading = false;
+        }
       }
     },
 
@@ -548,7 +585,7 @@ export const useConversationsStore = defineStore('conversations', {
         this.pendingKey = null;
         this.question = '';
         // 8A-2 边界：last_message_at 变了，列表只可能漏读不会重复，回到第一页最诚实。
-        await this.loadListFirst();
+        await this.fetchFirstListPage();
       } catch (error) {
         applyFailure(this, error);
       } finally {

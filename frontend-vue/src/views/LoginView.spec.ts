@@ -7,7 +7,7 @@ import LoginView from './LoginView.vue';
 import { changePassword } from '../api/auth';
 import { bindSessionToAuthStore } from '../stores/sessionBridge';
 import { useAuthStore } from '../stores/auth';
-import { DEMO_TOKEN, problem } from '../../tests/fixtures';
+import { DEMO_TOKEN, envelope, problem } from '../../tests/fixtures';
 import { server } from '../../tests/server';
 import { PASSWORD_CHANGED_NOTICE } from '../utils/display';
 
@@ -194,6 +194,24 @@ describe('LoginView', () => {
     await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
     await vi.waitFor(() => expect(useAuthStore().token).toBe(DEMO_TOKEN));
     expect(wrapper.find('[data-testid="login-notice"]').exists()).toBe(false);
+  });
+
+  it('trims the username on sign-in just like registration', async () => {
+    let captured = '';
+    server.use(
+      mswHttp.post('/api/v1/auth/login', async ({ request }) => {
+        const body = (await request.json()) as { username?: string };
+        captured = body.username ?? '';
+        return HttpResponse.json(
+          envelope({ accessToken: DEMO_TOKEN, tokenType: 'Bearer', expiresIn: 900 }),
+        );
+      }),
+    );
+    const { wrapper } = await mountLogin();
+
+    await submit(wrapper, 'right-password', '  demo  ');
+
+    expect(captured).toBe('demo');
   });
 
   it('renders only the fixed notice key and never echoes whatever the query string carries', async () => {

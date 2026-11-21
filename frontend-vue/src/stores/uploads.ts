@@ -248,6 +248,13 @@ export const useUploadsStore = defineStore('uploads', {
             reject(task, error);
             return;
           }
+          // 尊重服务端限流建议：429 用 Retry-After 拉长间隔，5xx 退避到上限，
+          // 避免高压下轮询打爆状态接口（C-11）。
+          if (error instanceof ApiError && error.status === 429 && error.retryAfterSeconds != null) {
+            delay = Math.max(delay, error.retryAfterSeconds * 1000);
+          } else if (error instanceof ApiError && error.status >= 500) {
+            delay = Math.max(delay, POLL_MAX_DELAY_MS);
+          }
         }
         if (Date.now() >= budgetEndsAt) {
           // 预算耗尽不代表解析失败，只是前端不再守着；刷新列表仍能看到最终状态。

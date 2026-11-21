@@ -112,9 +112,12 @@ onBeforeUnmount(() => {
   uploads.cancelAll();
 });
 
-// 有文档到达 INDEXED 就刷新首页，让新条目和分块数立刻可见。
-watch(() => uploads.indexedCount, () => {
-  void reload();
+// 有文档到达 INDEXED（计数上升）就刷新首页；下降来自 clearFinished/删除，
+// 不该把翻到第 3 页的用户拉回第 1 页并发起多余整页重取（C-10）。
+watch(() => uploads.indexedCount, (n, o) => {
+  if (n > o) {
+    void reload();
+  }
 });
 </script>
 
