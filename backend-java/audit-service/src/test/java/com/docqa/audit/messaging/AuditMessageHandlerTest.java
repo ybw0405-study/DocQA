@@ -67,29 +67,29 @@ class AuditMessageHandlerTest {
     }
 
     @Test
-    void rejectsAnEmptyBodyAndLetsRocketMqDeadLetterIt() {
+    void discardsAnEmptyBodyWithoutRetry() {
         ConsumeResult result = handler.handle(new byte[0], TRACE_ID);
 
-        assertThat(result).isEqualTo(ConsumeResult.RETRY);
+        assertThat(result).isEqualTo(ConsumeResult.ACK);
         verifyNoInteractions(auditEventService);
     }
 
     @Test
-    void rejectsMalformedJsonWithoutCallingTheService() {
+    void discardsMalformedJsonWithoutCallingTheService() {
         ConsumeResult result = handler.handle("{not-json".getBytes(StandardCharsets.UTF_8), TRACE_ID);
 
-        assertThat(result).isEqualTo(ConsumeResult.RETRY);
+        assertThat(result).isEqualTo(ConsumeResult.ACK);
         verifyNoInteractions(auditEventService);
     }
 
     @Test
-    void rejectsEventsWithInvalidCoreFieldsSoTheyReachTheDeadLetterQueue() {
+    void discardsEventsWithInvalidCoreFieldsWithoutRetry() {
         doThrow(new AuditEventRejectedException("invalid eventType"))
                 .when(auditEventService).ingest(any(), eq(TRACE_ID));
 
         ConsumeResult result = handler.handle(body(TRACE_ID), TRACE_ID);
 
-        assertThat(result).isEqualTo(ConsumeResult.RETRY);
+        assertThat(result).isEqualTo(ConsumeResult.ACK);
     }
 
     @Test

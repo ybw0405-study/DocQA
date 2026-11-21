@@ -60,6 +60,31 @@ def test_explicit_settings_skip_the_startup_guard_for_embedded_callers() -> None
     assert app.state.startup_guard_error is None
 
 
+def test_dev_on_non_loopback_without_credentials_is_rejected(monkeypatch: object) -> None:
+    """dev + 0.0.0.0 且无任何凭据 = 数据面裸奔，必须在启动期挡住。"""
+    _clear_env_signals(monkeypatch)
+    monkeypatch.setenv("DOCQA_ENV", "dev")  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_INTERNAL_TOKEN", raising=False)  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_INTERNAL_HMAC_SECRET", raising=False)  # type: ignore[attr-defined]
+    monkeypatch.setenv("DOCQA_AI_API_HOST", "0.0.0.0")  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_ALLOW_ANONYMOUS_API", raising=False)  # type: ignore[attr-defined]
+    app = create_app()
+    assert app.state.startup_guard_error is not None
+    assert "non-loopback" in app.state.startup_guard_error
+
+
+def test_dev_on_non_loopback_can_opt_in_anonymously(monkeypatch: object) -> None:
+    """部署者显式 allow_anonymous_api=true 时放行这条本地联调路径。"""
+    _clear_env_signals(monkeypatch)
+    monkeypatch.setenv("DOCQA_ENV", "dev")  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_INTERNAL_TOKEN", raising=False)  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_INTERNAL_HMAC_SECRET", raising=False)  # type: ignore[attr-defined]
+    monkeypatch.setenv("DOCQA_AI_API_HOST", "0.0.0.0")  # type: ignore[attr-defined]
+    monkeypatch.setenv("DOCQA_AI_ALLOW_ANONYMOUS_API", "true")  # type: ignore[attr-defined]
+    app = create_app()
+    assert app.state.startup_guard_error is None
+
+
 async def test_internal_token_guard_uses_a_whitelist_not_a_blacklist() -> None:
     app = create_app(
         make_settings(internal_token=SecretStr(TOKEN)),

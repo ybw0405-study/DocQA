@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,9 @@ import org.springframework.stereotype.Component;
 public class DemoUserSeeder implements ApplicationRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DemoUserSeeder.class);
-    private static final Pattern BCRYPT_HASH = Pattern.compile("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
+    /** 与 AuthProperties 默认强度一致；低于此值的哈希不接受作为种子管理员口令。 */
+    private static final int MIN_BCRYPT_COST = 12;
+    private static final Pattern BCRYPT_HASH = Pattern.compile("^\\$2[aby]\\$(\\d{2})\\$[./A-Za-z0-9]{53}$");
 
     private final DemoUserProperties properties;
     private final UserRepository userRepository;
@@ -47,8 +50,16 @@ public class DemoUserSeeder implements ApplicationRunner {
             LOGGER.warn("Demo account seeding skipped: docqa.demo-user.password-hash is not configured");
             return;
         }
-        if (!BCRYPT_HASH.matcher(passwordHash).matches()) {
+        Matcher matcher = BCRYPT_HASH.matcher(passwordHash);
+        if (!matcher.matches()) {
             throw new IllegalStateException("Demo user password hash must be a BCrypt hash");
+        }
+        // 只查形态不够：cost=4 的哈希形态合法但 GPU 分钟级可爆破，且曾随备份落盘。
+        // 种子管理员必须达到与应用策略一致的下限，弱哈希直接拒绝启动而非静默放行。
+        int cost = Integer.parseInt(matcher.group(1));
+        if (cost < MIN_BCRYPT_COST) {
+            throw new IllegalStateException(
+                    "Demo user BCrypt cost " + cost + " is below minimum " + MIN_BCRYPT_COST);
         }
         String username = properties.getUsername() == null
                 ? "demo"

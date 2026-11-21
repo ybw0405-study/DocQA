@@ -3,6 +3,7 @@ package com.docqa.user.service;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
 import com.docqa.common.tenant.TenantContext;
+import com.docqa.user.config.AuthProperties;
 import com.docqa.user.domain.TenantRecord;
 import com.docqa.user.repository.TenantRepository;
 import java.util.Locale;
@@ -30,9 +31,11 @@ public class TenantResolver {
     private static final String DEFAULT_SLUG = "default";
 
     private final TenantRepository tenantRepository;
+    private final AuthProperties authProperties;
 
-    public TenantResolver(TenantRepository tenantRepository) {
+    public TenantResolver(TenantRepository tenantRepository, AuthProperties authProperties) {
         this.tenantRepository = tenantRepository;
+        this.authProperties = authProperties;
     }
 
     /**
@@ -53,5 +56,23 @@ public class TenantResolver {
             throw new BusinessException(ErrorCode.USR_AUTH_001);
         }
         return record.id();
+    }
+
+    /**
+     * 注册专用：在 resolve 的状态/存在性校验之上，再加租户级准入白名单。
+     *
+     * <p>登录用 resolve 即可（凭口令）；注册是「无凭据即可落入某租户」的入口，
+     * 必须限制在运维显式开放的 slug 内。拒绝时复用通用 401，避免把租户清单
+     * 变成可枚举接口。
+     */
+    public UUID resolveForRegistration(String tenantSlug) {
+        UUID id = resolve(tenantSlug);
+        String slug = (tenantSlug == null || tenantSlug.isBlank())
+                ? DEFAULT_SLUG : tenantSlug.trim().toLowerCase(Locale.ROOT);
+        // 缺省/"default" 统一按默认 slug 判定白名单
+        if (!authProperties.getRegistrationAllowedSlugs().contains(slug)) {
+            throw new BusinessException(ErrorCode.USR_AUTH_001);
+        }
+        return id;
     }
 }

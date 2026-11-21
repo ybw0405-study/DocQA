@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.docqa.agentgateway.domain.AgentExecution;
 import com.docqa.agentgateway.domain.OutboxBacklog;
 import com.docqa.agentgateway.domain.OutboxExecution;
+import com.docqa.agentgateway.domain.RelayCursor;
 import com.docqa.agentgateway.dto.AuditEvent;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -118,6 +119,29 @@ public class JdbcAgentExecutionRepository implements AgentExecutionRepository {
             Timestamp oldest = rs.getTimestamp("oldest_recorded_at");
             return new OutboxBacklog(rs.getInt("pending"), oldest == null ? null : oldest.toInstant());
         };
+    }
+
+    @Override
+    public RelayCursor findRelayCursor() {
+        List<RelayCursor> rows = jdbcTemplate.query(
+                "SELECT recorded_at, execution_id FROM audit_relay_cursor WHERE id = 1",
+                (rs, _rowNum) -> new RelayCursor(
+                        rs.getTimestamp("recorded_at").toInstant(),
+                        UUID.fromString(rs.getString("execution_id"))));
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    @Override
+    public void saveRelayCursor(Instant recordedAt, UUID id) {
+        jdbcTemplate.update("""
+                        INSERT INTO audit_relay_cursor (id, recorded_at, execution_id, updated_at)
+                        VALUES (1, ?, ?, NOW(3))
+                        ON DUPLICATE KEY UPDATE
+                          recorded_at = VALUES(recorded_at),
+                          execution_id = VALUES(execution_id),
+                          updated_at = VALUES(updated_at)
+                        """,
+                Timestamp.from(recordedAt), id.toString());
     }
 
     private OutboxExecution mapRow(ResultSet rs) throws SQLException {

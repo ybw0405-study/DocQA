@@ -43,7 +43,9 @@ docqa:
     refresh-ttl: 14d
     idempotency-in-progress-ttl: 60s
     idempotency-result-ttl: 24h
-    self-registration-enabled: ${DOCQA_SELF_REGISTRATION_ENABLED:true}
+    self-registration-enabled: ${DOCQA_SELF_REGISTRATION_ENABLED:false}
+    # 允许自助注册的租户 slug 白名单；默认仅默认租户，新增租户须由运维显式放开
+    registration-allowed-slugs: ${DOCQA_REGISTRATION_ALLOWED_SLUGS:default}
     max-registrations-per-window: 5
     registration-window: 120s
     refresh-cookie-name: docqa_refresh

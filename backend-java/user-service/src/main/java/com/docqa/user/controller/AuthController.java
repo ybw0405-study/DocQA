@@ -86,7 +86,7 @@ public class AuthController {
             @Valid @RequestBody ChangePasswordRequest request,
             HttpServletRequest httpRequest) {
         JwtIdentity identity = accessTokenAuthenticator.authenticate(authorization);
-        authService.changePassword(identity, request, idempotencyKey, httpRequest.getRemoteAddr());
+        authService.changePassword(identity, request, idempotencyKey, clientIpResolver.resolve(httpRequest));
         return ResponseEntity.noContent().build();
     }
 

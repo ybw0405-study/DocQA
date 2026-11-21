@@ -168,17 +168,17 @@ class MigrationOnRealMysqlTest {
     }
 
     @Test
-    @DisplayName("V1→V11 在真库上全量执行，账本无失败记录")
+    @DisplayName("V1→V12 在真库上全量执行，账本无失败记录")
     void appliesAllMigrationsOnRealMysql() throws SQLException {
         assertThat(appliedMigrations)
-                .as("V1–V11 共 11 份脚本，执行数不等于 11 说明 Flyway 跳过了或重复执行了某些脚本")
-                .isEqualTo(11);
+                .as("V1–V12 共 12 份脚本，执行数不等于 12 说明 Flyway 跳过了或重复执行了某些脚本")
+                .isEqualTo(12);
         assertThat(queryAsRoot("SELECT version FROM flyway_schema_history WHERE success = 0"))
                 .as("账本里出现 success=0 就是半迁移态，必须人工介入，绝不能被测试放过")
                 .isEmpty();
         assertThat(queryAsRoot("SELECT version FROM flyway_schema_history "
                 + "WHERE type = 'SQL' ORDER BY installed_rank"))
-                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
     }
 
     @Test

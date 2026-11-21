@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
+import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -33,6 +34,12 @@ public class AuthProperties {
 
     /** 关闭后自助注册返回 403，建号只能通过管理面。 */
     private boolean selfRegistrationEnabled = true;
+
+    /**
+     * 允许自助注册的租户 slug 白名单（租户级准入）。默认仅默认租户；
+     * 猜中某企业 slug 也不能直接入驻，须由运维显式加入白名单。
+     */
+    private Set<String> registrationAllowedSlugs = Set.of("default");
 
     @Min(1)
     private int maxRegistrationsPerWindow = 5;
@@ -106,6 +113,14 @@ public class AuthProperties {
 
     public void setSelfRegistrationEnabled(boolean selfRegistrationEnabled) {
         this.selfRegistrationEnabled = selfRegistrationEnabled;
+    }
+
+    public Set<String> getRegistrationAllowedSlugs() {
+        return registrationAllowedSlugs;
+    }
+
+    public void setRegistrationAllowedSlugs(Set<String> registrationAllowedSlugs) {
+        this.registrationAllowedSlugs = registrationAllowedSlugs;
     }
 
     public int getMaxRegistrationsPerWindow() {

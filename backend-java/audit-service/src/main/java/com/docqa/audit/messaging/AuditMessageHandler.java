@@ -26,17 +26,20 @@ public class AuditMessageHandler {
 
     public ConsumeResult handle(byte[] body, String traceIdProperty) {
         if (body == null || body.length == 0) {
-            LOGGER.error("Rejecting empty audit event message; it will be retried and then dead-lettered");
-            return ConsumeResult.RETRY;
+            // 空消息是确定性失败：重试再多次也不会变得可解析。直接 ACK 并以 ERROR
+            // 留痕，避免占用 maxReconsumeTimes（16 次）的 broker 资源。
+            LOGGER.error("Discarding empty audit event message (poison message)");
+            return ConsumeResult.ACK;
         }
         AuditEventMessage message;
         try {
             message = objectMapper.readValue(body, AuditEventMessage.class);
         } catch (IOException ex) {
+            // 反序列化失败同理是毒消息，重试无意义；ERROR 日志保留排查线索。
             LOGGER.error(
-                    "Rejecting malformed audit event; it will be retried and then dead-lettered: reason={}",
+                    "Discarding malformed audit event (poison message): reason={}",
                     ex.getClass().getSimpleName());
-            return ConsumeResult.RETRY;
+            return ConsumeResult.ACK;
         }
         String traceId = resolveTraceId(traceIdProperty, message.traceId());
         try {
@@ -45,11 +48,13 @@ public class AuditMessageHandler {
                 return ConsumeResult.ACK;
             });
         } catch (AuditEventRejectedException ex) {
+            // 字段校验失败同样是确定性失败（重试不会让缺失的 eventId 出现），
+            // 直接 ACK + ERROR 留痕；只有下游 RuntimeException 才真正需要重试。
             LOGGER.error(
-                    "Rejecting invalid audit event; it will be retried and then dead-lettered: eventId={}, reason={}",
+                    "Discarding invalid audit event (poison message): eventId={}, reason={}",
                     eventId(message),
                     ex.getMessage());
-            return ConsumeResult.RETRY;
+            return ConsumeResult.ACK;
         } catch (RuntimeException ex) {
             LOGGER.error("Audit event ingestion failed; scheduling retry: eventId={}", eventId(message), ex);
             return ConsumeResult.RETRY;

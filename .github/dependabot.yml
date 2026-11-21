@@ -79,9 +79,9 @@ updates:
         patterns:
           - "*"
 
-  # 仓库当前没有任何 Dockerfile（G17 待办）；以 "/" 作为占位目录。
-  # ops/docker-compose.infra.yml 的镜像版本目前由人工维护（G16 计划改 digest 固定），
-  # 待新增 Dockerfile 后此生态会自动纳入版本跟踪，届时按实际路径调整 directory。
+  # 根 Dockerfile 的运行阶段基础镜像已按 digest 固定，dependabot 无法给出
+  # digest 的语义化升级；ops/docker-compose.infra.yml 的镜像版本仍由人工维护。
+  # 保留此生态以便新镜像引入时收到提醒，directory 指向根 Dockerfile 所在目录。
   - package-ecosystem: "docker"
     directory: "/"
     schedule:

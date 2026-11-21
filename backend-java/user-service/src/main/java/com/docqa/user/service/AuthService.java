@@ -141,7 +141,8 @@ public class AuthService {
         String password = request.password();
         String key = requireIdempotencyKey(idempotencyKey);
         rejectWeakPassword("password", password);
-        UUID tenantId = tenantResolver.resolve(request.tenantSlug());
+        // 注册须过租户级准入白名单，不能凭猜中的 slug 落入任意 ACTIVE/TRIAL 租户。
+        UUID tenantId = tenantResolver.resolveForRegistration(request.tenantSlug());
 
         String scope = principal(tenantId, username);
         String fingerprint = Fingerprints.sha256(
