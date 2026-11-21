@@ -9,7 +9,7 @@ spring:
       fail-on-unknown-properties: true
   datasource:
     url: ${DOCQA_DB_URL:jdbc:mysql://127.0.0.1:3306/docqa?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
-    username: ${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:root}}
+    username: ${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:}}
     password: ${DOCQA_APP_DB_PASSWORD:${DOCQA_DB_PASSWORD:}}
     hikari:
       maximum-pool-size: 10

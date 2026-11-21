@@ -634,6 +634,13 @@ public class DocumentService {
         Instant now = clock.instant();
         String minioUploadId = objectStorage.createMultipartUpload(document.objectKey());
         try {
+            // 重复 init 会覆盖 Redis 中同一 documentId 的旧 session；先把旧分片 abort 掉，
+            // 否则旧 minioUploadId 失去引用成为孤儿（C-3）。
+            uploadSessionStore.find(document.id()).ifPresent(previous -> {
+                if (!minioUploadId.equals(previous.minioUploadId())) {
+                    abortQuietly(previous.objectKey(), previous.minioUploadId());
+                }
+            });
             Instant sessionExpiresAt = now.plus(documentProperties.getSessionTtl());
             UploadSession session = new UploadSession(
                     document.id(),
@@ -686,12 +693,17 @@ public class DocumentService {
                         ErrorCode.DOC_CONFLICT_001,
                         "上传会话已过期，请重新初始化上传。"));
         if (!session.expiresAt().isAfter(clock.instant())) {
+            // 过期会话：先 abort MinIO 未完成的分片再删会话，避免悬挂分片累积（C-3）。
+            abortQuietly(session.objectKey(), session.minioUploadId());
             deleteSessionQuietly(uploadId);
             throw new BusinessException(ErrorCode.DOC_CONFLICT_001, "上传会话已过期，请重新初始化上传。");
         }
         if (!session.userId().equals(userId)
                 || !session.objectKey().equals(document.objectKey())
                 || !session.documentId().equals(document.id())) {
+            // 会话与文档不匹配：这条分片同样不会被 complete，主动清理
+            abortQuietly(session.objectKey(), session.minioUploadId());
+            deleteSessionQuietly(uploadId);
             throw new BusinessException(ErrorCode.DOC_CONFLICT_001, "上传会话与文档不匹配，请重新初始化上传。");
         }
         validateCompleteParts(request.parts(), session.partCount());

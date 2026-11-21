@@ -5,6 +5,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.micrometer.tagged.TaggedCircuitBreakerMetrics;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.channel.ChannelOption;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -18,15 +19,23 @@ public class WebClientConfiguration {
     private static final int MAX_IN_MEMORY_BYTES = 2 * 1024 * 1024;
 
     @Bean
-    public WebClient pythonWebClient(WebClient.Builder builder, PythonProperties properties) {
+    public WebClient pythonWebClient(
+            WebClient.Builder builder,
+            PythonProperties properties,
+            @Value("${docqa.ai.internal-token:${DOCQA_AI_INTERNAL_TOKEN:}}") String internalToken) {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, Math.toIntExact(properties.getConnectTimeout().toMillis()))
                 .responseTimeout(properties.getResponseTimeout());
-        return builder
+        WebClient.Builder configured = builder
                 .baseUrl(properties.getBaseUrl())
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_IN_MEMORY_BYTES))
-                .build();
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_IN_MEMORY_BYTES));
+        // 网关 → 数据面共享密钥：defaultHeader 覆盖同步 /agent/ask 与 SSE /agent/ask/stream
+        // 全部请求；留空时保持本地 dev 与既有测试零改动（Python 侧同样不启用校验）。
+        if (internalToken != null && !internalToken.isBlank()) {
+            configured.defaultHeader("X-Internal-Token", internalToken);
+        }
+        return configured.build();
     }
 
     @Bean

@@ -9,7 +9,7 @@ spring:
       fail-on-unknown-properties: true
   datasource:
     url: ${DOCQA_DB_URL:jdbc:mysql://127.0.0.1:3306/docqa?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
-    username: ${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:root}}
+    username: ${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:}}
     password: ${DOCQA_APP_DB_PASSWORD:${DOCQA_DB_PASSWORD:}}
     hikari:
       maximum-pool-size: 5
@@ -30,11 +30,12 @@ docqa:
     ttl: 15m
     secret: ${DOCQA_JWT_SECRET:}
   demo-user:
-    enabled: ${DOCQA_DEMO_USER_ENABLED:true}
+    # 默认关闭种子 ADMIN；本地演示由 start-dev 脚本显式打开这两个开关（SEC-5）
+    enabled: ${DOCQA_DEMO_USER_ENABLED:false}
     username: ${DOCQA_DEMO_USERNAME:demo}
     password-hash: ${DOCQA_DEMO_PASSWORD_HASH:}
     user-id: ${DOCQA_DEMO_USER_ID:00000000-0000-0000-0000-000000000001}
-    admin: ${DOCQA_DEMO_ADMIN:true}
+    admin: ${DOCQA_DEMO_ADMIN:false}
   auth:
     max-login-failures: 5
     login-failure-window: 60s

@@ -66,6 +66,7 @@ class AuthServiceTest {
     private InMemoryRefreshTokenRepository refreshTokenRepository;
     private RecordingRevocationStore revocationStore;
     private RegistrationRateLimiter registrationRateLimiter;
+    private LoginRateLimiter loginRateLimiter;
     private PasswordEncoder passwordEncoder;
     private JwtService jwtService;
     private AuthProperties properties;
@@ -80,7 +81,9 @@ class AuthServiceTest {
         refreshTokenRepository = new InMemoryRefreshTokenRepository();
         revocationStore = new RecordingRevocationStore();
         registrationRateLimiter = mock(RegistrationRateLimiter.class);
-        when(registrationRateLimiter.check(any())).thenReturn(RateLimitDecision.permit());
+        when(registrationRateLimiter.check(any(), any())).thenReturn(RateLimitDecision.permit());
+        loginRateLimiter = mock(LoginRateLimiter.class);
+        when(loginRateLimiter.check(any(), any())).thenReturn(RateLimitDecision.permit());
         when(roleRepository.findRoles(any(), any())).thenReturn(Set.of(UserRole.USER));
 
         properties = new AuthProperties();
@@ -104,7 +107,7 @@ class AuthServiceTest {
                 new PasswordPolicy(),
                 new IdempotencyGuard(new InMemoryIdempotencyStore(), objectMapper, clock),
                 registrationRateLimiter,
-                new LoginRateLimiter(properties, clock),
+                loginRateLimiter,
                 jwtService,
                 passwordEncoder,
                 properties,
@@ -160,6 +163,8 @@ class AuthServiceTest {
                     .isInstanceOf(BusinessException.class);
         }
 
+        // 限流计数语义由 LoginRateLimiterTest 覆盖；这里只验证 AuthService 对 reject 的映射。
+        when(loginRateLimiter.check(any(), any())).thenReturn(RateLimitDecision.reject(60));
         assertThatThrownBy(() -> authService.login(new LoginRequest(USERNAME, PASSWORD), IP))
                 .isInstanceOfSatisfying(RateLimitedException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_RATE_LIMIT_001);
@@ -268,7 +273,7 @@ class AuthServiceTest {
 
     @Test
     void registerAppliesSourceRateLimitBeforeAnythingElse() {
-        when(registrationRateLimiter.check(IP)).thenReturn(RateLimitDecision.reject(42));
+        when(registrationRateLimiter.check(eq(IP), any())).thenReturn(RateLimitDecision.reject(42));
 
         assertThatThrownBy(() -> authService.register(
                 new RegisterRequest("zhang.wei", "correct-horse-9"), IDEMPOTENCY_KEY, IP))

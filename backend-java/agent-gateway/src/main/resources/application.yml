@@ -16,7 +16,7 @@ spring:
       fail-on-unknown-properties: true
   datasource:
     url: ${DOCQA_DB_URL:jdbc:mysql://127.0.0.1:3306/docqa?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
-    username: ${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:root}}
+    username: ${DOCQA_APP_DB_USERNAME:${DOCQA_DB_USERNAME:}}
     password: ${DOCQA_APP_DB_PASSWORD:${DOCQA_DB_PASSWORD:}}
     hikari:
       maximum-pool-size: 10
@@ -119,7 +119,7 @@ docqa:
     relay-batch-size: 100
     # 网关也会直接往 audit_event 追加管理端事件（JdbcAdminAuditRepository），
     # 所以它同样要被这条判据看住：能写，但不能改。
-    append-only-guard: ${DOCQA_AUDIT_APPEND_ONLY_GUARD:warn}
+    append-only-guard: ${DOCQA_AUDIT_APPEND_ONLY_GUARD:enforce}
 
 logging:
   level:

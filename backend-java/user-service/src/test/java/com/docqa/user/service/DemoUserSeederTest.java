@@ -41,6 +41,7 @@ class DemoUserSeederTest {
         properties.setUsername(" Demo ");
         properties.setPasswordHash(BCRYPT_HASH);
         properties.setUserId(USER_ID);
+        properties.setEnabled(true);
         properties.setAdmin(true);
     }
 

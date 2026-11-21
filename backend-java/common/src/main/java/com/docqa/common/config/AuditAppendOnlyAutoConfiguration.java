@@ -25,7 +25,7 @@ public class AuditAppendOnlyAutoConfiguration {
     @ConditionalOnMissingBean
     public AuditAppendOnlyGuard auditAppendOnlyGuard(
             JdbcTemplate jdbcTemplate,
-            @Value("${docqa.audit.append-only-guard:warn}") String mode) {
+            @Value("${docqa.audit.append-only-guard:enforce}") String mode) {
         return new AuditAppendOnlyGuard(jdbcTemplate, AuditAppendOnlyGuard.Mode.parse(mode));
     }
 }
