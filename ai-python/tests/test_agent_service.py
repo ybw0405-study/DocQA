@@ -10,6 +10,7 @@ from docqa_ai.config import Settings
 from docqa_ai.governance.budget import BudgetSnapshot, BudgetUnavailable, Deadline, InMemoryBudgetStore
 from docqa_ai.governance.experiment_budget import ExperimentBudgetStore, InMemoryExperimentBudgetStore
 from docqa_ai.governance.kill_switch import StaticKillSwitch
+from docqa_ai.governance.model_connection import ResolvedPlanner
 from docqa_ai.pii.masker import mask_text
 from docqa_ai.protocol.errors import AgentError
 from docqa_ai.providers.embeddings import OfflineEmbeddingProvider
@@ -100,6 +101,7 @@ def service(
     tools: ToolRegistry | None = None,
     experiment: ExperimentBudgetStore | None = None,
     mcp: object | None = None,
+    planner_resolver: object | None = None,
 ) -> AgentAskService:
     return AgentAskService(
         settings or make_settings(),
@@ -110,6 +112,7 @@ def service(
         tools or ToolRegistry([]),
         experiment=experiment,
         mcp=mcp,  # type: ignore[arg-type]
+        planner_resolver=planner_resolver,  # type: ignore[arg-type]
     )
 
 
@@ -589,3 +592,50 @@ async def test_startup_publish_failure_only_degrades_the_echo(caplog: pytest.Log
 
     assert any("not published" in record.message for record in caplog.records)
     assert await ledger.snapshot() == await InMemoryExperimentBudgetStore(10, 1000).snapshot()
+
+
+class StubResolver:
+    """按请求解析的替身：记录被问到的租户，并暴露 aclose 是否被收口。"""
+
+    def __init__(self, resolved: ResolvedPlanner) -> None:
+        self.resolved = resolved
+        self.tenants: list[object] = []
+        self.closed = False
+
+    async def resolve(self, tenant_id):
+        self.tenants.append(tenant_id)
+        return self.resolved
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+async def test_ui_connection_drives_the_planner_and_the_reported_model() -> None:
+    """界面连接生效时，图用的 planner 与审计报的模型都必须来自解析结果，而不是启动期 settings。"""
+
+    planner = FixedPlanner(PlannerOutput(kind="final", answer="来自界面配置的模型", token_in=5, token_out=5))
+    resolver = StubResolver(ResolvedPlanner(planner=planner, model="deepseek-chat", provider="openai"))
+
+    result = await service(settings=make_settings(llm_model="qwen-plus"), planner_resolver=resolver).ask(make_request())
+
+    completed = next(event for event in result.audit_events if event.eventType == "AGENT_COMPLETED")
+    assert completed.payloadRedacted["model"] == "deepseek-chat"
+    assert result.answer == "来自界面配置的模型"
+    assert resolver.tenants == [TENANT_ID]
+
+
+async def test_offline_planner_does_not_claim_a_vendor_model_name() -> None:
+    """诚实性回归：provider=offline 时审计不得报 env 里的厂商模型名（此前报 qwen-plus）。"""
+
+    result = await service(settings=make_settings(llm_provider="offline", llm_model="qwen-plus")).ask(make_request())
+
+    completed = next(event for event in result.audit_events if event.eventType == "AGENT_COMPLETED")
+    assert completed.payloadRedacted["model"] == "offline-extractive"
+
+
+async def test_aclose_closes_the_resolver_owned_planners() -> None:
+    resolver = StubResolver(ResolvedPlanner(planner=OfflinePlanner(), model="offline-extractive", provider="offline"))
+
+    await service(planner_resolver=resolver).aclose()
+
+    assert resolver.closed is True

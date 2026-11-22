@@ -532,6 +532,9 @@ const ENVELOPE_SCHEMAS = [
   'AiQuotaListEnvelope',
   'AuditEventListEnvelope',
   'UsageEnvelope',
+  'ModelConnectionEnvelope',
+  'ModelConnectionListEnvelope',
+  'ModelProbeEnvelope',
 ];
 
 /** 未镜像的契约 schema 必须在此显式列名并写原因；两边都没覆盖会让覆盖测试变红。 */
@@ -567,6 +570,36 @@ const NOT_MIRRORED: { schema: string; reason: string }[] = [
     schema: 'AskStreamError',
     reason:
       'data 直接 $ref ProblemDetail，复用既有镜像；该引用形态由下方专项断言锁定。前端不产出 error 事件——api/conversations.ts 把它映射成 ApiError 抛出，与首字节前的 JSON 拒绝同构。',
+  },
+  // 契约 2.7.0 模型连接管理面：后端链路先落地，前端向导页与类型镜像随下一个 PR 交付。
+  // 豁免是暂时的：镜像落地时必须把这 7 条移进 MIRRORED_OBJECTS / MIRRORED_ENUMS 并删掉这里。
+  {
+    schema: 'ModelConnection',
+    reason: '模型连接读侧形态；前端镜像随「模型连接」管理页 PR 落地，届时移入 MIRRORED_OBJECTS。',
+  },
+  {
+    schema: 'ModelConnectionListData',
+    reason: '模型连接列表体；前端镜像随「模型连接」管理页 PR 落地。',
+  },
+  {
+    schema: 'CreateModelConnectionRequest',
+    reason: '建立/更新连接的请求体；前端镜像随「模型连接」管理页 PR 落地。',
+  },
+  {
+    schema: 'AuthorizeModelConnectionRequest',
+    reason: '录入 API Key 的请求体；前端镜像随「模型连接」管理页 PR 落地（密钥只存组件本地 state）。',
+  },
+  {
+    schema: 'UpdateActivationRequest',
+    reason: '切换生效状态的请求体；前端镜像随「模型连接」管理页 PR 落地。',
+  },
+  {
+    schema: 'ModelProbeData',
+    reason: '探测结论载荷；前端镜像随「模型连接」管理页 PR 落地。',
+  },
+  {
+    schema: 'ModelProbeFailure',
+    reason: '探测失败原因枚举；前端镜像随「模型连接」管理页 PR 落地，届时移入 MIRRORED_ENUMS。',
   },
 ];
 
@@ -929,8 +962,8 @@ describe('契约 ↔ 前端类型对账', () => {
 
     expect(unaccounted, `契约新增/改名的 schema 未经裁决：${unaccounted.join(', ')}`).toEqual([]);
     expect(stale, `前端镜像表里的 schema 在契约中已不存在：${stale.join(', ')}`).toEqual([]);
-    // 契约 2.6.0 的 schema 计数（新增 KillSwitchStateEnvelope）。契约一旦增删，这一条先红，逼着来做一次裁决。
-    expect(SCHEMA_NAMES).toHaveLength(99);
+    // 契约 2.7.0 的 schema 计数（新增模型连接管理面 10 个）。契约一旦增删，这一条先红，逼着来做一次裁决。
+    expect(SCHEMA_NAMES).toHaveLength(109);
   });
 
   it('mirrors every object schema field-for-field', () => {
@@ -1244,6 +1277,13 @@ describe('契约 ↔ 前端类型对账', () => {
         'KeysetCursor',
       ],
       getAiUsage: ['TimeFrom', 'TimeTo', 'UsageBucket', 'UsageTopUsers'],
+      // 契约 2.7.0 模型连接管理面：同样按值幂等，不声明幂等键（D-197）。
+      listModelConnections: [],
+      upsertModelConnection: [],
+      deleteModelConnection: ['ConnectionId'],
+      authorizeModelConnection: ['ConnectionId'],
+      probeModelConnection: ['ConnectionId'],
+      updateModelConnectionActivation: ['ConnectionId'],
     };
     for (const [operationId, names] of Object.entries(expectedParameters)) {
       const refs = operationParameterRefs(operationBody(operationId));
@@ -1321,7 +1361,7 @@ describe('契约 ↔ 前端类型对账', () => {
 
   it('routes every error response through the single mirrored ProblemDetail', () => {
     // 契约 2.5.0 的 components.responses 计数，全部复用同一个 ProblemDetail。
-    expect(RESPONSE_BLOCKS).toHaveLength(34);
+    expect(RESPONSE_BLOCKS).toHaveLength(35);
     const offContract = RESPONSE_BLOCKS.filter(
       (block) => !block.body.some((line) => line.trim() === "$ref: '#/components/schemas/ProblemDetail'"),
     ).map((block) => block.name);

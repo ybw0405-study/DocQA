@@ -82,8 +82,8 @@ class TenantIsolationContractTest {
             }
         }
         assertThat(checked)
-                .as("必须实际扫描到 19 个 Jdbc 仓库，扫描数为 0 说明测试路径写错了")
-                .isEqualTo(19);
+                .as("必须实际扫描到 20 个 Jdbc 仓库，扫描数为 0 说明测试路径写错了")
+                .isEqualTo(20);
         assertThat(offenders)
                 .as("每个业务仓库都必须出现 tenant_id 谓词/列；遗漏即跨租户数据泄漏")
                 .isEmpty();

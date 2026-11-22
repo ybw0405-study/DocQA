@@ -126,8 +126,8 @@ Write-Note "库 $Schema 与迁移账本都在位；管理员账号 $AdminUser"
 
 $businessTables = @(
     'agent_execution', 'ai_quota', 'app_user', 'app_user_role', 'chunk', 'conversation',
-    'document', 'document_tag', 'document_tag_link', 'message', 'refresh_token',
-    'reminder', 'reminder_trigger', 'tenant', 'vector_cleanup_task'
+    'document', 'document_tag', 'document_tag_link', 'message', 'model_connection',
+    'refresh_token', 'reminder', 'reminder_trigger', 'tenant', 'vector_cleanup_task'
 )
 # audit_relay_cursor 也是业务表，但目标态没有 DELETE（模板按 upsert 覆盖单行，没有删除路径），
 # 和 audit_event 一样属于「按表特例授权」，所以不进 $businessTables。

@@ -102,6 +102,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`ai_quota`          TO 'ss_app'@
 GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`vector_cleanup_task` TO 'ss_app'@'__ACCOUNT_HOST__';
 GRANT SELECT, INSERT, UPDATE         ON `docqa`.`audit_relay_cursor`  TO 'ss_app'@'__ACCOUNT_HOST__';
 
+-- model_connection（V13 引入）：管理员在界面配置的生成模型连接。给 DELETE 是必须的——
+-- 删除连接就要连带删除 credential 密文，留副本等于密钥无法真正吊销。
+-- 与 audit_event 的「只追加」相反：这是可修改、可删除的运营配置，不是历史事实。
+GRANT SELECT, INSERT, UPDATE, DELETE ON `docqa`.`model_connection`  TO 'ss_app'@'__ACCOUNT_HOST__';
+
 -- tenant（V10 引入）：租户清单。**故意不给 DELETE**——注销租户走 status='DELETED'
 -- 的软删除，chk_tenant_status 已经把这个状态写进约束，硬删会连带打断所有存量行的
 -- 归属关系。SELECT 供 P1 按 slug 解析租户；INSERT 供 document-service 启动期写入

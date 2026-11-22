@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: DocQA Java API
-  version: 2.6.0
+  version: 2.7.0
   description: |
     本文件是 Java 对外核心业务接口契约，覆盖 5 个核心业务接口，
     并在实现时补充 Auth 支撑接口与会话创建接口；1.2.0 与 1.3.0 为 `frontend-vue` 补充四个只读列表接口。
@@ -34,6 +34,18 @@ info:
     `agent:kill-switch:tenant:{tenantId}` 键，两者在 Python agent 执行点按 OR 判读；
     `tenantId` 一律取自已验签 JWT，不接受请求体或 Header 传参。既有路径、schema 与错误码
     一律不删不改，新增一个 `KillSwitchStateEnvelope` 响应信封。
+    2.7.0 是**模型连接管理面**（向后兼容的次版本）：新增 `/api/v1/admin/ai/model-connections`
+    及其 `{connectionId}` / `credential` / `probe` / `activation` 子路径，共 **5 条路径 / 6 个操作**，
+    让管理员在界面里选厂商预设、填自己的 API Key、测试连通性并设为生效，取代「改 env 再重启」。
+    凭据**只进不出**：明文 Key 只出现在 `PUT …/credential` 的请求体，服务端以 AES-256-GCM
+    封装落库（AAD 绑定 `connectionId|tenantId`），读侧只有 `hasCredential` 布尔。
+    写操作全部按值幂等（创建按租户内 `name` upsert、凭据与生效状态覆盖式写入），
+    沿用 D-197「管理端不声明幂等头」。**不新增错误码**：连接不存在复用 `COM-NOT_FOUND-001`，
+    出网策略与连接数上限复用 `COM-VALIDATION-001`，主密钥未配置复用 `COM-INTERNAL-001`；
+    探测失败不是 HTTP 错误，仍返回 200 并由 `ModelProbeFailure` 枚举表达结论。
+    跨语言协议（`cross-language-protocol.md`）**零改动**：刻意不给 ask payload 增加模型字段，
+    改由网关把生效连接的密文发布到 `agent:model-connection:tenant:{tenantId}`，
+    数据面用同一把主密钥本地解密后按请求选模型——明文 Key 不过内部 HTTP，也不过 Redis。
 
     - 2.1.0 新增的五个写操作全部要求 `Idempotency-Key`，`operation` 取值分别为
       `DOCUMENT_RENAME`、`DOCUMENT_TAG_UPDATE`、`DOCUMENT_DELETE`、`DOCUMENT_RETRY`、`DOCUMENT_REINDEX`；
@@ -3014,6 +3026,358 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/admin/ai/model-connections:
+    get:
+      tags:
+        - Admin
+      operationId: listModelConnections
+      summary: 列出本租户的模型连接
+      description: |
+        需要 `ADMIN` 角色。返回当前租户配置的全部生成模型连接，按 `created_at, id` 排序。
+        `tenantId` 取自已验签 JWT，不接受查询参数或请求体传参。
+
+        **凭据只进不出**：每项只有 `hasCredential` 布尔，密文、keyId 与明文 API Key 都不在响应里。
+        `active` 为真的项至多一条，由存储层 `(tenant_id, active_slot)` 唯一键保证。
+        连接是小集合（每租户上限 20 条），因此本端点不分页、不返回 `total`。
+        本端点不投递 MQ、不调用 Python、不触发 LLM。
+      responses:
+        '200':
+          description: 本租户的连接清单
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelConnectionListEnvelope'
+              examples:
+                page:
+                  value:
+                    code: OK
+                    msg: success
+                    data:
+                      items:
+                        - id: aaaaaaaa-0000-0000-0000-000000000001
+                          name: DeepSeek 主连接
+                          presetId: deepseek
+                          baseUrl: https://api.deepseek.com/v1
+                          model: deepseek-chat
+                          enabled: true
+                          active: true
+                          hasCredential: true
+                          probeStatus: OK
+                          lastProbedAt: '2026-11-22T10:15:42.010Z'
+                          createdAt: '2026-11-22T10:12:03.004Z'
+                          updatedAt: '2026-11-22T10:15:42.010Z'
+                          updatedBy: 00000000-0000-0000-0000-000000000001
+                        - id: aaaaaaaa-0000-0000-0000-000000000002
+                          name: 本地 Ollama
+                          presetId: ollama
+                          baseUrl: http://127.0.0.1:11434/v1
+                          model: qwen2.5:7b
+                          enabled: true
+                          active: false
+                          hasCredential: false
+                          probeStatus: UNKNOWN
+                          lastProbedAt: null
+                          createdAt: '2026-11-22T10:13:11.482Z'
+                          updatedAt: '2026-11-22T10:13:11.482Z'
+                          updatedBy: 00000000-0000-0000-0000-000000000001
+                    traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - Admin
+      operationId: upsertModelConnection
+      summary: 建立或更新一条模型连接（按租户内名称 upsert）
+      description: |
+        需要 `ADMIN` 角色。请求体**不含 API Key**：凭据走独立的
+        `PUT …/{connectionId}/credential`，因此本请求体可以安全地进访问日志。
+
+        `name` 在租户内唯一，同名重复提交收敛到同一行并更新 `presetId` / `baseUrl` / `model` /
+        `enabled`，**不改变生效状态**（`is_active` 不被 upsert 触碰）。因此本操作按值幂等，
+        沿用管理面 D-197 裁决：不声明 `Idempotency-Key`。
+
+        `baseUrl` 必须是 `http` / `https`，且出网前过主机白名单与私网判定：回环、私网、
+        链路本地（含云元数据 169.254.169.254）、保留地址默认拒绝，本地自托管端点需要服务端
+        显式打开 `DOCQA_LLM_ALLOW_PRIVATE`。不满足返回 400 `COM-VALIDATION-001`，
+        字段级原因落在 `baseUrl`。每租户连接数达到 20 条后新建同样返回 400。
+
+        连接写入与管理审计事件插入在同一 MySQL 事务内；提交后把生效连接的**密文**发布到
+        `agent:model-connection:tenant:{tenantId}` 供数据面按请求取用。本端点不触发 LLM。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateModelConnectionRequest'
+            examples:
+              vendor:
+                value:
+                  name: DeepSeek 主连接
+                  presetId: deepseek
+                  baseUrl: https://api.deepseek.com/v1
+                  model: deepseek-chat
+                  enabled: true
+              selfHosted:
+                value:
+                  name: 本地 Ollama
+                  presetId: ollama
+                  baseUrl: http://127.0.0.1:11434/v1
+                  model: qwen2.5:7b
+      responses:
+        '200':
+          description: 连接已建立或更新
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelConnectionEnvelope'
+              examples:
+                created:
+                  value:
+                    code: OK
+                    msg: success
+                    data:
+                      id: aaaaaaaa-0000-0000-0000-000000000001
+                      name: DeepSeek 主连接
+                      presetId: deepseek
+                      baseUrl: https://api.deepseek.com/v1
+                      model: deepseek-chat
+                      enabled: true
+                      active: false
+                      hasCredential: false
+                      probeStatus: UNKNOWN
+                      lastProbedAt: null
+                      createdAt: '2026-11-22T10:12:03.004Z'
+                      updatedAt: '2026-11-22T10:12:03.004Z'
+                      updatedBy: 00000000-0000-0000-0000-000000000001
+                    traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/ai/model-connections/{connectionId}:
+    delete:
+      tags:
+        - Admin
+      operationId: deleteModelConnection
+      summary: 删除一条模型连接
+      description: |
+        需要 `ADMIN` 角色。删除连接即删除其密文，不留副本——这是密钥可被真正吊销的前提。
+        删掉的若是生效连接，分发键同时被删除，数据面回退到 env 配置的 provider。
+        删除与审计事件在同一事务内；按值幂等，不声明 `Idempotency-Key`。
+      parameters:
+        - $ref: '#/components/parameters/ConnectionId'
+      responses:
+        '204':
+          description: 连接已删除，无响应体
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ModelConnectionNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/ai/model-connections/{connectionId}/credential:
+    put:
+      tags:
+        - Admin
+      operationId: authorizeModelConnection
+      summary: 录入或替换连接的 API Key
+      description: |
+        需要 `ADMIN` 角色。这是明文 Key 唯一进入服务端的入口：服务端立即用 AES-256-GCM
+        封装成密文落库，AAD 绑定 `connectionId|tenantId`，因此密文被搬到别的连接或别的租户下
+        都解不开。响应只回 `hasCredential`，**任何形式的密钥材料都不回显**。
+
+        主密钥来自 `DOCQA_CRED_MASTER_KEY`（base64 的 32 字节）。未配置或格式非法时返回
+        500 `COM-INTERNAL-001`，并在 `detail` 里说明要配置哪个变量；这不影响网关其它功能。
+        覆盖式写入，按值幂等，不声明 `Idempotency-Key`。本端点不触发 LLM。
+      parameters:
+        - $ref: '#/components/parameters/ConnectionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizeModelConnectionRequest'
+            examples:
+              set:
+                value:
+                  secret: sk-your-own-vendor-key
+      responses:
+        '200':
+          description: 凭据已封装落库
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelConnectionEnvelope'
+              examples:
+                authorized:
+                  value:
+                    code: OK
+                    msg: success
+                    data:
+                      id: aaaaaaaa-0000-0000-0000-000000000001
+                      name: DeepSeek 主连接
+                      presetId: deepseek
+                      baseUrl: https://api.deepseek.com/v1
+                      model: deepseek-chat
+                      enabled: true
+                      active: false
+                      hasCredential: true
+                      probeStatus: UNKNOWN
+                      lastProbedAt: null
+                      createdAt: '2026-11-22T10:12:03.004Z'
+                      updatedAt: '2026-11-22T10:14:20.881Z'
+                      updatedBy: 00000000-0000-0000-0000-000000000001
+                    traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ModelConnectionNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/ai/model-connections/{connectionId}/probe:
+    post:
+      tags:
+        - Admin
+      operationId: probeModelConnection
+      summary: 测试连接连通性（真实出网 GET /models）
+      description: |
+        需要 `ADMIN` 角色。服务端解密凭据后真实出网 `GET {baseUrl}/models`，验证网络可达、
+        出网策略放行、凭据正确、端点符合 OpenAI 兼容形态。**前端只拿模型 id 与失败原因**。
+
+        探测失败仍返回 **200**：这是「探测这个动作完成了，结论是连不上」，不是 HTTP 层错误；
+        调用方按 `failureReason` 给出可操作文案。响应体有字节上限、模型清单有条数与长度上限，
+        且不跟随重定向（否则一次 302 就能绕过白名单）。
+
+        `probeStatus` 三态：从未探测保持 `UNKNOWN`（未录 Key 时不发生探测），
+        探测通过写 `OK`，其余写 `FAILED`。密文解不开（主密钥轮换后旧密钥未保留）时
+        `failureReason=CREDENTIAL_UNREADABLE`，提示重新录入 Key，**不静默降级**。
+        本端点会真实外呼厂商端点，但不触发问答 LLM 生成。
+      parameters:
+        - $ref: '#/components/parameters/ConnectionId'
+      responses:
+        '200':
+          description: 探测结论（成功或失败都在这里）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelProbeEnvelope'
+              examples:
+                ok:
+                  value:
+                    code: OK
+                    msg: success
+                    data:
+                      ok: true
+                      models:
+                        - deepseek-chat
+                        - deepseek-reasoner
+                      failureReason: null
+                      detail: null
+                    traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+                rejected:
+                  value:
+                    code: OK
+                    msg: success
+                    data:
+                      ok: false
+                      models: []
+                      failureReason: HTTP_4XX
+                      detail: 端点返回 HTTP 401
+                    traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ModelConnectionNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/ai/model-connections/{connectionId}/activation:
+    put:
+      tags:
+        - Admin
+      operationId: updateModelConnectionActivation
+      summary: 设为生效连接或取消生效
+      description: |
+        需要 `ADMIN` 角色。`active=true` 时服务端在同一事务里先清掉本租户其它生效标记再设本条，
+        存储层 `(tenant_id, active_slot)` 唯一键保证任何时刻至多一条生效；对已停用的连接
+        （`enabled=false`）设为生效返回 400 `COM-VALIDATION-001`。
+
+        `active=false` 只取消**这一条**的生效标记，不影响租户内其它连接。
+        生效连接变更后立即重发布分发键；取消生效后若无其它生效连接则删键，
+        数据面回退到 env 配置的 provider。覆盖式写入，按值幂等，不声明 `Idempotency-Key`。
+        本端点不触发 LLM。
+      parameters:
+        - $ref: '#/components/parameters/ConnectionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateActivationRequest'
+            examples:
+              activate:
+                value:
+                  active: true
+              deactivate:
+                value:
+                  active: false
+      responses:
+        '200':
+          description: 生效状态已变更
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelConnectionEnvelope'
+              examples:
+                activated:
+                  value:
+                    code: OK
+                    msg: success
+                    data:
+                      id: aaaaaaaa-0000-0000-0000-000000000001
+                      name: DeepSeek 主连接
+                      presetId: deepseek
+                      baseUrl: https://api.deepseek.com/v1
+                      model: deepseek-chat
+                      enabled: true
+                      active: true
+                      hasCredential: true
+                      probeStatus: OK
+                      lastProbedAt: '2026-11-22T10:15:42.010Z'
+                      createdAt: '2026-11-22T10:12:03.004Z'
+                      updatedAt: '2026-11-22T10:16:02.337Z'
+                      updatedBy: 00000000-0000-0000-0000-000000000001
+                    traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ModelConnectionNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3207,6 +3571,18 @@ components:
         type: string
         format: uuid
       example: 0192f3a4-9d4e-7f32-8a01-1234567890ab
+    ConnectionId:
+      name: connectionId
+      in: path
+      required: true
+      description: |
+        模型连接 ID，必须与 `model_connection.id` 精确匹配。它是**路径参数而非身份来源**：
+        调用者是谁、属于哪个租户只由已验签 JWT 决定，本字段表示「对哪条连接操作」。
+        所有查询都带 `tenant_id` 谓词，因此别的租户的连接 ID 一律返回 404，不泄露其是否存在。
+      schema:
+        type: string
+        format: uuid
+      example: aaaaaaaa-0000-0000-0000-000000000001
     UserStatusFilter:
       name: status
       in: query
@@ -5972,6 +6348,242 @@ components:
           maxLength: 300
           example: must not contain path separators
 
+    ModelConnection:
+      type: object
+      description: |
+        一条生成模型连接的对外形态。**没有凭据字段**：只有 `hasCredential` 布尔，
+        密文、keyId 与明文 API Key 都不出现在任何读响应里。
+        `active` 为真的项在同一租户内至多一条，由存储层唯一键保证。
+      required:
+        - id
+        - name
+        - presetId
+        - baseUrl
+        - model
+        - enabled
+        - active
+        - hasCredential
+        - probeStatus
+        - lastProbedAt
+        - createdAt
+        - updatedAt
+        - updatedBy
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: aaaaaaaa-0000-0000-0000-000000000001
+        name:
+          type: string
+          maxLength: 64
+          description: 连接显示名，租户内唯一；创建按它 upsert。
+          example: DeepSeek 主连接
+        presetId:
+          type: string
+          maxLength: 32
+          nullable: true
+          description: 前端预设标识，仅用于回显厂商与申请 Key 的入口；自定义端点为 `null`。
+          example: deepseek
+        baseUrl:
+          type: string
+          maxLength: 512
+          description: OpenAI 兼容端点根地址，已按出网策略归一化（去掉 query 与 fragment）。
+          example: https://api.deepseek.com/v1
+        model:
+          type: string
+          maxLength: 64
+          description: 实际下发给厂商的模型名。
+          example: deepseek-chat
+        enabled:
+          type: boolean
+          description: 停用后不参与生效判定，但保留配置与密文。
+        active:
+          type: boolean
+          description: 是否为本租户当前生效的连接。
+        hasCredential:
+          type: boolean
+          description: 是否已录入 API Key。**这是凭据状态的唯一对外表达**。
+        probeStatus:
+          type: string
+          enum:
+            - UNKNOWN
+            - OK
+            - FAILED
+          description: 三态探测状态；`UNKNOWN` 表示从未探测，与「探测失败」不同。
+        lastProbedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-11-22T10:15:42.010Z'
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-11-22T10:12:03.004Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2026-11-22T10:15:42.010Z'
+        updatedBy:
+          type: string
+          format: uuid
+          nullable: true
+          description: 最近一次操作的管理员 `userId`；审计事实以 `audit_event` 为准。
+          example: 00000000-0000-0000-0000-000000000001
+
+    ModelConnectionListData:
+      type: object
+      description: |
+        租户内的连接清单。连接是小集合（每租户上限 20 条），因此不分页、不返回 `total`；
+        生效与否由每项的 `active` 表达，不另设「当前连接」字段。
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/ModelConnection'
+
+    ModelConnectionListEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/ModelConnectionListData'
+
+    ModelConnectionEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/ModelConnection'
+
+    CreateModelConnectionRequest:
+      type: object
+      description: |
+        建立或更新连接。**刻意不含 API Key**：凭据走独立的 credential 端点，
+        因此本请求体可以安全地进访问日志与错误回显。
+        `enabled` 缺省为 `true`；同名重复提交不改变生效状态。
+      required:
+        - name
+        - baseUrl
+        - model
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: DeepSeek 主连接
+        presetId:
+          type: string
+          maxLength: 32
+          nullable: true
+          pattern: '^[a-z0-9][a-z0-9-]{0,31}$'
+          example: deepseek
+        baseUrl:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: 只允许 http/https；出网前还要过主机白名单与私网判定。
+          example: https://api.deepseek.com/v1
+        model:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: deepseek-chat
+        enabled:
+          type: boolean
+          nullable: true
+          description: 缺省 `true`；显式 `false` 表示建立但停用。
+
+    AuthorizeModelConnectionRequest:
+      type: object
+      description: |
+        录入 API Key。明文只在这一个请求体里出现，服务端立即封装成密文落库；
+        响应与日志都不含它。
+      required:
+        - secret
+      properties:
+        secret:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: 厂商 API Key 明文；服务端不校验其形态（各家格式不同），只校验非空与长度。
+          example: sk-your-own-vendor-key
+
+    UpdateActivationRequest:
+      type: object
+      description: 切换生效状态。`active` 必须显式出现且非 `null`，避免「漏传」被误解成取消生效。
+      required:
+        - active
+      properties:
+        active:
+          type: boolean
+          example: true
+
+    ModelProbeFailure:
+      type: string
+      description: |
+        探测失败原因。与 HTTP 状态码无关——探测失败仍返回 200，由本枚举表达结论。
+        `CREDENTIAL_UNREADABLE` 表示密文解不开（主密钥轮换后旧密钥未保留、或行被搬动过），
+        处置是重新录入 Key，而不是重试。
+      enum:
+        - HTTP_4XX
+        - HTTP_5XX
+        - UNREACHABLE
+        - TIMEOUT
+        - NOT_OPENAI_COMPATIBLE
+        - EGRESS_BLOCKED
+        - CREDENTIAL_MISSING
+        - CREDENTIAL_UNREADABLE
+
+    ModelProbeData:
+      type: object
+      description: |
+        连通性探测结论。**只回模型 id 与失败原因**，任何凭据材料都不进这个响应。
+        成功时 `failureReason` 与 `detail` 为 `null`；失败时 `models` 为空数组。
+      required:
+        - ok
+        - models
+        - failureReason
+        - detail
+      properties:
+        ok:
+          type: boolean
+        models:
+          type: array
+          maxItems: 200
+          items:
+            type: string
+            maxLength: 128
+          description: 端点 `GET /models` 返回的模型 id，去重后按端点顺序。
+        failureReason:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/ModelProbeFailure'
+        detail:
+          type: string
+          maxLength: 200
+          nullable: true
+          description: 可读原因，不含凭据材料，也不透传对端响应体。
+          example: 端点返回 HTTP 401
+
+    ModelProbeEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/ModelProbeData'
+
   headers:
     RefreshCookie:
       description: |
@@ -6687,4 +7299,23 @@ components:
                 detail: AI 服务响应超时，请稍后重试。
                 instance: /api/v1/conversations/0192f3a4-8c3d-7e21-8f90-abcdef123456/ask
                 code: AGT-UPSTREAM-002
+                traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+
+    ModelConnectionNotFound:
+      description: |
+        模型连接不存在，或它属于别的租户。两种情况返回同一个 404，不泄露连接是否存在：
+        所有查询都带 `tenant_id` 谓词，租户边界由 SQL 保证而不是由错误文案区分。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            notFound:
+              value:
+                type: https://docqa.example/problems/not-found
+                title: Not found
+                status: 404
+                detail: 模型连接不存在。
+                instance: /api/v1/admin/ai/model-connections/aaaaaaaa-0000-0000-0000-000000000001/probe
+                code: COM-NOT_FOUND-001
                 traceId: 4bf92f3577b34da6a3ce929d0e0e4736

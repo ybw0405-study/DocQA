@@ -105,6 +105,21 @@ docqa:
       minimum-number-of-calls: 10
       wait-duration-in-open-state: 30s
       permitted-number-of-calls-in-half-open-state: 3
+  ai:
+    model-connection:
+      # 凭据主密钥（base64 的 32 字节）。留空 = 未配置：网关照常启动，
+      # 只有「保存 API Key」与「测试连接」会被明确拒绝，不影响其它任何功能。
+      # 与 Python 数据面读同一个变量名，两侧必须拿到同一把密钥，否则密文解不开。
+      master-key: ${DOCQA_CRED_MASTER_KEY:}
+      # 轮换前的旧主密钥（逗号分隔），只用于解封历史密文；新写入一律用当前主密钥。
+      previous-keys: ${DOCQA_CRED_MASTER_KEY_PREVIOUS:}
+      # 出网主机后缀白名单（逗号分隔）；空 = 放行任意公网主机。与数据面同一份取值。
+      allowed-hosts: ${DOCQA_LLM_ALLOWED_HOSTS:}
+      # 回环/私网放行开关：本地 Ollama 这类自托管端点需要显式打开，默认拒绝。
+      allow-private: ${DOCQA_LLM_ALLOW_PRIVATE:false}
+      key-prefix: "agent:model-connection:tenant:"
+      probe-timeout: 5s
+      probe-max-bytes: 262144
   admin:
     # 管理动作只写这两个键的元数据 / 只读账本；主键 agent:kill-switch 仍由 KillSwitch 统一读写
     kill-switch-meta-key: agent:kill-switch:meta

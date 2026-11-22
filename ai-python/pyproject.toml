@@ -37,6 +37,10 @@ dependencies = [
     # D-147：正文提取与 arXiv Atom 解析复用 venv 内既有 lxml（python-docx 的传递依赖），
     # 显式声明以避免依赖解析变化时静默消失；本轮未新增任何安装。
     "lxml>=5.0",
+    # 模型连接凭据的 AES-256-GCM 解封（与网关 Java 侧逐字节兼容）。同 D-147 口径：
+    # cryptography 早已是传递依赖并锁在 requirements.lock.txt（50.0.2），这里显式声明
+    # 以免依赖解析变化时静默消失；本轮未新增任何安装，锁文件无需重生成。
+    "cryptography>=43.0",
     # D-132：协议底座来自官方 SDK；治理层（白名单、掩码、预算、审计）仍在自有代码。
     "mcp==2.3.0",
 ]
