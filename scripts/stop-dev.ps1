@@ -51,7 +51,14 @@ while ((Get-Date) -lt $deadline) {
 }
 
 if ($Infra) {
-    docker compose -f (Join-Path $root 'ops/docker-compose.infra.yml') down
+    # compose 的端口映射依赖 local.env 插值；不带 --env-file 时变量为空，
+    # config 解析直接报错，down 会静默失败、容器继续跑。
+    $envFile = Join-Path $root 'ops/env/local.env'
+    if (Test-Path -LiteralPath $envFile) {
+        docker compose --env-file $envFile -f (Join-Path $root 'ops/docker-compose.infra.yml') down
+    } else {
+        docker compose -f (Join-Path $root 'ops/docker-compose.infra.yml') down
+    }
 }
 if (-not $Quiet) {
     if ($targets.Count -eq 0) { Write-Host 'nothing running.' }
