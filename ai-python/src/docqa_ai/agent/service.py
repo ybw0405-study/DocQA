@@ -476,8 +476,11 @@ class AgentAskService:
             raise _map_agent_error(collector, request, exc, deadline) from exc
 
     def _validate_request_pii(self, request: AgentAskRequest, collector: AuditCollector) -> str:
-        original = mask_text(request.question)
-        masked_question = mask_text(request.pii_masked_question)
+        # 复检 Java 第一层结果必须按请求声明的契约版本：v1 客户端只承诺遮三类，
+        # 用 v2 规则去复检会把未遮的银行卡误判成「Java 漏脱敏」而 422（DQ-P2-3）。
+        declared = request.pii_masking_version
+        original = mask_text(request.question, version=declared)
+        masked_question = mask_text(request.pii_masked_question, version=declared)
         if original.count:
             collector.add(
                 "PII_DIFFERENTIAL_CHECK",
@@ -491,7 +494,7 @@ class AgentAskService:
             self._audit_pii_block(collector, masked_question.categories, masked_question.count)
             raise pii_blocked(audit_events=collector.events(), trace_id=request.trace_id)
         for message in request.history:
-            check = mask_text(message.pii_masked_content)
+            check = mask_text(message.pii_masked_content, version=declared)
             if message.role == "USER" and check.count:
                 self._audit_pii_block(collector, check.categories, check.count)
                 raise pii_blocked(audit_events=collector.events(), trace_id=request.trace_id)

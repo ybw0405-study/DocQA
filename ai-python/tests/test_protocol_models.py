@@ -79,7 +79,7 @@ def test_mcp_tool_names_follow_the_protocol_pattern() -> None:
         {"protocolVersion": "1"},
         {"tenantId": "not-a-uuid"},
         {"tenantId": None},
-        {"piiMaskingVersion": "pii-v2"},
+        {"piiMaskingVersion": "pii-v999"},
         {"traceId": "A" * 32},
         {"traceId": "abc"},
         {"tokenBudget": 0},

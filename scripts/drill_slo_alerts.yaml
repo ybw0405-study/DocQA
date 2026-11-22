@@ -7,7 +7,7 @@
 # 本文件为新增脚手架，不修改任何现有源码 / 脚本 / 配置 / ops/**。
 #
 # 用法（真实环境）：
-#   promtool check rules batch4_slo_alerts.yaml
+#   promtool check rules drill_slo_alerts.yaml
 #   把 prometheus.rules 段挂到 rule_files；slo / error_budget 段供文档与看板消费。
 # =============================================================================
 
@@ -60,7 +60,7 @@ error_budget:
 # ---- Prometheus 记录规则 + 告警规则（标准 rule 结构，可 promtool 校验）----
 prometheus:
   groups:
-    - name: docqa.batch4.recording
+    - name: docqa.drill.recording
       interval: 30s
       rules:
         - record: job:docqa_ask_error_rate:ratio_rate5m
@@ -72,7 +72,7 @@ prometheus:
         - record: job:docqa_tenant_isolation_pass:ratio_rate5m
           expr: "sum(rate(docqa_tenant_isolation_checks_total{result='pass'}[5m])) / sum(rate(docqa_tenant_isolation_checks_total[5m]))"
 
-    - name: docqa.batch4.alerts
+    - name: docqa.drill.alerts
       rules:
         - alert: DocQAAskHighErrorRate
           expr: "job:docqa_ask_error_rate:ratio_rate5m > 0.005"
@@ -84,7 +84,7 @@ prometheus:
           annotations:
             summary: "/agent/ask 5xx 率超过 SLO (0.5%)"
             description: "当前 {{ $value | humanizePercentage }}，持续 5m。检查 parse worker / PG / Redis。"
-            runbook: "scripts/batch4_canary_rollback_runbook.md 第 4 节"
+            runbook: "scripts/drill_canary_rollback_runbook.md 第 4 节"
 
         - alert: DocQAAskLatencyP99
           expr: "job:docqa_ask_p99:seconds > 3.0"
@@ -96,7 +96,7 @@ prometheus:
           annotations:
             summary: "/agent/ask p99 超过 3s"
             description: "当前 {{ $value }}s。结合 PG 连接池饱和度与 MQ 堆积一起看。"
-            runbook: "scripts/batch4_canary_rollback_runbook.md 第 3 节"
+            runbook: "scripts/drill_canary_rollback_runbook.md 第 3 节"
 
         - alert: DocQATenantIsolationBreach
           expr: "job:docqa_tenant_isolation_pass:ratio_rate5m < 1.0 OR increase(docqa_tenant_cross_hits_total[5m]) > 0"
@@ -108,7 +108,7 @@ prometheus:
           annotations:
             summary: "租户隔离断言破线（异租户命中 != 0）——最高优先级"
             description: "立即全量回滚，不要等待错误预算。"
-            runbook: "scripts/batch4_canary_rollback_runbook.md 第 4 / 5 节"
+            runbook: "scripts/drill_canary_rollback_runbook.md 第 4 / 5 节"
 
         - alert: DocQAMissingTenantWrite
           expr: "increase(docqa_missing_tenant_rejected_total[5m]) > 0"
@@ -120,7 +120,7 @@ prometheus:
           annotations:
             summary: "出现漏传 tenant_id 的写入（写侧代码与 005 收口不匹配）"
             description: "005 后 NOT NULL 无默认，漏传即报错；说明发布顺序或写侧接线有问题。"
-            runbook: "修复执行报告.md 第 5 节 / batch4_canary_rollback_runbook.md 第 5.1 节"
+            runbook: "修复执行报告.md 第 5 节 / drill_canary_rollback_runbook.md 第 5.1 节"
 
         - alert: DocQAPgPoolSaturation
           expr: "job:docqa_pg_pool_saturation:ratio > 0.85"

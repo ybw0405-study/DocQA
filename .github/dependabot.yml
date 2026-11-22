@@ -79,9 +79,10 @@ updates:
         patterns:
           - "*"
 
-  # 仓库当前没有任何 Dockerfile（G17 待办）；以 "/" 作为占位目录。
-  # ops/docker-compose.infra.yml 的镜像版本目前由人工维护（G16 计划改 digest 固定），
-  # 待新增 Dockerfile 后此生态会自动纳入版本跟踪，届时按实际路径调整 directory。
+  # 根 Dockerfile 的基础镜像按 digest 固定；dependabot 仍会提议 tag 升级
+  # （同步刷新 digest）。主版本升级（如 temurin 17→26、node 20→26）与
+  # 「版本下限矩阵」冲突，和其它生态一样排除 semver-major，由维护者手工评估。
+  # ops/docker-compose.infra.yml 的镜像钉扎由人工维护，dependabot 不改 compose。
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -91,3 +92,13 @@ updates:
       prefix: "build(docker)"
     labels:
       - "dependencies"
+    groups:
+      docker-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"

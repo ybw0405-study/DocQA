@@ -265,6 +265,61 @@ def test_blank_pdf_has_no_extractable_text() -> None:
     assert captured.value.code == INVALID_DOCUMENT
 
 
+class _FakeOcr:
+    """可注入的 OCR 替身：按页数返回固定文本。"""
+
+    def __init__(self, recognized: list[str] | None = None) -> None:
+        self._recognized = recognized
+        self.calls = 0
+
+    @property
+    def enabled(self) -> bool:
+        return True
+
+    def recognize(self, pdf_bytes: bytes) -> list[str]:
+        self.calls += 1
+        return self._recognized if self._recognized is not None else []
+
+
+def test_scanned_pdf_is_ocr_rescued_when_ocr_enabled() -> None:
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+
+    ocr = _FakeOcr(["扫描页识别的文字"])
+    parsed = DocumentParser(ocr=ocr).parse(buffer.getvalue(), PDF, "a.pdf")
+
+    assert ocr.calls == 1
+    assert parsed.pages[0].text == "扫描页识别的文字"
+    assert parsed.pages[0].page_no == 1
+
+
+def test_scanned_pdf_without_ocr_still_rejected() -> None:
+    """默认 Noop provider 下，扫描件维持旧行为：无文本即失败，不隐式引入外呼。"""
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    with pytest.raises(ParseJobError) as captured:
+        DocumentParser().parse(buffer.getvalue(), PDF, "a.pdf")
+    assert captured.value.code == INVALID_DOCUMENT
+
+
+def test_ocr_page_count_mismatch_is_treated_as_empty() -> None:
+    """OCR 返回页数与 PDF 实际页数不一致，退回「无文本」而非静默接受错误结果。"""
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    writer.add_blank_page(width=72, height=72)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+
+    ocr = _FakeOcr(["只有一页"])  # PDF 有两页
+    with pytest.raises(ParseJobError) as captured:
+        DocumentParser(ocr=ocr).parse(buffer.getvalue(), PDF, "a.pdf")
+    assert captured.value.code == INVALID_DOCUMENT
+
+
 def test_chunker_honors_size_overlap_and_page_numbers() -> None:
     text = "段落一。" * 40
     pages = [ParsedPage(text=text, page_no=3), ParsedPage(text="", page_no=4), ParsedPage(text="尾巴", page_no=5)]

@@ -38,7 +38,7 @@ public class PythonProperties {
     private String promptVersion = "p1";
 
     @NotBlank
-    private String maskingVersion = "pii-v1";
+    private String maskingVersion = "pii-v2";
 
     @NotEmpty
     private List<String> allowedTools = new ArrayList<>(List.of(

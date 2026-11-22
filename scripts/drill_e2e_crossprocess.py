@@ -16,8 +16,8 @@
   * 本文件为新增脚手架，不修改任何现有源码 / 脚本 / 配置。
 
 运行：
-  python batch4_e2e_crossprocess.py                       # dry-run（默认，安全）
-  python batch4_e2e_crossprocess.py --execute \
+  python drill_e2e_crossprocess.py                       # dry-run（默认，安全）
+  python drill_e2e_crossprocess.py --execute \
       --java-base-url http://127.0.0.1:8080 --ai-base-url http://127.0.0.1:8000 \
       --internal-token <token> --tenant-a <uuid> --tenant-b <uuid> --report out.json
 """
@@ -70,7 +70,7 @@ class Result:
     def dump(self, path: str | None) -> dict:
         passed = sum(1 for c in self.checks if c["ok"])
         report = {
-            "kind": "batch4-crossprocess-e2e",
+            "kind": "drill-crossprocess-e2e",
             "executed": self.execute,
             "note": "骨架自检；本机未接真实服务，未产生真实 e2e 记录" if not self.execute
                     else "真实执行；端点/凭据由调用方提供",
@@ -122,8 +122,8 @@ def run(args: argparse.Namespace) -> int:
     code, _ = http_json("GET", args.ai_base_url + PATH_READY, None, hdr, args.timeout)
     r.add("preflight", code == 200, f"ai-python readiness HTTP {code}")
     code, doc = http_json("POST", args.java_base_url + PATH_UPLOAD,
-                          {"tenantId": args.tenant_a, "fileName": "batch4-e2e.txt",
-                           "content": "batch4 cross-process probe"}, hdr, args.timeout)
+                          {"tenantId": args.tenant_a, "fileName": "drill-e2e.txt",
+                           "content": "drill cross-process probe"}, hdr, args.timeout)
     doc_id = str(doc.get("documentId", "")) if isinstance(doc, dict) else ""
     r.add("upload_document", 200 <= code < 300 and bool(doc_id), f"HTTP {code}, documentId={doc_id!r}")
 
@@ -132,7 +132,7 @@ def run(args: argparse.Namespace) -> int:
     #   且 tenant_id <> ''。骨架不内嵌 DB 依赖，标记为待接线。
     r.add("wait_indexed", False, "TODO: 接真实 PG 查询/轮询，本骨架不内嵌 DB 客户端")
 
-    ask_body = {"tenantId": args.tenant_a, "question": "batch4 probe?", "documentScopes": [doc_id] if doc_id else []}
+    ask_body = {"tenantId": args.tenant_a, "question": "drill probe?", "documentScopes": [doc_id] if doc_id else []}
     code, same = http_json("POST", args.ai_base_url + PATH_ASK, ask_body, hdr, args.timeout)
     cites_same = len(same.get("references", same.get("citations", []))) if isinstance(same, dict) else 0
     r.add("ask_same_tenant", code == 200 and cites_same >= 1, f"HTTP {code}, references={cites_same}")

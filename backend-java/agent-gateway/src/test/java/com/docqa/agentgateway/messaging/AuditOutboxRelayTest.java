@@ -4,10 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -17,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.docqa.agentgateway.config.AuditProperties;
 import com.docqa.agentgateway.domain.OutboxBacklog;
 import com.docqa.agentgateway.domain.OutboxExecution;
+import com.docqa.agentgateway.domain.RelayCursor;
 import com.docqa.agentgateway.dto.AuditEvent;
 import com.docqa.agentgateway.repository.AgentExecutionRepository;
 import com.docqa.common.metrics.BusinessMetrics;
@@ -31,8 +29,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 
 @ExtendWith(MockitoExtension.class)
 class AuditOutboxRelayTest {
@@ -45,10 +41,6 @@ class AuditOutboxRelayTest {
     private AgentExecutionRepository repository;
     @Mock
     private AuditEventPublisher publisher;
-    @Mock
-    private StringRedisTemplate redisTemplate;
-    @Mock
-    private ValueOperations<String, String> valueOperations;
 
     private AuditOutboxRelay relay;
     private BusinessMetrics metrics;
@@ -56,17 +48,15 @@ class AuditOutboxRelayTest {
     @BeforeEach
     void setUp() {
         metrics = new BusinessMetrics(new SimpleMeterRegistry());
-        relay = new AuditOutboxRelay(repository, publisher, redisTemplate, new AuditProperties(), metrics);
+        relay = new AuditOutboxRelay(repository, publisher, new AuditProperties(), metrics);
         // relay 每轮都会刷新积压指标；默认给一个「已追平」的快照，避免各用例都要重复 stub。
         lenient()
-                .when(repository.outboxBacklog(nullable(Instant.class), nullable(UUID.class)))
+                .when(repository.outboxBacklog(any(), any()))
                 .thenReturn(new OutboxBacklog(0, null));
     }
 
     @Test
     void publishesEventsStampedWithOutboxTenantAndAdvancesCursor() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(AuditOutboxRelay.CURSOR_KEY)).thenReturn(null);
         AuditEvent first = event("AGENT_ASK_COMPLETED");
         AuditEvent second = event("AGENT_CACHE_HIT");
         when(repository.findOutboxBatch(null, null, 100))
@@ -80,55 +70,45 @@ class AuditOutboxRelayTest {
             assertThat(published.tenantId()).isEqualTo(TENANT_ID);
             assertThat(published.eventId()).isIn(first.eventId(), second.eventId());
         });
-        verify(valueOperations).set(
-                AuditOutboxRelay.CURSOR_KEY, RECORDED_AT.toEpochMilli() + "|" + EXECUTION_ID);
+        // 游标持久化到 DB，而不是可被 LRU 驱逐的 Redis
+        verify(repository).saveRelayCursor(RECORDED_AT, EXECUTION_ID);
     }
 
     @Test
     void resumesFromStoredCursor() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(AuditOutboxRelay.CURSOR_KEY))
-                .thenReturn("1000|00000000-0000-0000-0000-000000000002");
+        UUID storedId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        when(repository.findRelayCursor()).thenReturn(new RelayCursor(Instant.ofEpochMilli(1000), storedId));
         when(repository.findOutboxBatch(any(Instant.class), any(UUID.class), anyInt()))
                 .thenReturn(List.of());
 
         relay.relay();
 
-        verify(repository).findOutboxBatch(
-                Instant.ofEpochMilli(1000),
-                UUID.fromString("00000000-0000-0000-0000-000000000002"),
-                100);
+        verify(repository).findOutboxBatch(Instant.ofEpochMilli(1000), storedId, 100);
     }
 
     @Test
-    void discardsMalformedCursorAndReplaysFromStart() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(AuditOutboxRelay.CURSOR_KEY)).thenReturn("broken-cursor");
+    void noCursorStartsFromTheBeginning() {
+        when(repository.findRelayCursor()).thenReturn(null);
         when(repository.findOutboxBatch(isNull(), isNull(), anyInt())).thenReturn(List.of());
 
         relay.relay();
 
-        verify(redisTemplate).delete(AuditOutboxRelay.CURSOR_KEY);
         verify(repository).findOutboxBatch(null, null, 100);
     }
 
     @Test
     void skipsEmptyOutboxButAdvancesCursor() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(AuditOutboxRelay.CURSOR_KEY)).thenReturn(null);
         when(repository.findOutboxBatch(null, null, 100))
                 .thenReturn(List.of(execution(List.of())));
 
         relay.relay();
 
         verify(publisher, never()).publish(any());
-        verify(valueOperations).set(AuditOutboxRelay.CURSOR_KEY, RECORDED_AT.toEpochMilli() + "|" + EXECUTION_ID);
+        verify(repository).saveRelayCursor(RECORDED_AT, EXECUTION_ID);
     }
 
     @Test
     void swallowsRepositoryFailure() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(AuditOutboxRelay.CURSOR_KEY)).thenReturn(null);
         when(repository.findOutboxBatch(any(), any(), anyInt()))
                 .thenThrow(new IllegalStateException("db down"));
 
@@ -138,8 +118,6 @@ class AuditOutboxRelayTest {
 
     @Test
     void doesNotAdvanceCursorWhenPublishFails() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(AuditOutboxRelay.CURSOR_KEY)).thenReturn(null);
         AuditEvent failing = event("AGENT_ASK_COMPLETED");
         when(repository.findOutboxBatch(null, null, 100))
                 .thenReturn(List.of(execution(List.of(failing))));
@@ -147,7 +125,7 @@ class AuditOutboxRelayTest {
 
         assertThatCode(() -> relay.relay()).doesNotThrowAnyException();
 
-        verify(valueOperations, never()).set(eq(AuditOutboxRelay.CURSOR_KEY), anyString());
+        verify(repository, never()).saveRelayCursor(any(), any());
     }
 
     private OutboxExecution execution(List<AuditEvent> events) {

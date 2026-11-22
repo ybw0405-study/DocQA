@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 
@@ -64,5 +65,15 @@ class RateLimiterTest {
         when(redisTemplate.execute(any(RedisScript.class), anyList(), anyString())).thenReturn(null);
 
         assertThatCode(() -> rateLimiter.check(USER_ID)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void failsClosedWhenRedisIsUnavailable() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), anyString()))
+                .thenThrow(new DataAccessResourceFailureException("redis down"));
+
+        // 契约要求 Redis 故障时上抛 500，不能在限流闸口放行流量打穿到模型计费。
+        assertThatThrownBy(() -> rateLimiter.check(USER_ID))
+                .isInstanceOf(DataAccessResourceFailureException.class);
     }
 }

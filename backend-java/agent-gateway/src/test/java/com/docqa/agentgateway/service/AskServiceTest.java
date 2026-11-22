@@ -214,7 +214,7 @@ class AskServiceTest {
         assertThat(request.tenantId()).isEqualTo(TENANT_ID);
         assertThat(request.question()).isEqualTo(QUESTION);
         assertThat(request.piiMaskedQuestion()).isEqualTo(QUESTION);
-        assertThat(request.piiMaskingVersion()).isEqualTo("pii-v1");
+        assertThat(request.piiMaskingVersion()).isEqualTo("pii-v2");
         assertThat(request.tokenBudget()).isEqualTo(8000);
         assertThat(request.maxToolCalls()).isEqualTo(3);
         assertThat(request.maxRounds()).isEqualTo(3);

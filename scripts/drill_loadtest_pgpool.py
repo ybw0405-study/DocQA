@@ -10,7 +10,7 @@
   * /agent/ask p50 / p95 / p99 延迟、错误率、吞吐；
   * pg_stat_activity 中 docqa 应用连接数峰值；
   * 断言：峰值 <= pool_max_size + 余量，且远小于 并发数 * 2（未接线的特征）；
-  * 断言：错误率低于 SLO（见 batch4_slo_alerts.yaml）。
+  * 断言：错误率低于 SLO（见 drill_slo_alerts.yaml）。
 
 【脚手架定位 / 诚实边界】
   * 这是可执行骨架，**本机未做真实压测**：没有生产/预发环境、没有真实流量，
@@ -20,8 +20,8 @@
     端点/令牌/DSN 全部由调用方提供。
 
 运行：
-  python batch4_loadtest_pgpool.py                          # dry-run（默认）
-  python batch4_loadtest_pgpool.py --execute --ask-url http://127.0.0.1:8000/agent/ask \
+  python drill_loadtest_pgpool.py                          # dry-run（默认）
+  python drill_loadtest_pgpool.py --execute --ask-url http://127.0.0.1:8000/agent/ask \
       --dsn postgresql://docqa:xxx@127.0.0.1:5432/docqa_vec --internal-token xxx \
       --concurrency 10 50 100 200 --duration 30 --max-pg-connections 40 --report out.json
 """
@@ -56,7 +56,7 @@ class LoadResult:
 
     def dump(self, path: str | None) -> dict:
         report = {
-            "kind": "batch4-loadtest-pgpool",
+            "kind": "drill-loadtest-pgpool",
             "executed": self.execute,
             "note": "骨架自检；本机未做真实压测，无实测数值" if not self.execute
                     else "真实执行；数值由调用方环境产生",
@@ -107,7 +107,7 @@ def percentile(values: list[float], p: float) -> float:
 
 def run_level(level: int, args: argparse.Namespace) -> dict:
     headers = {"Content-Type": "application/json", "X-Internal-Token": args.internal_token}
-    body = {"tenantId": args.tenant, "question": "batch4 load probe", "documentScopes": []}
+    body = {"tenantId": args.tenant, "question": "drill load probe", "documentScopes": []}
     deadline = time.time() + args.duration
     lat: list[float] = []
     errors = 0

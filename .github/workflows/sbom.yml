@@ -1,6 +1,6 @@
 name: sbom
 
-# G10：SBOM 产物门禁。每次 push main / PR / 手工触发都产出可下载的
+# SBOM 产物门禁。每次 push main / PR / 手工触发都产出可下载的
 # CycloneDX JSON + SPDX JSON，作为 artifact 归档，供发布与回滚追溯。
 # Apache-2.0 项目的第三方归属由 NOTICE / THIRD-PARTY-LICENSES.md 承载，
 # 本文件产出的是带版本与哈希的逐包权威清单。

@@ -3,6 +3,7 @@ package com.docqa.agentgateway.repository;
 import com.docqa.agentgateway.domain.AgentExecution;
 import com.docqa.agentgateway.domain.OutboxBacklog;
 import com.docqa.agentgateway.domain.OutboxExecution;
+import com.docqa.agentgateway.domain.RelayCursor;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -27,4 +28,10 @@ public interface AgentExecutionRepository {
      * @param afterId         游标 id，与时间共同构成 keyset 位置
      */
     OutboxBacklog outboxBacklog(Instant afterRecordedAt, UUID afterId);
+
+    /** 读取持久化的 relay 游标；null 表示尚未投递过任何一批（从表头开始）。 */
+    RelayCursor findRelayCursor();
+
+    /** upsert 单行游标。游标是不可丢失的进度，存 DB 而非可被 LRU 驱逐的 Redis。 */
+    void saveRelayCursor(Instant recordedAt, UUID id);
 }

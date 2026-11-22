@@ -124,6 +124,8 @@ class AuthControllerTest {
                 .thenReturn(Optional.of(credentials));
 
         authProperties = new AuthProperties();
+        // 注册准入白名单：默认租户 + 本测试用的 acme（其它 slug 应被拒）
+        authProperties.setRegistrationAllowedSlugs(java.util.Set.of("default", SECOND_SLUG));
         authProperties.setMaxLoginFailures(5);
         authProperties.setLoginFailureWindow(Duration.ofSeconds(60));
         authProperties.setRefreshTtl(Duration.ofDays(14));
@@ -155,7 +157,7 @@ class AuthControllerTest {
                 jwtService,
                 passwordEncoder,
                 authProperties,
-                new TenantResolver(tenantRepository),
+                new TenantResolver(tenantRepository, authProperties),
                 clock);
 
         mockMvc = MockMvcBuilders

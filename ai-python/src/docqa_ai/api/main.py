@@ -109,6 +109,11 @@ def _runs_in_production() -> bool:
     return True
 
 
+def _binds_non_loopback(host: str) -> bool:
+    """监听地址是否对非本机开放。'' 与通配地址都视为开放。"""
+    return host.strip().lower() in {"", "0.0.0.0", "::", "[::]"}
+
+
 def _payload_too_large() -> AgentError:
     return AgentError(
         code=AGT_UPSTREAM_004,
@@ -427,6 +432,22 @@ def create_app(
         startup_guard_error = (
             "DOCQA_AI_INTERNAL_TOKEN must be configured in production: "
             "the data plane otherwise accepts unauthenticated identity fields"
+        )
+    # dev 模式默认只监听 loopback；若有人显式放宽到 0.0.0.0 又不配任何凭据，
+    # 数据面就会把请求体里的 userId/tenantId 当成可信身份——必须在启动期挡住，
+    # 除非部署者显式声明 allow_anonymous_api=true 承担这个风险。
+    if (
+        not explicit_settings
+        and startup_guard_error is None
+        and not expected_token
+        and not hmac_secret
+        and _binds_non_loopback(settings.api_host)
+        and not settings.allow_anonymous_api
+    ):
+        startup_guard_error = (
+            "data plane would listen on a non-loopback address without any internal "
+            "credential; configure DOCQA_AI_INTERNAL_TOKEN (or HMAC secret), or set "
+            "DOCQA_AI_ALLOW_ANONYMOUS_API=true explicitly to opt in"
         )
     if tracer is None:
         tracer, tracer_provider = build_tracing(settings, exporter=span_exporter)

@@ -6,7 +6,7 @@ name: Release
 # ancestor of main: enforced by `git merge-base --is-ancestor`, plus tag
 # existence / strict vX.Y.Z format checks, --verify-tag and the CHANGELOG guard.
 # workflow_dispatch 的 tag 输入同样走这一整套校验，不会因手工填错而发错版本。
-# G14：新增 images job，构建多阶段镜像、推送 GHCR，并把
+# 新增 images job，构建多阶段镜像、推送 GHCR，并把
 # repo:tag@sha256:<digest> 写入 digests.txt 挂到 Release 与 artifact，
 # 让 rollback-runbook 的「按 digest 部署上一版本」真正可执行。
 

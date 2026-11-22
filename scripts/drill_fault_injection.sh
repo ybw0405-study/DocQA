@@ -16,9 +16,9 @@
 #   * 不修改任何现有源码/脚本/配置；本文件为新增脚手架。
 #
 # 运行（Windows Git Bash）：
-#   bash batch4_fault_injection.sh redis-halfopen                 # dry-run
-#   bash batch4_fault_injection.sh mq-backlog --apply --target docqa-rmq-broker
-#   bash batch4_fault_injection.sh rolling-restart --apply --target docqa-parse-worker
+#   bash drill_fault_injection.sh redis-halfopen                 # dry-run
+#   bash drill_fault_injection.sh mq-backlog --apply --target docqa-rmq-broker
+#   bash drill_fault_injection.sh rolling-restart --apply --target docqa-parse-worker
 # =============================================================================
 set -euo pipefail
 
@@ -74,13 +74,14 @@ case "$case_name" in
     say "目的：MQ 堆积时有限重投、FAILED 不永久 ACK、对账任务能覆盖待清理版本。"
     say "前置：记录基线堆积深度；确认 DLQ topic 与对账任务开关。"
     say "注入思路：暂停 consumer + 批量投递 parse-requested / vector-change 消息。"
-    run "echo 'TODO: 按真实 mqadmin/SDK 投递 N 条消息；本骨架不内嵌 MQ 客户端'"
-    run "echo 'TODO: 暂停 consumer（docker pause 或关闭消费组）持续 ${DURATION}s'"
+    run "docker pause ${TARGET:-docqa-parse-worker} || true"
+    say "  # 上一条暂停 parse-worker 容器（consumer 所在进程）；批量投递用项目自带 MQ 客户端或 mqadmin。"
+    say "  # TODO(可选)：按真实 mqadmin/SDK 投递 N 条消息（本骨架默认只做「暂停消费」注入）。"
     say "观测点："
     say "  - 堆积深度随投递上升，恢复消费后回落"
     say "  - FAILED 消息不被 markProcessed 永久 ACK，超过重投上限进 DLQ"
     say "  - 旧版本向量不残留（DELETE_VERSION / 待清理 outbox 被对账收口）"
-    say "恢复：恢复 consumer；清理本次注入的测试消息（勿动业务 topic 存量）"
+    say "恢复：docker unpause ${TARGET:-docqa-parse-worker}；清理本次注入的测试消息（勿动业务 topic 存量）"
     say "判据：无永久残留向量；DLQ 条数符合预期；对账后 pending 归零。"
     ;;
 
@@ -88,18 +89,19 @@ case "$case_name" in
     say "目的：SIGTERM 滚动发布时，在途解析任务先 drain 再按序关 publisher/PG/Redis。"
     say "前置：确认至少 2 个实例、LB 摘流、在途任务可观测；记录当前镜像 digest。"
     say "注入思路：逐个实例发 SIGTERM，间隔观察在途任务收口。"
-    run "echo 'TODO: 对 ${TARGET:-<instance>} 发 SIGTERM（docker stop / kill -TERM），间隔 ${DURATION}s 逐个执行'"
+    run "docker stop --signal=SIGTERM --time=${DURATION} ${TARGET:-docqa-parse-worker}"
+    say "  # 逐个实例发 SIGTERM；多实例时重复对下一个 --target 执行，间隔 ${DURATION}s"
     say "观测点："
     say "  - 日志无 'Task was destroyed but it is pending!'"
     say "  - 在途解析结果不丢失（parse.completed 与 PG 行数一致）"
     say "  - 关停顺序：停 consumer -> gather 在途 -> publisher -> PG provider -> redis -> loop.close"
     say "  - 新实例 readiness 变绿后才接收流量"
     say "恢复：按 digest 重新拉起实例；确认 /health/ready 200"
-    say "判据：零在途丢失、零幽灵任务、租约接管时延 < SLO（见 batch4_slo_alerts.yaml）。"
+    say "判据：零在途丢失、零幽灵任务、租约接管时延 < SLO（见 drill_slo_alerts.yaml）。"
     ;;
 
   *)
-    say "用法: bash batch4_fault_injection.sh {redis-halfopen|mq-backlog|rolling-restart} [--apply] [--target NAME] [--duration N]"
+    say "用法: bash drill_fault_injection.sh {redis-halfopen|mq-backlog|rolling-restart} [--apply] [--target NAME] [--duration N]"
     exit 2
     ;;
 esac

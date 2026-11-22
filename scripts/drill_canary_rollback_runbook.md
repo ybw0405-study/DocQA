@@ -15,7 +15,7 @@
 | P2 | 本轮修复已按报告第 5 节顺序发布（**写侧强制 tenant_id 的代码先上线**） | `修复执行报告.md` 第 5 节 |
 | P3 | 回填已完成且 `unresolvedDocuments` / `emptyTenantRows` 均为 0 | `python -m docqa_ai.maintenance.backfill_tenant_id --mapping ...`（回填后复跑） |
 | P4 | `DOCQA_ENV=prod` + `DOCQA_AI_INTERNAL_TOKEN` 已注入，`api_host` / `/metrics` 暴露面符合拓扑 | 生产守卫 fail-fast；`CONTRIBUTING.md` |
-| P5 | SLO 与告警规则已加载、错误预算基线已取 | 同目录 `batch4_slo_alerts.yaml` |
+| P5 | SLO 与告警规则已加载、错误预算基线已取 | 同目录 `drill_slo_alerts.yaml` |
 | P6 | 监控面板：`/health/ready`、ask 延迟/错误率、PG 连接池、MQ 堆积、Redis PING | — |
 | P7 | 回滚窗口与审批人已就位；旧版本 digest 已记录 | 第 3 节 |
 
@@ -30,7 +30,7 @@
 ```bash
 # 当前稳定版本 digest 与版本
 CURRENT_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' docqa-ai:<current-tag>)
-echo "$CURRENT_DIGEST" | tee /var/log/docqa/batch4-canary/digest-before.txt
+echo "$CURRENT_DIGEST" | tee /var/log/docqa/drill-canary/digest-before.txt
 # 待发布版本 digest
 NEW_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' docqa-ai:<new-tag>)
 # 当前错误预算余量、QPS、p99、PG 连接峰值、MQ 堆积深度（从 Prometheus 取，记录时间戳）
@@ -63,7 +63,7 @@ curl -fsS http://127.0.0.1:8000/health/ready   # 必须 200 后才放量
 ## 3. 每级必看的观测与判据
 
 - **可用性**：`/agent/ask` 5xx 率、`/health/ready` 200 比例（依赖 down 应为 503 并被摘除）。
-- **延迟**：p50 / p95 / p99，与基线对比不得劣化超过阈值（见 `batch4_slo_alerts.yaml`）。
+- **延迟**：p50 / p95 / p99，与基线对比不得劣化超过阈值（见 `drill_slo_alerts.yaml`）。
 - **租户隔离**（本次 P0 修复的核心）：同租户引用命中、异租户 0 引用；`tenant_id=''` 行数必须为 0。
 - **写侧 tenant 信封**：日志中 `DOC-TENANT-001` / `INVALID` 不应因正常流量新增；出现即说明写路径漏传。
 - **连接池**：`pg_stat_activity` 应用连接峰值 <= `pool_max_size + 余量`，且不随 QPS 线性增长（B2 修复判据）。
@@ -108,9 +108,9 @@ curl -fsS http://127.0.0.1:8000/health/ready
 ## 6. 灰度 / 回滚演练的机检产物（真跑时生成）
 
 - Prometheus 快照（每级起止时间戳）；
-- 租户隔离断言脚本输出（`batch4_e2e_crossprocess.py --execute --report ...`）；
-- 连接池压测报表（`batch4_loadtest_pgpool.py --execute --report ...`）；
-- 故障注入观测（`batch4_fault_injection.sh <case> --apply --target ...`）；
+- 租户隔离断言脚本输出（`drill_e2e_crossprocess.py --execute --report ...`）；
+- 连接池压测报表（`drill_loadtest_pgpool.py --execute --report ...`）；
+- 故障注入观测（`drill_fault_injection.sh <case> --apply --target ...`）；
 - 本 runbook 第 7 节填写的演练记录。
 
 ---

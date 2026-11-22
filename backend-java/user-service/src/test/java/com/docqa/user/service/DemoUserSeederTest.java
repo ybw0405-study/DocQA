@@ -29,7 +29,7 @@ class DemoUserSeederTest {
 
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    private static final String BCRYPT_HASH = new BCryptPasswordEncoder(4).encode("demo-pass-123");
+    private static final String BCRYPT_HASH = new BCryptPasswordEncoder(12).encode("demo-pass-123");
 
     private final ApplicationArguments arguments = mock(ApplicationArguments.class);
     private final UserRepository userRepository = mock(UserRepository.class);
@@ -106,6 +106,17 @@ class DemoUserSeederTest {
         assertThatThrownBy(() -> seeder().run(arguments))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("BCrypt");
+        verify(userRepository, never()).insert(any(), any(), any());
+    }
+
+    @Test
+    void refusesAWeakBcryptCost() {
+        // 形态合法但 cost=4：曾随备份落盘、GPU 分钟级可爆破的弱哈希必须拒绝。
+        properties.setPasswordHash(new BCryptPasswordEncoder(4).encode("demo-pass-123"));
+
+        assertThatThrownBy(() -> seeder().run(arguments))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("below minimum");
         verify(userRepository, never()).insert(any(), any(), any());
     }
 

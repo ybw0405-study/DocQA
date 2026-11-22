@@ -111,7 +111,7 @@ class AuthServiceTest {
                 jwtService,
                 passwordEncoder,
                 properties,
-                new TenantResolver(tenantRepository),
+                new TenantResolver(tenantRepository, properties),
                 clock);
     }
 
@@ -486,6 +486,19 @@ class AuthServiceTest {
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_AUTH_001));
         verify(userRepository, never()).findCredentialsByUsername(any(), anyString());
+    }
+
+    @Test
+    void registerRejectsActiveTenantNotInTheWhitelist() {
+        // acme 是 ACTIVE 租户且可登录，但未列入注册白名单：不得凭猜中 slug 自助入驻。
+        givenTenant(SECOND_SLUG, SECOND_TENANT, "ACTIVE");
+
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("new.user", "correct-horse-9", SECOND_SLUG),
+                IDEMPOTENCY_KEY, IP))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_AUTH_001));
+        verify(userRepository, never()).insert(any(), any(), any());
     }
 
     @Test

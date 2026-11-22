@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     # 默认只监听 loopback：Python 数据面不对公网暴露，需要跨主机时由部署显式放宽。
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8000, ge=1, le=65535)
+    # 未配内部凭据时是否允许匿名访问数据面。默认拒绝；仅在 loopback 监听时
+    # 可被部署显式开启用于本地联调。跨主机 + 无凭据的组合会在启动时被拒绝。
+    allow_anonymous_api: bool = False
 
     redis_url: str = Field(
         default="redis://127.0.0.1:6379/0",
