@@ -13,12 +13,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -145,6 +148,37 @@ public class GlobalExceptionHandler {
             NoHandlerFoundException exception,
             HttpServletRequest request) {
         return respond(ErrorCode.COM_NOT_FOUND_001, null, List.of(), request);
+    }
+
+    /** R-02：框架级客户端拒绝（方法/媒体类型）不再落 500 兜底，按 4xx 登记码返回。 */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ProblemDetail> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException exception,
+            HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetailFactory.create(
+                ErrorCode.COM_METHOD_NOT_ALLOWED_001,
+                null,
+                List.of(),
+                request.getRequestURI());
+        LOGGER.debug(
+                "Request rejected: code={}, traceId={}",
+                ErrorCode.COM_METHOD_NOT_ALLOWED_001.code(),
+                problem.getProperties().get("traceId"));
+        ResponseEntity.BodyBuilder builder = ResponseEntity
+                .status(ErrorCode.COM_METHOD_NOT_ALLOWED_001.status())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON);
+        String[] supported = exception.getSupportedMethods();
+        if (supported != null && supported.length > 0) {
+            builder.header(HttpHeaders.ALLOW, String.join(", ", supported));
+        }
+        return builder.body(problem);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ProblemDetail> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException exception,
+            HttpServletRequest request) {
+        return respond(ErrorCode.COM_UNSUPPORTED_MEDIA_001, null, List.of(), request);
     }
 
     @ExceptionHandler(Exception.class)

@@ -78,21 +78,28 @@ for url in "$USER_SVC/actuator/health" "$GATEWAY/actuator/health" "$PYTHON_API/h
 done
 
 echo "=== 1. bootstrap 供给：防护、创建、幂等 ==="
+# 鉴权加固后 user-service 的 BearerEnforcementFilter 对 /api/v1/** 非认证面一律要求
+# Bearer 形态（只校形态不验签）。bootstrap 供给是契约外运维面，真实鉴权仍由控制器
+# 校验 X-Bootstrap-Token，故这里带一个占位 Bearer 通过形态门禁；缺了它会先撞 401。
+PROVISION_AUTH='Authorization: Bearer bootstrap-provisioning'
 TENANT_BODY="{\"slug\":\"${TENANT_SLUG}\",\"name\":\"Acme Drill\",\"tier\":\"STANDARD\",\"isolation\":\"SHARED\"}"
 req 01-no-token 403 -X POST "$USER_SVC/api/v1/admin/tenants" \
-    -H 'Content-Type: application/json' -d "$TENANT_BODY"
+    -H 'Content-Type: application/json' -H "$PROVISION_AUTH" -d "$TENANT_BODY"
 req 02-wrong-token 403 -X POST "$USER_SVC/api/v1/admin/tenants" \
-    -H 'Content-Type: application/json' -H 'X-Bootstrap-Token: definitely-wrong' -d "$TENANT_BODY"
+    -H 'Content-Type: application/json' -H "$PROVISION_AUTH" -H 'X-Bootstrap-Token: definitely-wrong' -d "$TENANT_BODY"
 req 03-create-tenant 201 -X POST "$USER_SVC/api/v1/admin/tenants" \
-    -H 'Content-Type: application/json' -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN" -d "$TENANT_BODY"
+    -H 'Content-Type: application/json' -H "$PROVISION_AUTH" -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN" -d "$TENANT_BODY"
 req 04-replay-idempotent 201 -X POST "$USER_SVC/api/v1/admin/tenants" \
-    -H 'Content-Type: application/json' -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN" -d "$TENANT_BODY"
+    -H 'Content-Type: application/json' -H "$PROVISION_AUTH" -H "X-Bootstrap-Token: $BOOTSTRAP_TOKEN" -d "$TENANT_BODY"
 TENANT_B="$(json_get "$EVIDENCE/03-create-tenant.json" "d['data']['id']")"
 TENANT_B_REPLAY="$(json_get "$EVIDENCE/04-replay-idempotent.json" "d['data']['id']")"
 [ "$TENANT_B" = "$TENANT_B_REPLAY" ] || fail "幂等重放返回了不同的 tenant id"
 note "第二租户 id=${TENANT_B}（重放一致）"
 
 echo "=== 2. 双租户注册与 JWT tenant_id 断言 ==="
+# 前置（注册准入加固后）：治理默认关闭自助注册。跑本节前须在 ops/env/local.env 设
+# DOCQA_SELF_REGISTRATION_ENABLED=true，并把演练租户 slug 加入
+# DOCQA_REGISTRATION_ALLOWED_SLUGS（默认租户 default 已在白名单），否则 05/06 按设计返回 403。
 req 05-register-A 201 -X POST "$GATEWAY/api/v1/auth/register" \
     -H 'Content-Type: application/json' -H "Idempotency-Key: drill-${RUN_ID}-a" \
     -d "{\"username\":\"${USER_A}\",\"password\":\"${PASS_A}\"}"

@@ -192,8 +192,9 @@ class ScheduleImportControllerTest {
     @Test
     void missingLeadMinutesPartIsReportedAsAMissingField() throws Exception {
         // 文本 Part 是表单字段，容器把它暴露成请求参数，所以缺失形态与 query 参数同判据（400）。
-        // 415 从此只表示「声称是 multipart 但信封解析不开」（MultipartException），
-        // 与「顶层 Content-Type 根本不是 multipart」落 500（R-02）是两回事，后者在本类末尾钉住。
+        // 415 有两种来源：「声称是 multipart 但信封解析不开」（MultipartException → REM-VALIDATION-003，
+        // 本地 advice）与「顶层 Content-Type 根本不是 multipart」（全局 advice → COM-UNSUPPORTED_MEDIA-001，
+        // R-02 修复后不再落 500），后者在本类末尾钉住。
         mockMvc.perform(multipart(IMPORT_PATH)
                         .file(new MockMultipartFile("file", "schedule.ics", "text/calendar", ICS))
                         .part(part("fallbackTimezone", ZONE))
@@ -279,16 +280,16 @@ class ScheduleImportControllerTest {
     }
 
     @Test
-    void nonMultipartRequestContentTypeFallsThroughToTheCatchAll() throws Exception {
-        // R-02：顶层 Content-Type 非 multipart 时，HttpMediaTypeNotSupportedException 没有被任何
-        // 专用 handler 接住，落进 GlobalExceptionHandler 的 Exception.class 兜底成 500。
-        // 钉成断言是为了让修复时的行为变化可见——修好后这条断言必须同步改成 415。
+    void nonMultipartRequestContentTypeIsRejectedAsUnsupportedMedia() throws Exception {
+        // R-02 已修复：顶层 Content-Type 非 multipart 时，HttpMediaTypeNotSupportedException
+        // 由 GlobalExceptionHandler 的专用 handler 接住，返回 415 COM-UNSUPPORTED_MEDIA-001，
+        // 不再落 Exception.class 兜底成 500。与信封解析不开的 REM-VALIDATION-003 分属两条路径。
         mockMvc.perform(post(PREVIEW_PATH)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, USER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.code").value("COM-INTERNAL-001"));
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("COM-UNSUPPORTED_MEDIA-001"));
     }
 
     private void givenPreviewReturnsOneCreate() {

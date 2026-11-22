@@ -40,7 +40,8 @@ import org.springframework.web.multipart.MultipartFile;
  * 把除文件以外的 Part 一律交给 {@code HttpMessageConverter}，而 curl 与浏览器都不会给文本字段写
  * Part 级 Content-Type，没有任何转换器能把这种字段读成 {@code String} 或 {@code int}，
  * 于是每个请求都在绑定阶段抛出 {@code HttpMediaTypeNotSupportedException}——它表达的是
- * 「这个 Part 我读不了」，与调用方的错无关，最终落进兜底分支变成 500。
+ * 「这个 Part 我读不了」，与调用方的错无关，全局策略会把它映射成 415
+ * {@code COM-UNSUPPORTED_MEDIA-001}（R-02 修复前曾落兜底 500）。
  * servlet 容器本来就把 multipart 里的文本字段暴露成请求参数，{@code @RequestParam} 才是对等的绑法。
  */
 @RestController

@@ -90,6 +90,30 @@ do {
 if ($health -ne 'healthy') { throw 'MySQL 未在 3 分钟内就绪；docker logs docqa-mysql 查看。' }
 
 # -----------------------------------------------------------------------------
+# 3.5 预建 MQ topic（旧 WSL 脚本有此步，迁移时遗漏会让 document-service 的
+#     MQ 消费 lag 探针查不到 %RETRY% 路由，readiness 一直 DOWN）
+#     三个坑与 AgentFlow 同源：
+#     1) namesrv 是独立容器，broker 容器内的 127.0.0.1 够不到它，走 docker 网络主机名；
+#     2) mqadmin 失败仍返回退出码 0，按 topicRoute 输出有无 brokerDatas 判定；
+#     3) broker TCP 健康通过 ≠ 完成首次 namesrv 注册（~30s 周期），带重试窗口。
+#     HOME=/tmp：命名卷属主问题让 rocketmq 用户建不了工具日志目录。
+# -----------------------------------------------------------------------------
+Write-Host '==> [3.5/6] 预建 MQ topic（消费端 readiness 依赖路由存在）'
+$namesrvPort = Get-Conf 'DOCQA_ROCKETMQ_NAMESRV_PORT'
+$topics = @('parse-requested', 'parse-completed', 'parse-failed',
+            'vector-change-requested', 'vector-change-completed', 'audit-event')
+foreach ($t in $topics) {
+    $ok = $false
+    foreach ($i in 1..18) {
+        docker exec -e HOME=/tmp docqa-rmq-broker sh -c "sh mqadmin updateTopic -n rocketmq-namesrv:$namesrvPort -c DefaultCluster -t $t" *> $null
+        $route = docker exec -e HOME=/tmp docqa-rmq-broker sh -c "sh mqadmin topicRoute -t $t -n rocketmq-namesrv:$namesrvPort" 2>$null
+        if ($route -match 'brokerDatas') { $ok = $true; break }
+        Start-Sleep -Seconds 5
+    }
+    if (-not $ok) { throw "预建 topic $t 失败：90s 内 namesrv 始终查不到路由（docker logs docqa-rmq-broker）" }
+}
+
+# -----------------------------------------------------------------------------
 # 4. 幂等重放最小权限授权（复用 ops/sql/least-privilege.sql.tmpl）
 #    账号 host 必须是 '%'：Windows 侧经端口映射连入时，MySQL 看到的是 bridge 网关地址，
 #    不是 localhost。模板只做加法（CREATE USER IF NOT EXISTS + GRANT），可重复执行。

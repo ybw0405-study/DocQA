@@ -124,6 +124,29 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.status").value(404));
     }
 
+    @Test
+    void mapsUnsupportedMethodToMethodNotAllowedWithAllowHeader() throws Exception {
+        mockMvc.perform(post("/test/business"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(header().string("Allow", containsString("GET")))
+                .andExpect(jsonPath("$.code").value("COM-METHOD_NOT_ALLOWED-001"))
+                .andExpect(jsonPath("$.status").value(405))
+                .andExpect(jsonPath("$.traceId").value(matchesPattern(TRACE_ID_PATTERN)));
+    }
+
+    @Test
+    void mapsUnsupportedMediaTypeToUnsupportedMediaTypeProblem() throws Exception {
+        mockMvc.perform(post("/test/validate")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("name=demo"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("COM-UNSUPPORTED_MEDIA-001"))
+                .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.traceId").value(matchesPattern(TRACE_ID_PATTERN)));
+    }
+
     @RestController
     static class TestController {
 
