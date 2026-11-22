@@ -14,8 +14,8 @@ class ErrorCodeTest {
 
     @Test
     void registersExpectedCodes() {
-        assertThat(ErrorCode.values()).hasSize(38);
-        assertThat(Arrays.stream(ErrorCode.values()).map(ErrorCode::code).distinct()).hasSize(38);
+        assertThat(ErrorCode.values()).hasSize(40);
+        assertThat(Arrays.stream(ErrorCode.values()).map(ErrorCode::code).distinct()).hasSize(40);
     }
 
     @Test
@@ -25,7 +25,7 @@ class ErrorCodeTest {
                         errorCode -> errorCode.code().substring(0, errorCode.code().indexOf('-')),
                         Collectors.counting()));
         assertThat(countsByDomain).containsExactlyInAnyOrderEntriesOf(Map.of(
-                "COM", 4L,
+                "COM", 6L,
                 "USR", 9L,
                 "DOC", 6L,
                 "AGT", 11L,
@@ -52,6 +52,12 @@ class ErrorCodeTest {
     @Test
     void mapsPiiBlockToUnprocessableEntity() {
         assertThat(ErrorCode.AGT_VALIDATION_003.status().value()).isEqualTo(422);
+    }
+
+    @Test
+    void mapsFrameworkRejectionCodesToContractStatuses() {
+        assertThat(ErrorCode.COM_METHOD_NOT_ALLOWED_001.status().value()).isEqualTo(405);
+        assertThat(ErrorCode.COM_UNSUPPORTED_MEDIA_001.status().value()).isEqualTo(415);
     }
 
     @Test

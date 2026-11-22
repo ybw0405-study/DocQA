@@ -34,6 +34,18 @@ public enum ErrorCode {
             "not-found",
             "Not found",
             "请求的资源不存在。"),
+    COM_METHOD_NOT_ALLOWED_001(
+            "COM-METHOD_NOT_ALLOWED-001",
+            HttpStatus.METHOD_NOT_ALLOWED,
+            "method-not-allowed",
+            "Method not allowed",
+            "请求方法不被该资源支持。"),
+    COM_UNSUPPORTED_MEDIA_001(
+            "COM-UNSUPPORTED_MEDIA-001",
+            HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+            "unsupported-media-type",
+            "Unsupported media type",
+            "请求的媒体类型不被支持。"),
     USR_AUTH_001(
             "USR-AUTH-001",
             HttpStatus.UNAUTHORIZED,

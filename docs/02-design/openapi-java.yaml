@@ -88,15 +88,14 @@ info:
       声称 `multipart/form-data` 但**信封解析不开**（boundary 非法、Part 头残缺）才是 415
       `REM-VALIDATION-003`，`errors[].field` 为 `request`。缺字段与媒体类型不接受是两回事，
       同一个「少传一个 Part」的失误不应因 Part 类型不同而得到两种状态码。
-      而**顶层 `Content-Type` 不是 `multipart/form-data`** 的情形当前仍落 500：
-      `HttpMediaTypeNotSupportedException` 没有任何专用映射，被全局 advice 的 `Exception.class`
-      兜底成 `COM-INTERNAL-001`（advice 确实取到了上下文并出了 ProblemDetail，先前「取不到处理器
-      上下文」的推断已被控制器测试证伪）；该缺口连同「HTTP 方法不支持」登记为跨迭代项（R-02），
-      由收敛切片的框架级异常策略统一修复为 415/405。
+      而**顶层 `Content-Type` 不是 `multipart/form-data`** 的情形由全局 advice 的专用 handler
+      映射为 415 `COM-UNSUPPORTED_MEDIA-001`（R-02 已落地，不再落 `Exception.class` 兜底 500）；
+      「HTTP 方法不支持」同批修复为 405 `COM-METHOD_NOT_ALLOWED-001`，响应带 `Allow` 头。
+      两者与 `REM-VALIDATION-003`（信封解析不开）分属不同路径，控制器测试逐条钉住。
     - **两个文本 Part 按请求参数绑定，不按消息转换器绑定**：客户端以 `Content-Disposition: form-data`
       的普通字段发送即可，**不需要也不消费** Part 级 `Content-Type`；`curl -F` 与浏览器 `FormData`
       的默认形态就是如此。若服务端改按 `@RequestPart` 绑定这两个字段，没有任何消息转换器能把无媒体
-      类型的文本字段读成 `String` / `int`，每个请求都会在绑定阶段抛出上一条那个 500。
+      类型的文本字段读成 `String` / `int`，每个请求都会在绑定阶段抛出上一条那个 415。
     - `/ics/*` 上 `REM-VALIDATION-001` 的 `errors[].field` 有**两种形态**，同码不同形是刻意的：
       文件结构缺陷给 `file.line.<N>` 或 `file.uid.<UID>`（回答「文件哪里错了」），
       `fallbackTimezone` 取值非法给 `fallbackTimezone`（回答「哪个参数错了」）。
@@ -5931,7 +5930,8 @@ components:
           pattern: '^[A-Z]{2,4}-[A-Z_]+-[0-9]{3}$'
           description: |
             业务错误码。已登记：
-            COM-VALIDATION-001、COM-RATE_LIMIT-001、COM-INTERNAL-001、COM-NOT_FOUND-001；
+            COM-VALIDATION-001、COM-RATE_LIMIT-001、COM-INTERNAL-001、COM-NOT_FOUND-001、
+            COM-METHOD_NOT_ALLOWED-001、COM-UNSUPPORTED_MEDIA-001；
             USR-AUTH-001、USR-RATE_LIMIT-001、USR-NOT_FOUND-001、USR-CONFLICT-001、
             USR-FORBIDDEN-001、USR-DISABLED-001、USR-REFRESH-001、USR-VALIDATION-001、
             USR-IDEMPOTENCY-001；

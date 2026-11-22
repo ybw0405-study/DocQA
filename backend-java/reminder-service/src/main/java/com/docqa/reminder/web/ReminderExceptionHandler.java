@@ -25,8 +25,8 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
  * <p>不在此处映射 {@code HttpMediaTypeNotSupportedException}（顶层 Content-Type 不是
  * {@code multipart/form-data} 的情形）：本 advice 作用于整个服务，那样会让
  * {@code POST /api/v1/reminders} 的 {@code text/plain} 请求收到课表专属文案。
- * 该情形连同「HTTP 方法不支持」一起属于已在 CR 登记的 R-02，由收敛切片的
- * 全局 Spring MVC 异常策略统一处理。
+ * 该情形连同「HTTP 方法不支持」由 {@code GlobalExceptionHandler} 的全局策略统一处理
+ * （R-02 已落地：415 {@code COM-UNSUPPORTED_MEDIA-001} / 405 {@code COM-METHOD_NOT_ALLOWED-001}）。
  */
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
