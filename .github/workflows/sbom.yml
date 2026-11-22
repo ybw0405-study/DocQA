@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: 准备输出目录
         run: mkdir -p sbom
@@ -56,7 +56,7 @@ jobs:
           python3 -c "import json; [json.load(open(p, encoding='utf-8')) for p in ('sbom/docqa.cdx.json', 'sbom/docqa.spdx.json')]"
 
       - name: 上传 SBOM artifact（可下载）
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom-${{ github.sha }}
           path: sbom/*.json
