@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# DocQA 多阶段制品（G17）。构建 context = 仓库根目录，.dockerignore 已排除
+# DocQA 多阶段制品。构建 context = 仓库根目录，.dockerignore 已排除
 # .venv / node_modules / target / .git 等。用法示例：
 #   docker build --target java-service --build-arg JAR_PATH=/out/document-service.jar -t dq-document .
 #   docker build --target ai-python -t dq-ai .
@@ -24,7 +24,7 @@ RUN mkdir -p /out \
     done
 
 # ---------- 2. 前端构建 ----------
-FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS frontend-build
+FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS frontend-build
 WORKDIR /src/frontend-vue
 COPY frontend-vue/package.json frontend-vue/package-lock.json ./
 RUN npm ci
@@ -48,8 +48,8 @@ ARG JAR_PATH=/out/document-service.jar
 COPY --from=java-build --chown=10001:10001 ${JAR_PATH} /app/app.jar
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
 
-# ---------- 4. Python 数据面（G15 锁文件 + --require-hashes） ----------
-FROM python:3.12-slim AS python-base
+# ---------- 4. Python 数据面（锁文件 + --require-hashes） ----------
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b AS python-base
 USER root
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
