@@ -32,13 +32,21 @@ API 未配置 `DOCQA_AI_PG_DSN` 时仍可启动，检索会 fail-closed 为 `AGT
 Windows 侧 `pip` 能装上 `rocketmq-client-python`，但 `import` 即失败（其依赖的 `librocketmq.so`
 仅提供 Linux 绑定），因此 Worker 必须跑在 WSL/Linux：`docs/00-infra/setup-parse-worker.sh start [parse|vector|all]`。
 
-首次启动 Worker 前，在 PGVector 库**按序号**执行迁移（`001` 与 `002` 都要执行）：
+首次启动 Worker 前，在 PGVector 库**按序号**执行迁移（`001`–`004` 都要执行；
+`004` 之后读侧按 `tenant_id` 过滤，缺它检索查不到任何行）：
 
 ```bash
 # 以下命令在 ai-python/ 目录内执行
 psql "$DOCQA_AI_PG_DSN" -f migrations/001_chunk_embedding_1024.sql
 psql "$DOCQA_AI_PG_DSN" -f migrations/002_chunk_lexical_index.sql
+psql "$DOCQA_AI_PG_DSN" -f migrations/003_chunk_embedding_1024_text_embedding_v4.sql
+psql "$DOCQA_AI_PG_DSN" -f migrations/004_add_tenant_id.sql
 ```
+
+`scripts/start-dev.ps1` 的 `[4.5/8]` 已把这四步做成幂等重放，Docker 本地链路不必手工执行。
+`005_drop_tenant_default.sql` 不在自动重放之列：它要求 `tenant_id` 回填已完成，只能人工确认后执行。
+结构在位但零向量不是故障态：检索返回 `chunkCount=0`，问答给出「现有资料不足」而不是报错，
+`/health/ready` 也仍报 `pg: ok`（它只做 `SELECT 1`）。
 
 ## 向量表与模型切换
 

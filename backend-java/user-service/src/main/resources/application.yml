@@ -30,7 +30,9 @@ docqa:
     ttl: 15m
     secret: ${DOCQA_JWT_SECRET:}
   demo-user:
-    # 默认关闭种子 ADMIN；本地演示由 start-dev 脚本显式打开这两个开关（SEC-5）
+    # 种子 ADMIN 默认关闭（SEC-5）。两个开关由部署变量显式打开，本地演示见 ops/env/local.env.example；
+    # 启动脚本只做进程作用域注入，不会替任何人把它们改成 true。
+    # 打开后摘要必须过 DemoUserSeeder 的启动判据：合法 BCrypt 形态且 cost >= 12，否则服务拒绝启动。
     enabled: ${DOCQA_DEMO_USER_ENABLED:false}
     username: ${DOCQA_DEMO_USERNAME:demo}
     password-hash: ${DOCQA_DEMO_PASSWORD_HASH:}

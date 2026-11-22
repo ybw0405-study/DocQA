@@ -53,10 +53,59 @@ Copy-Item ops/env/local.env.example ops/env/local.env
 `start-dev.ps1` 每次启动会幂等重放 `ops/sql/least-privilege.sql.tmpl`（账号 host 为 `%`，因为
 Windows 侧经端口映射连入时 MySQL 看到的是 bridge 网关地址）。迁移仍由 document-service 启动时跑 Flyway。
 
+授权重放之后有一道对账：库里任何一张基表都必须出现在 `ss_app` 的授权面上，否则脚本直接拒启。
+漏授权不会让任何进程起不来，它只在运行时以 `ERROR 1142 → SQLState 42000 → BadSqlGrammarException`
+出现，日志里只剩一行异常类型名——`audit_relay_cursor` 就是这样让网关的 outbox relay 空转了近 750 次。
+新表须同时补进 `ops/sql/least-privilege.sql.tmpl` 与 `ops/sql/apply-least-privilege.ps1` 的
+`$businessTables`（后者把未纳管表视为硬失败，只有 `-DryRun` 放行）。
+
+向量库结构由 `start-dev.ps1` 的 `[4.5/8]` 幂等重放 `ai-python/migrations` 的 001–004。
+PG 侧没有 Flyway 账本，只能这样补：首次搬迁只导回了 MySQL，`docqa_vec` 是空库，
+而 `/health/ready` 只做 `SELECT 1`，照报 `pg: ok`，故障要到问答检索撞上「表不存在」才现形。
+005（`DROP` tenant 默认值）不在自动重放之列——它要求 `tenant_id` 回填已完成，需人工执行。
+
 ### Python 数据面与前端
 
-`start-dev.ps1` 默认只起中间件 + 5 个 Java 服务。Python 数据面与前端仍按本文后半部分的
-「手动启动顺序」单独启动（端口 `18000` / `5173`）；它们依赖 WSL venv 与 librocketmq，暂未容器化。
+`start-dev.ps1` 的第 7、8 步把这两项一起拉起，无需再手动启动：
+
+- **Python 数据面 API**：用 `ai-python/.venv` 跑 `python -u -m docqa_ai.api.main`，监听
+  `DOCQA_AI_PORT`（`18000`）。入口必须走 `main()` 而不是 `uvicorn ...:app`，前者会切
+  `WindowsSelectorEventLoopPolicy`，否则 psycopg 异步连接在 Proactor 循环上被拒、检索恒定 503。
+  脚本只给这个子进程声明 `DOCQA_AI_ENVIRONMENT=dev`，两端因此都不启用 `X-Internal-Token`；
+  **生产部署必须另配 `DOCQA_AI_INTERNAL_TOKEN`**（网关与数据面两侧同值）。
+  占位符口令在启动期就被拦：`DOCQA_AI_LLM_PROVIDER=openai` 而 `DOCQA_AI_LLM_API_KEY` 仍是
+  `CHANGE_ME*` 时，脚本会给这个子进程改派 `DOCQA_AI_LLM_PROVIDER=offline`（抽取式，不外呼），
+  并在结尾标注实际生效的生成模式。不这么做的话，占位符要一直到生成那一步才带 401 出去，
+  而网关把上游异常统一塌成 `AGT-UPSTREAM-001`，看不出是凭据问题。填真实 key 即恢复原配置。
+- **解析 / 向量 Worker 不在 Windows 启动**：`rocketmq-client-python` 只有 Linux 的
+  librocketmq C 绑定，需在 Linux 侧运行，见本文后半部分的历史 WSL 链路。
+  代价是**本机能跑起来，但新上传的文档不会写入向量**：`chunk` 正文只存在 PG，
+  MySQL 侧只有 `chunk_index` / `content_hash` / `token_count` 清单，因此空库下检索恒定
+  `chunkCount=0`，问答给出「现有资料不足」而不是报错。补齐索引需要 Linux worker 在线，
+  再对每个文档调 `POST /api/v1/documents/{id}/reindex`（worker 从 MinIO 重新解析并写回 PG）。
+- **前端**：直接 `node frontend-vue/node_modules/vite/bin/vite.js --host 127.0.0.1`，监听 `5173`。
+  用 `127.0.0.1` 而不是 `localhost` 打开，避免解析到 IPv6 后白等一次重试。
+  四组 `VITE_PROXY_*` 由脚本按 Java 服务同一张端口表注入，不依赖 `vite.config.ts` 里
+  `808x` 的 WSL 旧兜底——漏一条前缀不会报错，而是静默降级成 SPA fallback 返回 HTML。
+
+### 首次登录与账号
+
+全新库（`docker volume` 重建后）默认**没有任何可登录账号**：种子账号与自助注册两处开关都是关的
+（`DOCQA_DEMO_USER_ENABLED` 缺省 false、`DOCQA_SELF_REGISTRATION_ENABLED` 缺省 false）。
+这是 SEC-5 的取值，不是遗漏。两条受支持的路：
+
+- **种子演示账号**：在 `ops/env/local.env` 里打开 `DOCQA_DEMO_USER_ENABLED=true`，
+  需要管理面再打开 `DOCQA_DEMO_ADMIN=true`；`DOCQA_DEMO_PASSWORD_HASH` 必须是 **cost ≥ 12**
+  的真实 BCrypt 摘要（模板占位符 `CHANGE_ME_BCRYPT_HASH` 不算）。摘要由本机生成后填进 local.env，
+  仓库里不出现可用口令或其散列。
+- **自助注册**：`DOCQA_SELF_REGISTRATION_ENABLED=true`，走 `POST /api/v1/auth/register`，
+  受租户 slug 白名单与每窗口注册数上限约束。
+
+`start-dev.ps1` 在 `[1/8]` 之后校验第一种组合：开关打开但摘要形态不合法或 cost < 12 时直接拒启。
+`DemoUserSeeder` 本来就会为此抛 `IllegalStateException`，但那要到 `[6/8]` 才发生，
+现象是 user-service 起不来，看起来像构建坏了。
+本机现在的库是从 WSL 搬迁带来的账号，不需要种子；`demo` 那行仍是迁移前的 cost=04 摘要，
+`DOCQA_DEMO_USER_ENABLED` 因此不能打开——这也是把校验放在启动期的原因。
 
 ### 回滚
 
