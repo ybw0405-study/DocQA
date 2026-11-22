@@ -779,6 +779,11 @@ function clearStubState(): void {
   adminStubState.missingQuotaUsers.clear();
   usersStubState.roleOverrides.clear();
   usersStubState.statusOverrides.clear();
+  modelConnectionsStubState.rows = [];
+  modelConnectionsStubState.probeOk = true;
+  modelConnectionsStubState.probeFailureReason = 'HTTP_4XX';
+  modelConnectionsStubState.presetsFail = false;
+  modelConnectionsStubState.nextId = 1;
 }
 
 /** 状态机判定只用到看板行的这四个字段。 */
@@ -1247,6 +1252,76 @@ export const adminStubState = {
 
 export const KILL_SWITCH_WRITE_AT = '2026-11-03T10:04:11.508Z';
 
+/** 模型连接管理面的桩：行集合可变，便于验创建/生效/删除与「至多一条生效」。 */
+export const modelConnectionsStubState = {
+  rows: [] as Record<string, unknown>[],
+  /** 探测结论：ok=false 时按 failureReason 返回，用于验向导的失败与降级分支。 */
+  probeOk: true,
+  probeFailureReason: 'HTTP_4XX' as string,
+  /** 置真时预设目录返回 500，验「读取失败仍可走自定义端点」。 */
+  presetsFail: false,
+  nextId: 1,
+};
+
+export const MODEL_CONNECTION_WRITE_AT = '2026-11-22T10:15:42.010Z';
+
+export function modelConnectionItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: '0192f3a4-9d4e-7f32-8a01-1234567890b1',
+    name: 'DeepSeek 主连接',
+    presetId: 'deepseek',
+    baseUrl: 'https://api.deepseek.com/v1',
+    model: 'deepseek-chat',
+    enabled: true,
+    active: false,
+    hasCredential: true,
+    probeStatus: 'OK',
+    lastProbedAt: MODEL_CONNECTION_WRITE_AT,
+    createdAt: '2026-11-22T10:12:03.004Z',
+    updatedAt: MODEL_CONNECTION_WRITE_AT,
+    updatedBy: DEMO_USER_ID,
+    ...overrides,
+  };
+}
+
+/** 预设目录桩：公开端点与模型别名，不含任何密钥。 */
+export function modelPresetItems() {
+  return [
+    {
+      id: 'deepseek',
+      vendor: '深度求索',
+      mark: 'DS',
+      label: 'DeepSeek',
+      model: 'deepseek-chat',
+      models: ['deepseek-chat', 'deepseek-reasoner'],
+      baseUrl: 'https://api.deepseek.com/v1',
+      keyUrl: 'https://platform.deepseek.com',
+      keyHint: 'DeepSeek 开放平台创建 API Key',
+      group: 'recommended',
+      tag: '热门',
+      note: 'reasoner 为思考模式；别名会随版本升级，以控制台为准',
+      noKey: false,
+      needsServerOptIn: false,
+    },
+    {
+      id: 'ollama',
+      vendor: 'Ollama',
+      mark: 'OL',
+      label: '本地 Ollama',
+      model: 'qwen2.5:7b',
+      models: ['qwen2.5:7b', 'llama3.1:8b'],
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      keyUrl: '',
+      keyHint: '本地模型无需 API Key',
+      group: 'local',
+      tag: '需服务端放行',
+      note: 'http + 回环地址默认被出网策略拦截，需服务端打开 DOCQA_LLM_ALLOW_PRIVATE',
+      noKey: true,
+      needsServerOptIn: true,
+    },
+  ];
+}
+
 export function adminControlsData(overrides: Record<string, unknown> = {}) {
   return {
     killSwitch: { ...adminStubState.killSwitch },
@@ -1562,6 +1637,138 @@ export const adminHandlers = [
       return badWindow;
     }
     return HttpResponse.json(envelope(usageSummaryData()));
+  }),
+  mswHttp.get('/api/v1/admin/ai/model-connections/presets', ({ request }) => {
+    recordAdminOp('GET', request, null);
+    if (modelConnectionsStubState.presetsFail) {
+      return statusProblem(500, 'COM-INTERNAL-001', '预设目录暂不可用。', '/api/v1/admin/ai/model-connections/presets');
+    }
+    return HttpResponse.json(envelope({ items: modelPresetItems() }));
+  }),
+  mswHttp.get('/api/v1/admin/ai/model-connections', ({ request }) => {
+    recordAdminOp('GET', request, null);
+    return HttpResponse.json(envelope({ items: modelConnectionsStubState.rows }));
+  }),
+  mswHttp.post('/api/v1/admin/ai/model-connections', async ({ request }) => {
+    const instance = '/api/v1/admin/ai/model-connections';
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    recordAdminOp('POST', request, body);
+    const payload = body ?? {};
+    const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+    const baseUrl = typeof payload.baseUrl === 'string' ? payload.baseUrl.trim() : '';
+    const model = typeof payload.model === 'string' ? payload.model.trim() : '';
+    if (!name || !baseUrl || !model) {
+      return adminReject(instance, 'name、baseUrl、model 都必须出现且非空。');
+    }
+    if (!/^https?:\/\//.test(baseUrl)) {
+      return adminReject(instance, 'baseUrl 只支持 http/https。');
+    }
+    if ('secret' in payload) {
+      return adminReject(instance, '创建请求体不得携带 API Key，凭据走 credential 端点。');
+    }
+    const existing = modelConnectionsStubState.rows.find((row) => row.name === name);
+    if (existing) {
+      // 同名 upsert：更新配置但**不改变生效状态**，与契约一致。
+      Object.assign(existing, {
+        presetId: payload.presetId ?? null,
+        baseUrl,
+        model,
+        enabled: payload.enabled ?? true,
+        updatedAt: MODEL_CONNECTION_WRITE_AT,
+      });
+      return HttpResponse.json(envelope(existing));
+    }
+    const created = modelConnectionItem({
+      id: `0192f3a4-9d4e-7f32-8a01-1234567890c${modelConnectionsStubState.nextId++}`,
+      name,
+      presetId: payload.presetId ?? null,
+      baseUrl,
+      model,
+      enabled: payload.enabled ?? true,
+      active: false,
+      hasCredential: false,
+      probeStatus: 'UNKNOWN',
+      lastProbedAt: null,
+    });
+    modelConnectionsStubState.rows.push(created);
+    return HttpResponse.json(envelope(created));
+  }),
+  mswHttp.put('/api/v1/admin/ai/model-connections/:id/credential', async ({ request, params }) => {
+    const id = String(params.id);
+    const instance = `/api/v1/admin/ai/model-connections/${id}/credential`;
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    recordAdminOp('PUT', request, body);
+    const row = modelConnectionsStubState.rows.find((item) => item.id === id);
+    if (!row) {
+      return statusProblem(404, 'COM-NOT_FOUND-001', '模型连接不存在。', instance);
+    }
+    const secret = typeof body?.secret === 'string' ? body.secret.trim() : '';
+    if (!secret) {
+      return adminReject(instance, 'secret 必须出现且非空。');
+    }
+    row.hasCredential = true;
+    row.updatedAt = MODEL_CONNECTION_WRITE_AT;
+    // 响应只回 hasCredential，绝不回显 secret。
+    return HttpResponse.json(envelope(row));
+  }),
+  mswHttp.post('/api/v1/admin/ai/model-connections/:id/probe', ({ request, params }) => {
+    const id = String(params.id);
+    const instance = `/api/v1/admin/ai/model-connections/${id}/probe`;
+    recordAdminOp('POST', request, null);
+    const row = modelConnectionsStubState.rows.find((item) => item.id === id);
+    if (!row) {
+      return statusProblem(404, 'COM-NOT_FOUND-001', '模型连接不存在。', instance);
+    }
+    if (!row.hasCredential) {
+      return HttpResponse.json(envelope({ ok: false, models: [], failureReason: 'CREDENTIAL_MISSING', detail: '这条连接还没有保存 API Key' }));
+    }
+    if (!modelConnectionsStubState.probeOk) {
+      row.probeStatus = 'FAILED';
+      return HttpResponse.json(envelope({
+        ok: false,
+        models: [],
+        failureReason: modelConnectionsStubState.probeFailureReason,
+        detail: '端点返回 HTTP 401',
+      }));
+    }
+    row.probeStatus = 'OK';
+    row.lastProbedAt = MODEL_CONNECTION_WRITE_AT;
+    return HttpResponse.json(envelope({ ok: true, models: ['deepseek-chat', 'deepseek-reasoner'], failureReason: null, detail: null }));
+  }),
+  mswHttp.put('/api/v1/admin/ai/model-connections/:id/activation', async ({ request, params }) => {
+    const id = String(params.id);
+    const instance = `/api/v1/admin/ai/model-connections/${id}/activation`;
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    recordAdminOp('PUT', request, body);
+    const row = modelConnectionsStubState.rows.find((item) => item.id === id);
+    if (!row) {
+      return statusProblem(404, 'COM-NOT_FOUND-001', '模型连接不存在。', instance);
+    }
+    if (typeof body?.active !== 'boolean') {
+      return adminReject(instance, 'active 必须显式出现且为布尔。');
+    }
+    if (body.active && row.enabled === false) {
+      return adminReject(instance, '停用的连接不能设为生效。');
+    }
+    if (body.active) {
+      for (const other of modelConnectionsStubState.rows) {
+        other.active = false;
+      }
+    }
+    row.active = body.active;
+    row.updatedAt = MODEL_CONNECTION_WRITE_AT;
+    return HttpResponse.json(envelope(row));
+  }),
+  mswHttp.delete('/api/v1/admin/ai/model-connections/:id', ({ request, params }) => {
+    const id = String(params.id);
+    const instance = `/api/v1/admin/ai/model-connections/${id}`;
+    recordAdminOp('DELETE', request, null);
+    const index = modelConnectionsStubState.rows.findIndex((item) => item.id === id);
+    if (index < 0) {
+      return statusProblem(404, 'COM-NOT_FOUND-001', '模型连接不存在。', instance);
+    }
+    modelConnectionsStubState.rows.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
   }),
 ];
 

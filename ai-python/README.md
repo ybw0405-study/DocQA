@@ -98,6 +98,37 @@ rerank）都在字节离开本机**之前** `authorize_call` 预订，返回后�
 
 仓库中不保存任何真实凭据；`.env` 已被忽略。
 
+### 界面配置的模型连接
+
+管理员可以在 `/admin/model-connections` 里选厂商预设、填自己的 API Key、测试后设为生效，
+**不必改上面的 env 再重启**。数据面侧的口径：
+
+```bash
+DOCQA_AI_MODEL_CONNECTIONS_ENABLED=true   # 打开后才按请求解析界面连接；默认 false
+DOCQA_CRED_MASTER_KEY=...                 # base64 的 32 字节，与网关共用同一把
+DOCQA_CRED_MASTER_KEY_PREVIOUS=...        # 轮换期的旧主密钥，逗号分隔
+DOCQA_LLM_ALLOWED_HOSTS=...               # 主机后缀白名单，逗号分隔；留空放行任意公网主机
+DOCQA_LLM_ALLOW_PRIVATE=false             # 本地 Ollama 等 http+回环端点需显式打开
+```
+
+生效连接由网关发布到 Redis `agent:model-connection:tenant:{tenantId}`，载荷里**只有 AES-256-GCM
+密文**（AAD 绑定 `connectionId|tenantId`）与非密文字段；数据面用同一把主密钥在本地解封后构造
+planner。明文 Key 既不过内部 ask HTTP（dev 形态下那条通道没有内部鉴权），也不以明文进 Redis。
+
+三条语义刻意不同，不要混：
+
+- **键不存在** → 回退 env 配置的 provider（离线演示与占位符降级继续成立）；
+- **Redis 不可达** → 与 kill switch 同一 fail-closed 哲学，拒绝执行而不是猜一个 provider；
+- **密文解不开 / 端点不合规** → 硬失败（`AGT-UPSTREAM-001`），**绝不静默退回离线**。
+
+planner 按 `(connectionId, revision)` 缓存，改配置会换 revision 并新建 httpx client，
+旧 client 在宽限期后才关闭，避免掐断在途的流式响应。出网判定复用
+`tools/web/urls.py::validate_url`，与网关 `LlmEgressPolicy` 同一套规则、同一组环境变量。
+
+开关打开时即使 env 三个 provider 全 offline，两个实验额度也必须为正：界面激活的真实外呼
+同样受额度约束，账本因此一定会构造（`build_experiment_ledger` 的谓词包含该开关）。
+审计与 `PlanContext.model` 都报**本次请求实际使用的模型**，不再读启动期 settings。
+
 ## 配置项
 
 全部配置使用 `DOCQA_AI_` 前缀（共享变量除外），见 `src/docqa_ai/config.py`。

@@ -438,6 +438,7 @@ const TYPES = {
   reminders: 'src/types/reminders.ts',
   notifications: 'src/types/notifications.ts',
   admin: 'src/types/admin.ts',
+  modelConnections: 'src/types/modelConnections.ts',
   users: 'src/types/users.ts',
 } as const;
 
@@ -504,6 +505,15 @@ const MIRRORED_OBJECTS: { schema: string; file: string; iface: string }[] = [
   { schema: 'UserRolesUpdateRequest', file: TYPES.users, iface: 'UpdateUserRolesRequest' },
   { schema: 'UserStatusUpdateRequest', file: TYPES.users, iface: 'UpdateUserStatusRequest' },
   { schema: 'UserListData', file: TYPES.users, iface: 'UserListData' },
+  // 契约 2.7.0 模型连接管理面：读侧形态 → 列表体 → 三个写请求 → 探测结论 → 预设项与清单体。
+  { schema: 'ModelConnection', file: TYPES.modelConnections, iface: 'ModelConnection' },
+  { schema: 'ModelConnectionListData', file: TYPES.modelConnections, iface: 'ModelConnectionListData' },
+  { schema: 'CreateModelConnectionRequest', file: TYPES.modelConnections, iface: 'CreateModelConnectionRequest' },
+  { schema: 'AuthorizeModelConnectionRequest', file: TYPES.modelConnections, iface: 'AuthorizeModelConnectionRequest' },
+  { schema: 'UpdateActivationRequest', file: TYPES.modelConnections, iface: 'UpdateActivationRequest' },
+  { schema: 'ModelProbeData', file: TYPES.modelConnections, iface: 'ModelProbeData' },
+  { schema: 'ModelPreset', file: TYPES.modelConnections, iface: 'ModelPreset' },
+  { schema: 'ModelPresetListData', file: TYPES.modelConnections, iface: 'ModelPresetListData' },
 ];
 
 const ENVELOPE_SCHEMAS = [
@@ -535,6 +545,7 @@ const ENVELOPE_SCHEMAS = [
   'ModelConnectionEnvelope',
   'ModelConnectionListEnvelope',
   'ModelProbeEnvelope',
+  'ModelPresetListEnvelope',
 ];
 
 /** 未镜像的契约 schema 必须在此显式列名并写原因；两边都没覆盖会让覆盖测试变红。 */
@@ -571,36 +582,6 @@ const NOT_MIRRORED: { schema: string; reason: string }[] = [
     reason:
       'data 直接 $ref ProblemDetail，复用既有镜像；该引用形态由下方专项断言锁定。前端不产出 error 事件——api/conversations.ts 把它映射成 ApiError 抛出，与首字节前的 JSON 拒绝同构。',
   },
-  // 契约 2.7.0 模型连接管理面：后端链路先落地，前端向导页与类型镜像随下一个 PR 交付。
-  // 豁免是暂时的：镜像落地时必须把这 7 条移进 MIRRORED_OBJECTS / MIRRORED_ENUMS 并删掉这里。
-  {
-    schema: 'ModelConnection',
-    reason: '模型连接读侧形态；前端镜像随「模型连接」管理页 PR 落地，届时移入 MIRRORED_OBJECTS。',
-  },
-  {
-    schema: 'ModelConnectionListData',
-    reason: '模型连接列表体；前端镜像随「模型连接」管理页 PR 落地。',
-  },
-  {
-    schema: 'CreateModelConnectionRequest',
-    reason: '建立/更新连接的请求体；前端镜像随「模型连接」管理页 PR 落地。',
-  },
-  {
-    schema: 'AuthorizeModelConnectionRequest',
-    reason: '录入 API Key 的请求体；前端镜像随「模型连接」管理页 PR 落地（密钥只存组件本地 state）。',
-  },
-  {
-    schema: 'UpdateActivationRequest',
-    reason: '切换生效状态的请求体；前端镜像随「模型连接」管理页 PR 落地。',
-  },
-  {
-    schema: 'ModelProbeData',
-    reason: '探测结论载荷；前端镜像随「模型连接」管理页 PR 落地。',
-  },
-  {
-    schema: 'ModelProbeFailure',
-    reason: '探测失败原因枚举；前端镜像随「模型连接」管理页 PR 落地，届时移入 MIRRORED_ENUMS。',
-  },
 ];
 
 const MIRRORED_ENUMS: { schema: string; file: string; type: string; listConst: string | null }[] = [
@@ -616,6 +597,18 @@ const MIRRORED_ENUMS: { schema: string; file: string; type: string; listConst: s
     file: TYPES.reminders,
     type: 'ScheduleImportAction',
     listConst: 'SCHEDULE_IMPORT_ACTIONS',
+  },
+  {
+    schema: 'ModelProbeFailure',
+    file: TYPES.modelConnections,
+    type: 'ModelProbeFailure',
+    listConst: 'MODEL_PROBE_FAILURES',
+  },
+  {
+    schema: 'ModelPresetGroup',
+    file: TYPES.modelConnections,
+    type: 'ModelPresetGroup',
+    listConst: 'MODEL_PRESET_GROUPS',
   },
 ];
 
@@ -636,6 +629,13 @@ const MIRRORED_INLINE_ENUMS: {
   { schema: 'AuditEventItem', field: 'severity', file: TYPES.admin, type: 'AuditSeverity', listConst: 'AUDIT_SEVERITIES' },
   { schema: 'UsageStatusCount', field: 'status', file: TYPES.admin, type: 'UsageStatus', listConst: 'USAGE_STATUSES' },
   { schema: 'UsageSummary', field: 'bucket', file: TYPES.admin, type: 'UsageBucket', listConst: null },
+  {
+    schema: 'ModelConnection',
+    field: 'probeStatus',
+    file: TYPES.modelConnections,
+    type: 'ProbeStatus',
+    listConst: 'PROBE_STATUSES',
+  },
 ];
 
 /** 前端把契约的数值约束抄成常量，这里逐个回比。 */
@@ -962,8 +962,8 @@ describe('契约 ↔ 前端类型对账', () => {
 
     expect(unaccounted, `契约新增/改名的 schema 未经裁决：${unaccounted.join(', ')}`).toEqual([]);
     expect(stale, `前端镜像表里的 schema 在契约中已不存在：${stale.join(', ')}`).toEqual([]);
-    // 契约 2.7.0 的 schema 计数（新增模型连接管理面 10 个）。契约一旦增删，这一条先红，逼着来做一次裁决。
-    expect(SCHEMA_NAMES).toHaveLength(109);
+    // 契约 2.7.0 的 schema 计数（模型连接管理面 10 个 + 预设目录 4 个）。契约一旦增删，这一条先红，逼着来做一次裁决。
+    expect(SCHEMA_NAMES).toHaveLength(113);
   });
 
   it('mirrors every object schema field-for-field', () => {
@@ -1279,6 +1279,7 @@ describe('契约 ↔ 前端类型对账', () => {
       getAiUsage: ['TimeFrom', 'TimeTo', 'UsageBucket', 'UsageTopUsers'],
       // 契约 2.7.0 模型连接管理面：同样按值幂等，不声明幂等键（D-197）。
       listModelConnections: [],
+      listModelConnectionPresets: [],
       upsertModelConnection: [],
       deleteModelConnection: ['ConnectionId'],
       authorizeModelConnection: ['ConnectionId'],

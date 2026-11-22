@@ -59,6 +59,10 @@ Windows 侧经端口映射连入时 MySQL 看到的是 bridge 网关地址）。
 新表须同时补进 `ops/sql/least-privilege.sql.tmpl` 与 `ops/sql/apply-least-privilege.ps1` 的
 `$businessTables`（后者把未纳管表视为硬失败，只有 `-DryRun` 放行）。
 
+授权模板与新表存在先后关系：模板里指向**尚未创建**的表（例如 V13 的 `model_connection`）的 GRANT
+会在步骤 4 被推迟，等服务起来、Flyway 建表之后由 `[6b]` 补齐并做上面那道覆盖率对账。
+只跑 `-InfraOnly` 时服务不会启动，被推迟的授权也就不会下发，脚本会明确提示。
+
 向量库结构由 `start-dev.ps1` 的 `[4.5/8]` 幂等重放 `ai-python/migrations` 的 001–004。
 PG 侧没有 Flyway 账本，只能这样补：首次搬迁只导回了 MySQL，`docqa_vec` 是空库，
 而 `/health/ready` 只做 `SELECT 1`，照报 `pg: ok`，故障要到问答检索撞上「表不存在」才现形。
@@ -106,6 +110,28 @@ PG 侧没有 Flyway 账本，只能这样补：首次搬迁只导回了 MySQL，
 现象是 user-service 起不来，看起来像构建坏了。
 本机现在的库是从 WSL 搬迁带来的账号，不需要种子；`demo` 那行仍是迁移前的 cost=04 摘要，
 `DOCQA_DEMO_USER_ENABLED` 因此不能打开——这也是把校验放在启动期的原因。
+
+### 模型连接（在界面里换模型）
+
+管理页 `/admin/model-connections`（导航「模型」，仅 ADMIN）：选厂商预设 → 填自己的 API Key →
+测试连接 → 设为生效。凭据以 AES-256-GCM 密文落库并绑定到该连接与本租户，保存后不再回显，
+页面只显示「已配置 / 未配置」。**切换生效连接不需要重启任何服务**：网关把密文发布到 Redis，
+数据面在每次问答时解密并调用它。没有生效连接时，问答回退到 `DOCQA_AI_LLM_*` 配置的 provider。
+
+- **主密钥**：`DOCQA_CRED_MASTER_KEY`（base64 的 32 字节）。`start-dev.ps1` 首次启动会自动生成一次
+  并写回 gitignored 的 `ops/env/local.env`，**不回显、不入库、不写全局环境变量**；网关与数据面共用它。
+  生产部署须自行注入高熵值。未配置时服务照常启动，只有「保存 API Key」与「测试连接」会被明确拒绝。
+- **轮换**：旧主密钥放进 `DOCQA_CRED_MASTER_KEY_PREVIOUS`（逗号分隔），历史密文仍可解；
+  每条连接重新录入 Key 之后才能移除旧密钥，否则那些连接会硬失败（不会静默降级）。
+- **数据面开关**：`DOCQA_AI_MODEL_CONNECTIONS_ENABLED=true` 才会按请求解析界面连接；
+  `start-dev.ps1` 的本地 dev 形态默认打开它（只注入该子进程），手动起数据面时才需自己设。
+  打开时即使 env 三个 provider 全 offline，也要求 `DOCQA_AI_EXPERIMENT_BUDGET` 与
+  `_TOKEN_BUDGET` 为正——界面激活的真实外呼必须受额度约束。
+- **出网策略**：`DOCQA_LLM_ALLOWED_HOSTS`（主机后缀白名单，留空放行任意公网主机）与
+  `DOCQA_LLM_ALLOW_PRIVATE`（默认 false）。本地 Ollama 这类 http + 回环端点必须显式打开后者，
+  否则测试连接返回 `EGRESS_BLOCKED`。网关探测与数据面调用读同一组变量，判定一致。
+- **既有限制**：本机若没有文档向量（解析/向量 Worker 需 Linux `librocketmq`），检索恒为 0 条，
+  问答会降级为「现有资料不足」。换模型改变的是生成侧，不会凭空补出检索结果。
 
 ### 回滚
 
