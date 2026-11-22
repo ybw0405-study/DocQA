@@ -127,15 +127,22 @@ Write-Note "库 $Schema 与迁移账本都在位；管理员账号 $AdminUser"
 $businessTables = @(
     'agent_execution', 'ai_quota', 'app_user', 'app_user_role', 'chunk', 'conversation',
     'document', 'document_tag', 'document_tag_link', 'message', 'refresh_token',
-    'reminder', 'reminder_trigger', 'tenant'
+    'reminder', 'reminder_trigger', 'tenant', 'vector_cleanup_task'
 )
+# audit_relay_cursor 也是业务表，但目标态没有 DELETE（模板按 upsert 覆盖单行，没有删除路径），
+# 和 audit_event 一样属于「按表特例授权」，所以不进 $businessTables。
+$specialTables = @('audit_event', 'audit_relay_cursor')
 $liveTables = @(Invoke-Query "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$Schema' AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME;" '读取表清单' |
     Where-Object { $_ -ne 'flyway_schema_history' })
-# audit_event 是「按表特例授权」，不在 $businessTables 里，但它不是未纳管表
-$drift = @($liveTables | Where-Object { $_ -notin $businessTables -and $_ -ne 'audit_event' })
+# 未纳管 = 库里存在但两份清单都没覆盖；这种表连 ss_app 都读不到，运行时会以
+# ERROR 1142 → SQLState 42000 → BadSqlGrammarException 出现，日志只剩一行异常类型名。
+$drift = @($liveTables | Where-Object { $_ -notin $businessTables -and $_ -notin $specialTables })
 if ($drift.Count -gt 0) {
     Write-Note "警告：库里有未纳入授权清单的表：$($drift -join ', ')"
     Write-Note '     apply 不会自动授权新表；确认后把表名同时加进 least-privilege.sql.tmpl 与 $businessTables。'
+    if (-not $DryRun) {
+        throw "未纳管表 $($drift -join ', ') 会让 ss_app 在运行时撞 ERROR 1142；先把授权清单补齐再执行。"
+    }
 }
 
 # -----------------------------------------------------------------------------
@@ -200,6 +207,9 @@ $MigratorDdl = @('CREATE', 'ALTER', 'DROP', 'INDEX', 'REFERENCES', 'CREATE VIEW'
     'CREATE ROUTINE', 'ALTER ROUTINE', 'EXECUTE', 'TRIGGER')
 $FullDml = @('SELECT', 'INSERT', 'UPDATE', 'DELETE')
 $AppendOnly = @('SELECT', 'INSERT')
+# 游标表按 upsert 覆盖单行，没有删除路径；模板故意不给 DELETE，对账目标态必须一致，
+# 否则这里会把 DELETE 当成「多余授权」撤掉，与模板互相打架。
+$CursorUpsert = @('SELECT', 'INSERT', 'UPDATE')
 
 function Get-DesiredPrivileges {
     param([string]$Account, [string]$Scope, [string]$TableName)
@@ -211,6 +221,7 @@ function Get-DesiredPrivileges {
         }
         'ss_app' {
             if ($Scope -eq 'TABLE' -and $TableName -eq 'audit_event') { return $AppendOnly }
+            if ($Scope -eq 'TABLE' -and $TableName -eq 'audit_relay_cursor') { return $CursorUpsert }
             if ($Scope -eq 'TABLE' -and $businessTables -contains $TableName) { return $FullDml }
             return @()
         }

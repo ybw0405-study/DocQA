@@ -201,10 +201,18 @@ powershell -File scripts/verify-all.ps1 -Offline  # Windows PowerShell 5.1
 # 仅首次：从模板生成本机配置（gitignored，不写全局环境变量）
 Copy-Item ops/env/local.env.example ops/env/local.env   # 按需填写口令
 
-.\scripts\start-dev.ps1          # compose up → 等健康 → 幂等授权 → 构建 → 起全部服务
+.\scripts\start-dev.ps1          # compose up → 等健康 → 预建 topic → 授权对账 → 向量库结构 → 构建 → Java + Python 数据面 + 前端
 .\scripts\stop-dev.ps1           # 只停应用进程
 .\scripts\stop-dev.ps1 -Infra    # 连容器一起停（卷保留，数据不丢）
 ```
+
+> 脚本会先校验 `ops/env/local.env` 里两处「不影响启动、只影响能用」的配置：
+> LLM 密钥仍是占位符时把数据面生成降级为 `offline`，种子账号开关开着但口令摘要 strength 不够时直接拒启。
+> 解析 / 向量 Worker 依赖只有 Linux 提供的 librocketmq 绑定，不在本机启动，
+> 因此这里新上传的文档不会写入向量索引，问答检索命中为 0；补齐索引需要 Linux worker 与文档重新索引接口。
+
+启动完成后浏览器打开 <http://127.0.0.1:5173>（Vite 只绑 loopback，用 `127.0.0.1` 而不是 `localhost`，
+避免解析到 IPv6 后白等一次重试）。
 
 常用选项：`-NoBuild` 跳过构建（jar 已最新时）、`-InfraOnly` 只起中间件、`-SkipGrants` 跳过授权重放。
 分步手动启动与故障排查见 [getting-started.md](docs/00-infra/getting-started.md)。

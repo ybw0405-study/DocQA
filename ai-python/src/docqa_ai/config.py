@@ -81,7 +81,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # 默认只监听 loopback：Python 数据面不对公网暴露，需要跨主机时由部署显式放宽。
     api_host: str = "127.0.0.1"
-    api_port: int = Field(default=8000, ge=1, le=65535)
+    # 显式 validation_alias 不受 env_prefix 影响，这里必须写全名：配置契约用的是 DOCQA_AI_PORT
+    # （网关的 DOCQA_PYTHON_BASE_URL 也指向同一端口），漏掉别名时字段只认 DOCQA_AI_API_PORT，
+    # 数据面就永远绑 8000，网关按 18000 调用恒定 connection refused。
+    api_port: int = Field(default=8000, ge=1, le=65535, validation_alias="DOCQA_AI_PORT")
     # 未配内部凭据时是否允许匿名访问数据面。默认拒绝；仅在 loopback 监听时
     # 可被部署显式开启用于本地联调。跨主机 + 无凭据的组合会在启动时被拒绝。
     allow_anonymous_api: bool = False

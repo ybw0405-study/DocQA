@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 interface Backend {
@@ -29,6 +29,18 @@ const BACKENDS: readonly Backend[] = [
 // 对 VITE_MINIO_BUCKET 零引用（由 tests/redlines.spec.ts 机检），绝不烘焙进产物。
 const MINIO_BUCKET = 'docqa-documents';
 
+// dev 下 Vite 用内联 <style> 注入 CSS，而 index.html 的 meta CSP（CT-5 刻意去掉 unsafe-inline）
+// 会把它们全部拦掉，页面只剩裸 HTML。生产产物是外链 CSS，不需要这条例外，故只在 serve 时改写。
+function devCspForServe(): Plugin {
+  return {
+    name: 'docqa-dev-csp',
+    apply: 'serve',
+    transformIndexHtml(html: string): string {
+      return html.replace("style-src 'self'", "style-src 'self' 'unsafe-inline'");
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   // CT-8：Vite 的 base 只能在构建期确定，因此采用「相对 base + 可覆盖 env」：
@@ -37,7 +49,7 @@ export default defineConfig(({ mode }) => {
   const base = env.VITE_APP_BASE ?? './';
   return {
     base,
-    plugins: [vue()],
+    plugins: [vue(), devCspForServe()],
     build: {
       rollupOptions: {
         output: {

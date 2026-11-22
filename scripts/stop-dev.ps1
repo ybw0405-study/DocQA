@@ -37,16 +37,28 @@ function Get-RepoProcesses {
         })
 }
 
-$targets = Get-RepoProcesses
+# 函数返回会把单元素数组解包成标量，$null.Count 让下面的计数与判空全部失真，调用点必须再套 @()。
+$targets = @(Get-RepoProcesses)
+$failed = @()
 foreach ($p in $targets) {
     if (-not $Quiet) { Write-Host ("  stop {0,-16} pid={1}" -f $p.Name, $p.ProcessId) }
-    Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+    # 不能用 SilentlyContinue：非提权 shell 杀不掉提权进程，「拒绝访问」被吞掉就成了假成功。
+    try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop }
+    catch { $failed += $p.ProcessId }
 }
+
+# 提权进程的命令行对非提权 shell 不可读，Test-OwnedByRepo 因此一个都匹配不上。
+# 先分清「看不见」和「真没跑」，否则结尾会误报 nothing running.
+$invisible = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.Name -in @('java.exe', 'python.exe', 'node.exe', 'cmd.exe') -and
+        [string]::IsNullOrWhiteSpace($_.CommandLine)
+    })
 
 # 杀进程到句柄真正释放之间有窗口；轮询确认，最多 10s，不做无意义的固定 sleep。
 $deadline = (Get-Date).AddSeconds(10)
 while ((Get-Date) -lt $deadline) {
-    if ((Get-RepoProcesses).Count -eq 0) { break }
+    if (@(Get-RepoProcesses).Count -eq 0) { break }
     Start-Sleep -Milliseconds 300
 }
 
@@ -61,6 +73,18 @@ if ($Infra) {
     }
 }
 if (-not $Quiet) {
-    if ($targets.Count -eq 0) { Write-Host 'nothing running.' }
-    else { Write-Host ("stopped ({0} processes)." -f $targets.Count) }
+    if ($failed.Count -gt 0) {
+        Write-Host ("stopped {0}, 但杀不掉 {1} 个 (pid={2})。" -f `
+            ($targets.Count - $failed.Count), $failed.Count, ($failed -join ','))
+    } elseif ($targets.Count -eq 0) {
+        if ($invisible.Count -gt 0) {
+            # 归属证据（命令行）在提权进程上不可得，这里不能报「没在跑」。
+            Write-Host ("没找到可归属到本仓库的进程，但有 {0} 个 java/python/node/cmd 进程的命令行读不到。" -f $invisible.Count)
+            Write-Host '   它们多半由管理员 PowerShell 启动；请在同一个管理员窗口里重跑本脚本，否则端口会一直被占着。'
+        } else {
+            Write-Host 'nothing running.'
+        }
+    } else {
+        Write-Host ("stopped ({0} processes)." -f $targets.Count)
+    }
 }
