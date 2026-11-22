@@ -35,8 +35,10 @@ info:
     `tenantId` 一律取自已验签 JWT，不接受请求体或 Header 传参。既有路径、schema 与错误码
     一律不删不改，新增一个 `KillSwitchStateEnvelope` 响应信封。
     2.7.0 是**模型连接管理面**（向后兼容的次版本）：新增 `/api/v1/admin/ai/model-connections`
-    及其 `{connectionId}` / `credential` / `probe` / `activation` 子路径，共 **5 条路径 / 6 个操作**，
-    让管理员在界面里选厂商预设、填自己的 API Key、测试连通性并设为生效，取代「改 env 再重启」。
+    及其 `presets` / `{connectionId}` / `credential` / `probe` / `activation` 子路径，
+    共 **6 条路径 / 7 个操作**，让管理员在界面里选厂商预设、填自己的 API Key、测试连通性并设为生效，
+    取代「改 env 再重启」。厂商预设目录由服务端下发（前端红线禁止生产源码出现绝对服务地址，
+    且端点变化不必发前端版本），内容是公开端点与模型别名，不含任何密钥。
     凭据**只进不出**：明文 Key 只出现在 `PUT …/credential` 的请求体，服务端以 AES-256-GCM
     封装落库（AAD 绑定 `connectionId|tenantId`），读侧只有 `hasCredential` 布尔。
     写操作全部按值幂等（创建按租户内 `name` upsert、凭据与生效状态覆盖式写入），
@@ -3156,6 +3158,77 @@ paths:
                     traceId: 4bf92f3577b34da6a3ce929d0e0e4736
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/ai/model-connections/presets:
+    get:
+      tags:
+        - Admin
+      operationId: listModelConnectionPresets
+      summary: 厂商预设目录（公开端点与模型别名）
+      description: |
+        需要 `ADMIN` 角色。返回常见 OpenAI 兼容厂商的端点地址、常见模型别名与申请 API Key 的入口，
+        **不含任何密钥**，也不读配置、不出网。
+
+        由服务端下发而不是写死在前端：前端红线禁止生产源码出现绝对服务地址
+        （`frontend-vue/tests/redlines.spec.ts`），厂商端点属于同一类字面量；服务端下发既守住红线，
+        也让换端点不必发前端版本。端点与模型名在向导里都可编辑，服务商控制台才是最终依据。
+
+        `needsServerOptIn=true` 的预设（本地 Ollama）要求服务端显式打开 `DOCQA_LLM_ALLOW_PRIVATE`，
+        界面必须提示，否则用户会把「被策略拦截」误判成「功能坏了」。
+        本端点不投递 MQ、不调用 Python、不触发 LLM。
+      responses:
+        '200':
+          description: 预设目录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelPresetListEnvelope'
+              examples:
+                catalog:
+                  value:
+                    code: OK
+                    msg: success
+                    data:
+                      items:
+                        - id: deepseek
+                          vendor: 深度求索
+                          mark: DS
+                          label: DeepSeek
+                          model: deepseek-chat
+                          models:
+                            - deepseek-chat
+                            - deepseek-reasoner
+                          baseUrl: https://api.deepseek.com/v1
+                          keyUrl: https://platform.deepseek.com
+                          keyHint: DeepSeek 开放平台创建 API Key
+                          group: recommended
+                          tag: 热门
+                          note: reasoner 为思考模式；别名会随版本升级，以控制台为准
+                          noKey: false
+                          needsServerOptIn: false
+                        - id: ollama
+                          vendor: Ollama
+                          mark: OL
+                          label: 本地 Ollama
+                          model: qwen2.5:7b
+                          models:
+                            - qwen2.5:7b
+                            - llama3.1:8b
+                          baseUrl: http://127.0.0.1:11434/v1
+                          keyUrl: ''
+                          keyHint: 本地模型无需 API Key
+                          group: local
+                          tag: 需服务端放行
+                          note: http + 回环地址默认被出网策略拦截，需服务端打开 DOCQA_LLM_ALLOW_PRIVATE
+                          noKey: true
+                          needsServerOptIn: true
+                    traceId: 4bf92f3577b34da6a3ce929d0e0e4736
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -6583,6 +6656,119 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ModelProbeData'
+
+    ModelPresetGroup:
+      type: string
+      description: 预设分组，界面按此分节展示。
+      enum:
+        - recommended
+        - domestic
+        - overseas
+        - local
+
+    ModelPreset:
+      type: object
+      description: |
+        一个厂商预设：公开端点与常见模型别名，**不含任何密钥**。
+        端点与模型名在向导里都可编辑，服务商控制台才是最终依据。
+      required:
+        - id
+        - vendor
+        - mark
+        - label
+        - model
+        - models
+        - baseUrl
+        - keyUrl
+        - keyHint
+        - group
+        - tag
+        - note
+        - noKey
+        - needsServerOptIn
+      properties:
+        id:
+          type: string
+          maxLength: 32
+          pattern: '^[a-z0-9][a-z0-9-]{0,31}$'
+          example: deepseek
+        vendor:
+          type: string
+          maxLength: 64
+          example: 深度求索
+        mark:
+          type: string
+          maxLength: 2
+          description: 厂商标识，1~2 个 ASCII 字符，界面用 CSS 方块呈现，不引入图片。
+          example: DS
+        label:
+          type: string
+          maxLength: 64
+          example: DeepSeek
+        model:
+          type: string
+          maxLength: 64
+          description: 默认下发的模型名。
+          example: deepseek-chat
+        models:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 128
+          description: 候选模型别名，会与探测到的 /models 结果合并。
+        baseUrl:
+          type: string
+          maxLength: 512
+          example: https://api.deepseek.com/v1
+        keyUrl:
+          type: string
+          maxLength: 512
+          description: 申请 API Key 的控制台地址；本地无 Key 端点为空串。
+          example: https://platform.deepseek.com
+        keyHint:
+          type: string
+          maxLength: 120
+          example: DeepSeek 开放平台创建 API Key
+        group:
+          $ref: '#/components/schemas/ModelPresetGroup'
+        tag:
+          type: string
+          maxLength: 32
+          nullable: true
+          example: 热门
+        note:
+          type: string
+          maxLength: 200
+          description: 最容易填错的那一处提示。
+        noKey:
+          type: boolean
+          description: 不需要 API Key（例如本地 Ollama）。
+        needsServerOptIn:
+          type: boolean
+          description: 需要服务端显式放行（DOCQA_LLM_ALLOW_PRIVATE），界面必须提示。
+
+    ModelPresetListData:
+      type: object
+      description: 预设目录；纯静态公开数据，不分页。
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/ModelPreset'
+
+    ModelPresetListEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/ModelPresetListData'
 
   headers:
     RefreshCookie:

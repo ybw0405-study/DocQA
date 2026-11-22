@@ -1174,6 +1174,82 @@ form > button[type='submit']:disabled {
   margin: var(--space-3) 0 0;
 }
 
+/* 模型连接向导 -------------------------------------------------------- */
+
+/*
+ * 预设清单是「选一个厂商」而不是数据表，因此用列表而不是 table：
+ * 它没有列对齐语义，套 table 反而会给读屏器伪造出一张七列数据表。
+ * 厂商标记用 CSS 方块承载 1~2 个 ASCII 字符，不引入图片与原始色值。
+ */
+.model-wizard__group {
+  margin: var(--space-5) 0;
+}
+
+.model-wizard__group > h3 {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-faint);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.model-wizard__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.model-wizard__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  width: 100%;
+  text-align: left;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: var(--space-4);
+}
+
+.model-wizard__item:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-raised);
+}
+
+.model-wizard__mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-label);
+}
+
+.model-wizard__body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.model-wizard__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.model-wizard__body .muted {
+  overflow-wrap: anywhere;
+}
+
 /* 原文 JSON 默认折叠，展开后仍是文本插值（D-201）；等宽 + 任意断行，长哈希不会撑破表格。 */
 .admin-raw {
   margin: var(--space-3) 0;
@@ -2236,6 +2312,11 @@ form > button[type='submit']:hover:not(:disabled),
 
   .quota-table {
     min-width: 720px;
+  }
+
+  /* 连接表七列里有模型名与端点主机两个不定长标识，压到 820 以下只剩断字符。 */
+  .model-connection-table {
+    min-width: 820px;
   }
 
   /* 审计表七列里 traceId 与 userId 都是定长哈希，压到 620 以下就只剩断字符。 */

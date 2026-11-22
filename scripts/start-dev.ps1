@@ -423,11 +423,15 @@ if (-not (Test-Path -LiteralPath $py)) {
 # 所以只给这个子进程声明 dev，且取值必须是 dev/test/prod 之一（Settings 用 Literal 校验）。
 $env:DOCQA_AI_ENVIRONMENT = 'dev'
 if ($llmOfflineFallback) { $env:DOCQA_AI_LLM_PROVIDER = 'offline' }
+# 本地 dev 默认打开界面模型连接解析：没有生效连接时回退 env provider（行为不变），
+# 有连接则按请求用界面配置的模型。额度前置由 local.env 的正值保证。
+$env:DOCQA_AI_MODEL_CONNECTIONS_ENABLED = 'true'
 Start-Process -FilePath $py -ArgumentList @('-u', '-m', 'docqa_ai.api.main') -WorkingDirectory $ai `
     -RedirectStandardOutput (Join-Path $logs 'ai-api.out.log') `
     -RedirectStandardError  (Join-Path $logs 'ai-api.err.log') -WindowStyle Hidden
 $env:DOCQA_AI_ENVIRONMENT = $null
 if ($llmOfflineFallback) { $env:DOCQA_AI_LLM_PROVIDER = $null }
+$env:DOCQA_AI_MODEL_CONNECTIONS_ENABLED = $null
 
 $deadline = (Get-Date).AddSeconds(90)
 while ((Get-Date) -lt $deadline -and -not (Test-Port $aiPort)) { Start-Sleep -Milliseconds 700 }

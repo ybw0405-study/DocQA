@@ -23,6 +23,7 @@ import com.docqa.agentgateway.dto.ModelProbeData;
 import com.docqa.agentgateway.dto.ModelProbeFailure;
 import com.docqa.agentgateway.dto.UpdateActivationRequest;
 import com.docqa.agentgateway.service.ModelConnectionService;
+import com.docqa.agentgateway.service.ModelPresetCatalog;
 import com.docqa.agentgateway.web.AgentExceptionHandler;
 import com.docqa.agentgateway.web.JwtAuthenticationFilter;
 import com.docqa.common.error.BusinessException;
@@ -75,11 +76,24 @@ class AdminModelConnectionControllerTest {
         MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter(objectMapper);
         converter.setSupportedMediaTypes(List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_PROBLEM_JSON));
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AdminModelConnectionController(service))
+                .standaloneSetup(new AdminModelConnectionController(service, new ModelPresetCatalog()))
                 .setControllerAdvice(new AgentExceptionHandler(), new GlobalExceptionHandler())
                 .addFilters(new TraceIdFilter())
                 .setMessageConverters(converter)
                 .build();
+    }
+
+    @Test
+    void servesTheVendorPresetCatalogWithoutAnyCredentialMaterial() throws Exception {
+        mockMvc.perform(get(PATH + "/presets").requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.items[0].id").value("deepseek"))
+                .andExpect(jsonPath("$.data.items[0].baseUrl").value("https://api.deepseek.com/v1"))
+                .andExpect(jsonPath("$.data.items[0].models").isArray())
+                .andExpect(jsonPath("$.data.items[0].keyUrl").isNotEmpty())
+                .andExpect(jsonPath("$.data.items[0].secret").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].credential").doesNotExist());
     }
 
     @AfterEach

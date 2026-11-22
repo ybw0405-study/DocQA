@@ -25,6 +25,7 @@ export const routes: RouteRecordRaw[] = [
   { path: '/admin/quotas', name: 'admin-quotas', component: () => import('../views/admin/AdminQuotasView.vue'), meta: { requiresAdmin: true } },
   { path: '/admin/audit', name: 'admin-audit', component: () => import('../views/admin/AdminAuditView.vue'), meta: { requiresAdmin: true } },
   { path: '/admin/usage', name: 'admin-usage', component: () => import('../views/admin/AdminUsageView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/model-connections', name: 'admin-model-connections', component: () => import('../views/admin/AdminModelConnectionsView.vue'), meta: { requiresAdmin: true } },
   { path: '/admin/users', name: 'admin-users', component: () => import('../views/admin/AdminUsersView.vue'), meta: { requiresAdmin: true } },
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { requiresAuth: false } },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue') },

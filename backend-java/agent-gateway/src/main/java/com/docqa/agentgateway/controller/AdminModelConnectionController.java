@@ -4,9 +4,11 @@ import com.docqa.agentgateway.dto.AuthorizeModelConnectionRequest;
 import com.docqa.agentgateway.dto.CreateModelConnectionRequest;
 import com.docqa.agentgateway.dto.ModelConnection;
 import com.docqa.agentgateway.dto.ModelConnectionListData;
+import com.docqa.agentgateway.dto.ModelPresetListData;
 import com.docqa.agentgateway.dto.ModelProbeData;
 import com.docqa.agentgateway.dto.UpdateActivationRequest;
 import com.docqa.agentgateway.service.ModelConnectionService;
+import com.docqa.agentgateway.service.ModelPresetCatalog;
 import com.docqa.agentgateway.web.JwtAuthenticationFilter;
 import com.docqa.common.api.ApiResponse;
 import com.docqa.common.tenant.TenantContext;
@@ -37,9 +39,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminModelConnectionController {
 
     private final ModelConnectionService service;
+    private final ModelPresetCatalog presetCatalog;
 
-    public AdminModelConnectionController(ModelConnectionService service) {
+    public AdminModelConnectionController(ModelConnectionService service, ModelPresetCatalog presetCatalog) {
         this.service = service;
+        this.presetCatalog = presetCatalog;
+    }
+
+    /**
+     * 厂商预设目录：公开端点与常见模型别名，不含任何密钥。
+     * 由服务端下发是因为前端红线禁止生产源码出现绝对服务地址，且端点变化不必发前端版本。
+     */
+    @GetMapping("/presets")
+    public ApiResponse<ModelPresetListData> presets() {
+        return ApiResponse.ok(new ModelPresetListData(presetCatalog.presets()));
     }
 
     @GetMapping

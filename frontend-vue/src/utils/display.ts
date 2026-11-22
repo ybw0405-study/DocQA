@@ -196,6 +196,7 @@ export const EMPTY_STATE_TEXT = {
   auditWindow: '默认时间窗（最近 24 小时）内没有审计事件，可以放宽时刻条件再查一次。',
   auditFiltered: '当前查询条件下没有审计事件。',
   usageNone: '所选窗口内没有执行记录。',
+  modelConnectionsNone: '还没有模型连接：问答此时使用部署配置的模型，新建一条即可在界面里切换。',
 } as const;
 
 export function formatBytes(bytes: number): string {
