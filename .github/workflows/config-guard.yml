@@ -1,6 +1,6 @@
 name: config-guard
 
-# G19：ops/、scripts/、docs/ 此前没有任何 job。这里让这三类目录的改动有真实门禁：
+# ops/、scripts/、docs/ 此前没有任何 job。这里让这三类目录的改动有真实门禁：
 # pull_request.paths 显式列出它们及 workflow 自身；push main 无条件跑。
 # 校验项都是硬失败：compose 可解析且镜像按 digest 固定、全部 workflow YAML
 # safe_load 通过且每条 workflow 保留 timeout/permissions/concurrency、

@@ -16,7 +16,7 @@
 #     此文件不引入 flyway 容器；账号授权由 start-dev.ps1 幂等重放。
 #  5. ${...} 变量来自 start-dev.ps1 注入的进程环境，compose 不读取凭据文件本身。
 #
-# 镜像按 digest 固定（G16）：digest 取自主机
+# 镜像按 digest 固定：digest 取自主机
 #   docker image inspect --format '{{json .RepoDigests}}' <repo:tag>
 # 与 docker images --digests 的真实值，写成 repo:tag@sha256:...，
 # 并在行尾以注释保留原 tag，便于人工升级时核对。升级镜像须重新取 digest

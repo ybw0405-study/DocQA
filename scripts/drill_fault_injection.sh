@@ -16,9 +16,9 @@
 #   * 不修改任何现有源码/脚本/配置；本文件为新增脚手架。
 #
 # 运行（Windows Git Bash）：
-#   bash batch4_fault_injection.sh redis-halfopen                 # dry-run
-#   bash batch4_fault_injection.sh mq-backlog --apply --target docqa-rmq-broker
-#   bash batch4_fault_injection.sh rolling-restart --apply --target docqa-parse-worker
+#   bash drill_fault_injection.sh redis-halfopen                 # dry-run
+#   bash drill_fault_injection.sh mq-backlog --apply --target docqa-rmq-broker
+#   bash drill_fault_injection.sh rolling-restart --apply --target docqa-parse-worker
 # =============================================================================
 set -euo pipefail
 
@@ -97,11 +97,11 @@ case "$case_name" in
     say "  - 关停顺序：停 consumer -> gather 在途 -> publisher -> PG provider -> redis -> loop.close"
     say "  - 新实例 readiness 变绿后才接收流量"
     say "恢复：按 digest 重新拉起实例；确认 /health/ready 200"
-    say "判据：零在途丢失、零幽灵任务、租约接管时延 < SLO（见 batch4_slo_alerts.yaml）。"
+    say "判据：零在途丢失、零幽灵任务、租约接管时延 < SLO（见 drill_slo_alerts.yaml）。"
     ;;
 
   *)
-    say "用法: bash batch4_fault_injection.sh {redis-halfopen|mq-backlog|rolling-restart} [--apply] [--target NAME] [--duration N]"
+    say "用法: bash drill_fault_injection.sh {redis-halfopen|mq-backlog|rolling-restart} [--apply] [--target NAME] [--duration N]"
     exit 2
     ;;
 esac

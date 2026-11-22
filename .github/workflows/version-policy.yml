@@ -1,6 +1,6 @@
 name: version-policy
 
-# G12：CI 的 java/node/python 版本以根目录 .java-version / .nvmrc / .python-version
+# CI 的 java/node/python 版本以根目录 .java-version / .nvmrc / .python-version
 # 为单一来源（ci.yml 用 *-version-file 读取）。本 job 用矩阵显式声明并验证
 # 各语言「下限」：下限取自 backend-java/pom.xml / frontend-vue/package.json engines /
 # ai-python/pyproject.toml requires-python；断言「下限 == 矩阵声明」

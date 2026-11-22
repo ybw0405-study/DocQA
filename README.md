@@ -195,35 +195,29 @@ powershell -File scripts/verify-all.ps1 -Offline  # Windows PowerShell 5.1
 完整顺序、端口与环境变量清单见 [docs/00-infra/getting-started.md](docs/00-infra/getting-started.md)。
 以下脚本全部按自身位置推导仓库根，**没有 `<repo>` 占位符，目录改名后也不用改命令**。
 
-首次准备，在 WSL root 终端且当前目录为仓库根时执行：
-
-```bash
-REPO="$(pwd)"
-bash "$REPO/docs/00-infra/prepare-local-stack.sh"           # 中间件
-bash "$REPO/docs/00-infra/setup-parse-worker.sh" install    # venv + C 绑定
-bash "$REPO/docs/00-infra/install-wsl-autostart.sh" install # 注册 WSL 开机自启
-```
-
-日常使用，在仓库根目录开一个 PowerShell：
+前置：安装并启动 **Docker Desktop**（`docker info` 可正常返回）。在仓库根目录开一个 PowerShell：
 
 ```powershell
-# 推荐：注册登录自启（当前用户，无需管理员），之后开机自动完成全部拉起
-powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -InstallAutostart -IncludeApp
+# 仅首次：从模板生成本机配置（gitignored，不写全局环境变量）
+Copy-Item ops/env/local.env.example ops/env/local.env   # 按需填写口令
 
-# 或：立即启动一次 —— 同步 WSL IP 并拉起中间件、worker、Java、Python API、前端
-powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -IncludeApp
-
-# 若 8080/8081 被其它程序占用，整体平移端口
-powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -IncludeApp -PortOffset 10000
+.\scripts\start-dev.ps1          # compose up → 等健康 → 幂等授权 → 构建 → 起全部服务
+.\scripts\stop-dev.ps1           # 只停应用进程
+.\scripts\stop-dev.ps1 -Infra    # 连容器一起停（卷保留，数据不丢）
 ```
 
-只启动中间件与 worker（不启应用层）：去掉 `-IncludeApp` 即可；
-分步手动启动见 [getting-started.md](docs/00-infra/getting-started.md)。
+常用选项：`-NoBuild` 跳过构建（jar 已最新时）、`-InfraOnly` 只起中间件、`-SkipGrants` 跳过授权重放。
+分步手动启动与故障排查见 [getting-started.md](docs/00-infra/getting-started.md)。
+
+> 历史方案（WSL 中间件 + 开机自启，`docs/00-infra/` 下的 `prepare-local-stack.sh` /
+> `start-local.ps1` 等）已退役，仅保留作回滚参考，见 getting-started.md 后半部分。
 
 ### 环境变量
 
-所有连接串与凭据均通过 `DOCQA_*` 环境变量注入，仓库内不含任何真实凭据。
-变量清单见 [getting-started.md](docs/00-infra/getting-started.md#环境变量)。
+所有连接串与凭据的唯一事实来源是 `ops/env/local.env`（gitignored，模板见
+`ops/env/local.env.example`），由 `start-dev.ps1` 注入**进程作用域**，不写 Windows
+全局环境变量；仓库内不含任何真实凭据。变量清单见
+[getting-started.md](docs/00-infra/getting-started.md#环境变量)。
 
 ## 文档
 
@@ -263,4 +257,4 @@ powershell -ExecutionPolicy Bypass -File .\docs\00-infra\start-local.ps1 -Includ
 
 ## 许可证
 
-[Apache License 2.0](LICENSE) © 2026 YYYBBW
+[Apache License 2.0](LICENSE) © 2026 ybw0405-study

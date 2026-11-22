@@ -8,7 +8,7 @@ name: CI
 # test_pg_contract.py execute instead of skipping; DOCQA_TEST_PG_DSN points at it
 # and a gate step asserts all 3 PASS. The Java job runs `./mvnw verify`, and
 # MigrationOnRealMysqlTest starts its own MySQL 8.4 container via Testcontainers.
-# G19: DOCQA_DB_IT is explicitly set to `on` and a junit gate asserts that class
+# DOCQA_DB_IT is explicitly set to `on` and a junit gate asserts that class
 # actually ran (tests>0, skipped==0) — the whole class can no longer be skipped
 # away by DOCQA_DB_IT=off. cross-service-e2e runs the three real cross-service
 # boundaries on every event including main; see that job's comment for the honest
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      # G19：禁止通过 DOCQA_DB_IT=off / false 整类跳过真库迁移测试；
+      # 禁止通过 DOCQA_DB_IT=off / false 整类跳过真库迁移测试；
       # 显式标记并由下面的 junit 门禁断言该类真实执行、零 skip。
       DOCQA_DB_IT: 'on'
     defaults:
@@ -48,7 +48,7 @@ jobs:
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: '17'  # G12：与 .java-version / backend-java/pom.xml 一致
+          java-version: '17'  # 与 .java-version / backend-java/pom.xml 一致
           cache: maven
       - name: 显式标记真库门禁（G19）
         run: |
@@ -116,11 +116,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version-file: .python-version  # G12：单一来源
+          python-version-file: .python-version  # 单一来源
           cache: pip
-          cache-dependency-path: ai-python/requirements.lock.txt  # G20：绑定真实锁文件
+          cache-dependency-path: ai-python/requirements.lock.txt  # 绑定真实锁文件
       - name: Install (locked + verified hashes)
-        # G15：锁文件由 ops/gen-requirements-hashes.py 生成，含 PyPI 真实 sha256；
+        # 锁文件由 ops/gen-requirements-hashes.py 生成，含 PyPI 真实 sha256；
         # --require-hashes 强制逐包校验。项目本体单独 --no-deps -e . 安装。
         run: |
           python -m pip install --upgrade pip
@@ -172,9 +172,9 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version-file: .nvmrc  # G12：单一来源
+          node-version-file: .nvmrc  # 单一来源
           cache: npm
-          cache-dependency-path: frontend-vue/package-lock.json  # G20：真实锁文件
+          cache-dependency-path: frontend-vue/package-lock.json  # 真实锁文件
       - name: Install
         run: npm ci
       - name: Typecheck
@@ -186,7 +186,7 @@ jobs:
       - name: Build
         run: npm run build
 
-  # G19：新增跨服务 e2e job。无 if 条件 —— push main / PR / workflow_dispatch
+  # 新增跨服务 e2e job。无 if 条件 —— push main / PR / workflow_dispatch
   # 一律必跑，主分支当然在内。三条边界都用真实依赖与真实测试产物，不是恒真断言：
   #   1) Java↔Python 的 MQ 信封契约（ParseWorkerProtocolContractTest，真实 JUnit）；
   #   2) Python↔PG 的真实 SQL 契约（test_pg_contract.py + 真实 pgvector service）；

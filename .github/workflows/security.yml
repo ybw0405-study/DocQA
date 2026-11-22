@@ -1,10 +1,10 @@
 name: security
 
-# 依赖漏洞与代码扫描门禁（G9）。
+# 依赖漏洞与代码扫描门禁。
 # - dependency-review：仅在 PR 上运行，比对依赖图变化，高危漏洞直接失败；
 # - npm audit：只审运行时依赖（--omit=dev），high 及以上失败；
 # - CodeQL：java-kotlin / javascript-typescript / python 三语言 matrix。
-# 说明：action 引用已固定到联网核实过的 40 位 commit SHA（G6）。
+# 说明：action 引用已固定到联网核实过的 40 位 commit SHA。
 # actions/dependency-review-action 远端没有 v4 滚动 tag（只有 v4.x.y），
 # 因此固定到已核实的 v4.8.3 commit，避免 @v4 在 CI 上解析失败。
 # dependency-review 依赖仓库启用 Dependency Graph（公开仓库默认开启）；
