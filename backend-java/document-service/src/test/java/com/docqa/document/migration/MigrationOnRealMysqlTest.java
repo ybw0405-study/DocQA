@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.DockerClientFactory;
@@ -168,17 +169,17 @@ class MigrationOnRealMysqlTest {
     }
 
     @Test
-    @DisplayName("V1→V12 在真库上全量执行，账本无失败记录")
+    @DisplayName("V1→V13 在真库上全量执行，账本无失败记录")
     void appliesAllMigrationsOnRealMysql() throws SQLException {
         assertThat(appliedMigrations)
-                .as("V1–V12 共 12 份脚本，执行数不等于 12 说明 Flyway 跳过了或重复执行了某些脚本")
-                .isEqualTo(12);
+                .as("V1–V13 共 13 份脚本，执行数不等于 13 说明 Flyway 跳过了或重复执行了某些脚本")
+                .isEqualTo(13);
         assertThat(queryAsRoot("SELECT version FROM flyway_schema_history WHERE success = 0"))
                 .as("账本里出现 success=0 就是半迁移态，必须人工介入，绝不能被测试放过")
                 .isEmpty();
         assertThat(queryAsRoot("SELECT version FROM flyway_schema_history "
                 + "WHERE type = 'SQL' ORDER BY installed_rank"))
-                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13");
     }
 
     @Test
@@ -186,9 +187,11 @@ class MigrationOnRealMysqlTest {
     void everyBusinessTableCarriesTenantId() throws SQLException {
         // V11 的 vector_cleanup_task 是运行期显式写入的 outbox，tenant_id 刻意不设默认
         // 租户兜底（见 vectorCleanupOutboxRequiresExplicitTenant），不在这份存量表清单里。
+        // V13 的 model_connection 同理：它是租户地基之后新建的表，没有存量行需要归属，
+        // 给默认值反而会掩盖运行期漏传 tenantId（见 modelConnectionConstraintsOnRealMysql）。
         assertThat(queryAsRoot("SELECT table_name FROM information_schema.columns "
                 + "WHERE table_schema = '" + DATABASE + "' AND column_name = 'tenant_id' "
-                + "AND table_name <> 'vector_cleanup_task' "
+                + "AND table_name NOT IN ('vector_cleanup_task', 'model_connection') "
                 + "ORDER BY table_name"))
                 .containsExactlyInAnyOrderElementsOf(TENANT_TABLES);
 
@@ -216,6 +219,61 @@ class MigrationOnRealMysqlTest {
         assertThat(single(queryAsRoot("SELECT column_default FROM information_schema.columns " + where)))
                 .as("给默认租户兜底会掩盖运行期漏传 tenantId；enqueue 必须显式传值")
                 .isNull();
+    }
+
+    @Test
+    @DisplayName("V13 模型连接：单生效由生成列唯一键强制，凭据两列同生同死")
+    void modelConnectionConstraintsOnRealMysql() throws SQLException {
+        String tenantId = "44444444-0000-0000-0000-000000000001";
+        insertTenant(tenantId, "model-conn");
+
+        // 新建表没有存量行需要归属，tenant_id 不给默认值：漏传必须直接失败，
+        // 而不是悄悄落到默认租户——那让连接跨租户生效，正是本次要防的泄漏路径。
+        String tenantColumn = "WHERE table_schema = '" + DATABASE + "' AND table_name = 'model_connection' "
+                + "AND column_name = 'tenant_id'";
+        assertThat(single(queryAsRoot("SELECT is_nullable FROM information_schema.columns " + tenantColumn)))
+                .isEqualTo("NO");
+        assertThat(single(queryAsRoot("SELECT column_default FROM information_schema.columns " + tenantColumn)))
+                .as("给默认租户兜底会掩盖运行期漏传 tenantId")
+                .isNull();
+
+        JdbcTemplate jdbc = appJdbcTemplate();
+        String insert = "INSERT INTO model_connection "
+                + "(id, tenant_id, name, base_url, model, enabled, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String active = "44444444-0000-0000-0000-0000000000a1";
+        String standby = "44444444-0000-0000-0000-0000000000a2";
+        String url = "https://api.example.com/v1";
+        jdbc.update(insert, active, tenantId, "主连接", url, "model-a", true, true);
+        // 非生效行的 active_slot 是 NULL，不参与唯一性，因此备用连接可以任意多。
+        jdbc.update(insert, standby, tenantId, "备用连接", url, "model-b", true, false);
+
+        assertThatThrownBy(() -> jdbc.update(insert,
+                "44444444-0000-0000-0000-0000000000a3", tenantId, "第三连接", url, "model-c", true, true))
+                .as("第二条生效连接必须被存储层拒绝，而不是靠应用层先查再改")
+                .isInstanceOf(DuplicateKeyException.class)
+                .hasMessageContaining("uk_model_connection_tenant_active");
+
+        // 切换生效的真实形态：先释放旧槽位再设新，唯一键全程只允许一条生效。
+        jdbc.update("UPDATE model_connection SET enabled = FALSE WHERE id = ?", active);
+        jdbc.update("UPDATE model_connection SET is_active = TRUE WHERE id = ?", standby);
+        assertThat(single(queryAsRoot("SELECT COUNT(*) FROM model_connection WHERE active_slot = 1")))
+                .isEqualTo("1");
+        assertThat(single(queryAsRoot("SELECT name FROM model_connection WHERE active_slot = 1")))
+                .isEqualTo("备用连接");
+
+        assertThatThrownBy(() -> jdbc.update(insert,
+                "44444444-0000-0000-0000-0000000000a4", tenantId, "主连接", url, "model-d", true, false))
+                .as("租户内同名必须收敛到同一行，创建才能按值幂等（D-197）")
+                .isInstanceOf(DuplicateKeyException.class)
+                .hasMessageContaining("uk_model_connection_tenant_name");
+
+        assertThatThrownBy(() -> jdbc.update(
+                "UPDATE model_connection SET credential = ? WHERE id = ?", new byte[] {1, 2, 3}, standby))
+                .as("有密文却没 keyId 的行永远解不开，必须在写入时就被拦住")
+                // MySQL CHECK 违反是 error 3819 / SQLState HY000，Spring 归为 UncategorizedSQLException，
+                // 不是 DataIntegrityViolationException——按真库实际映射断言，别按直觉写。
+                .isInstanceOf(UncategorizedSQLException.class)
+                .hasMessageContaining("chk_model_connection_credential_pair");
     }
 
     @Test
@@ -259,9 +317,13 @@ class MigrationOnRealMysqlTest {
                 "uk_reminder_user_source",
                 "uk_reminder_trigger_planned");
 
+        // 只扫 V10 租户化的那批存量表：这条断言判的是「7 个单列外键全部升级」，
+        // 后续新增表自带的外键不属于该判定，扫全库会让断言随每张新表无谓变红。
+        String legacyTables = String.join(", ", TENANT_TABLES.stream().map(t -> "'" + t + "'").toList());
         List<String> foreignKeys = queryAsRoot(
                 "SELECT constraint_name FROM information_schema.table_constraints "
-                        + "WHERE table_schema = '" + DATABASE + "' AND constraint_type = 'FOREIGN KEY'");
+                        + "WHERE table_schema = '" + DATABASE + "' AND constraint_type = 'FOREIGN KEY' "
+                        + "AND table_name IN (" + legacyTables + ")");
         assertThat(foreignKeys)
                 .as("V1–V9 的 7 个单列外键必须全部升级；漏一个就意味着一张表的 tenant_id 可以被写错")
                 .containsExactlyInAnyOrderElementsOf(COMPOSITE_FOREIGN_KEYS);
@@ -458,7 +520,7 @@ class MigrationOnRealMysqlTest {
     private static void createAppAccount() throws SQLException {
         List<String> statements = new ArrayList<>();
         statements.add("CREATE USER '" + APP_USER + "'@'%' IDENTIFIED BY '" + APP_PASSWORD + "'");
-        for (String table : List.of("app_user", "app_user_role", "document", "chunk")) {
+        for (String table : List.of("app_user", "app_user_role", "document", "chunk", "model_connection")) {
             statements.add("GRANT SELECT, INSERT, UPDATE, DELETE ON `" + DATABASE + "`.`" + table
                     + "` TO '" + APP_USER + "'@'%'");
         }

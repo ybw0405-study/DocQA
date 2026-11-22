@@ -157,6 +157,34 @@ class Settings(BaseSettings):
     llm_timeout_ms: int = Field(default=10000, ge=100, le=30000)
     llm_max_output_tokens: int = Field(default=1024, ge=16, le=4096)
 
+    # 界面配置的模型连接（契约 2.7.0）。关闭时行为与改动前逐字节一致：只用上面的 env provider。
+    # 打开后按请求从 Redis 取生效连接的**密文**，本地解密后构造 planner；
+    # 键不存在则回退 env provider，密文解不开则硬失败，绝不静默降级。
+    model_connections_enabled: bool = False
+    model_connection_key_prefix: str = "agent:model-connection:tenant:"
+    model_connection_cache_ms: int = Field(default=5000, ge=0, le=30000)
+    # 与网关读同一个变量名：两侧必须是同一把主密钥，否则密文解不开。
+    # 用 SecretStr 保证它不进日志与 redacted_summary。
+    cred_master_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("DOCQA_CRED_MASTER_KEY"),
+    )
+    # 轮换前的旧主密钥，逗号分隔（与 Java 侧同一取值形态）；只用于解封历史密文。
+    cred_master_key_previous: str = Field(
+        default="",
+        validation_alias=AliasChoices("DOCQA_CRED_MASTER_KEY_PREVIOUS"),
+    )
+    # 出网白名单：逗号分隔的主机后缀，空 = 放行任意公网主机。刻意用 str 而不是 list[str]——
+    # pydantic-settings 对 list 按 JSON 解析，而网关侧是逗号分隔，同一变量不能要求两种格式。
+    llm_allowed_hosts: str = Field(
+        default="",
+        validation_alias=AliasChoices("DOCQA_LLM_ALLOWED_HOSTS"),
+    )
+    llm_allow_private: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("DOCQA_LLM_ALLOW_PRIVATE"),
+    )
+
     # rerank 的能力面与 embedding / 生成不同：E46 实测它不在 OpenAI 兼容面上，
     # 请求与响应都是原生形态，因此取值命名为 dashscope 而不是 openai。
     rerank_provider: Literal["offline", "dashscope"] = "offline"
@@ -267,10 +295,19 @@ class Settings(BaseSettings):
         real_provider_enabled = (
             self.embedding_provider == "openai" or self.llm_provider == "openai" or self.rerank_provider == "dashscope"
         )
-        if real_provider_enabled and (self.experiment_budget == 0 or self.experiment_token_budget == 0):
+        # 界面连接同样会真实外呼：开关打开时即使 env 全 offline 也必须先有额度，
+        # 否则「界面配了真模型、账本根本没构造」就成了不受额度约束的裸奔出口。
+        if (real_provider_enabled or self.model_connections_enabled) and (
+            self.experiment_budget == 0 or self.experiment_token_budget == 0
+        ):
             raise ValueError(
                 "experiment_budget and experiment_token_budget must be positive when a real provider is enabled"
             )
+        if self.model_connections_enabled and not self.cred_master_key.get_secret_value():
+            raise ValueError("DOCQA_CRED_MASTER_KEY is required when model_connections_enabled=true")
+        for host in self.llm_allowed_host_entries:
+            if not _HOST_ENTRY.fullmatch(host):
+                raise ValueError("llm_allowed_hosts entries must be bare hostnames")
         # D-117：向量空间守卫。放在额度守卫之后——先问「这次能不能花钱」，再问「花完写到哪张表」。
         # 真实 embedding 写进 offline 表是**无信号**的（`metadata->>'embedding_model'` 没有任何读取点，
         # HNSW 按 vector_cosine_ops 算距离、不知道向量来自哪个模型），所以只能在启动期拦住。
@@ -302,6 +339,15 @@ class Settings(BaseSettings):
     def minio_secure_effective(self) -> bool:
         return bool(self.minio_secure)
 
+    @property
+    def llm_allowed_host_entries(self) -> tuple[str, ...]:
+        """逗号分隔白名单的解析结果；空串表示不设白名单（仍拒私网）。"""
+        return tuple(entry.strip().lower() for entry in self.llm_allowed_hosts.split(",") if entry.strip())
+
+    @property
+    def cred_previous_key_entries(self) -> tuple[str, ...]:
+        return tuple(entry.strip() for entry in self.cred_master_key_previous.split(",") if entry.strip())
+
     def redacted_summary(self) -> dict[str, object]:
         """Safe to log at startup: never includes secrets or DSNs."""
 
@@ -311,6 +357,10 @@ class Settings(BaseSettings):
             "embedding_model": self.embedding_model,
             "llm_provider": self.llm_provider,
             "llm_model": self.llm_model,
+            "model_connections_enabled": self.model_connections_enabled,
+            "cred_master_key_configured": bool(self.cred_master_key.get_secret_value()),
+            "llm_allowed_host_count": len(self.llm_allowed_host_entries),
+            "llm_allow_private": self.llm_allow_private,
             "rerank_provider": self.rerank_provider,
             "rerank_model": self.rerank_model,
             "rerank_timeout_ms": self.rerank_timeout_ms,

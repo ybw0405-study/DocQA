@@ -79,6 +79,34 @@ $required = @(
 $missing = @($required | Where-Object { -not (Get-Conf $_) })
 if ($missing.Count -gt 0) { throw ("local.env 缺少必需项：{0}" -f ($missing -join ', ')) }
 
+# 凭据主密钥：模型连接的 API Key 以 AES-256-GCM 密文落库，网关与数据面必须共用同一把。
+# 本地首次启动自动生成一次并写回 gitignored 的 local.env；绝不回显、不入库、不写全局环境变量。
+# 生产部署应自行注入高熵值，本段只在缺失时补本地开发用的那一份。
+if (-not (Get-Conf 'DOCQA_CRED_MASTER_KEY')) {
+    $keyBytes = [byte[]]::new(32)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $rng.GetBytes($keyBytes)
+    $masterKey = [Convert]::ToBase64String($keyBytes)
+    [Environment]::SetEnvironmentVariable('DOCQA_CRED_MASTER_KEY', $masterKey, 'Process')
+
+    # local.env 是无 BOM 的 UTF-8：compose --env-file 会把 BOM 当成首行键名的一部分。
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    $lines = [System.IO.File]::ReadAllLines($envFile, $utf8NoBom)
+    $replaced = $false
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($lines[$i] -match '^\s*DOCQA_CRED_MASTER_KEY\s*=') {
+            $lines[$i] = "DOCQA_CRED_MASTER_KEY=$masterKey"
+            $replaced = $true
+            break
+        }
+    }
+    if (-not $replaced) {
+        $lines = @($lines) + @("DOCQA_CRED_MASTER_KEY=$masterKey")
+    }
+    [System.IO.File]::WriteAllLines($envFile, $lines, $utf8NoBom)
+    Write-Host '   已生成凭据主密钥并写入 ops/env/local.env（未回显）；模型连接的 API Key 将用它加密。'
+}
+
 $aiPort = [int](Get-Conf 'DOCQA_AI_PORT')
 # 与 frontend-vue/vite.config.ts 的 server.port 同源；改一处必须改另一处。
 $webPort = 5173
@@ -177,7 +205,33 @@ if (-not $SkipGrants) {
     $sql = $sql.Replace('__MIGRATOR_PASSWORD__', (Get-Conf 'DOCQA_MIGRATOR_DB_PASSWORD'))
     $sql = $sql.Replace('__APP_PASSWORD__',     (Get-Conf 'DOCQA_APP_DB_PASSWORD'))
     $sql = $sql.Replace('__AUDIT_PASSWORD__',   (Get-Conf 'DOCQA_AUDIT_DB_PASSWORD'))
-    $sql | docker exec -i docqa-mysql sh -c 'export MYSQL_PWD=$MYSQL_ROOT_PASSWORD; exec mysql --default-character-set=utf8mb4 -N -B -uroot docqa' 2>&1 |
+    # 新表由 document-service 启动期的 Flyway 创建，此刻可能还不存在：整份重放会撞
+    # ERROR 1146 把启动打断。这里只放行「表已存在」的逐表 GRANT，缺表的记下来，
+    # 等服务起来后在 [6b] 补齐并对账——授权不会被静默跳过。
+    $existingTables = @(
+        ("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='docqa';" |
+            docker exec -i docqa-mysql sh -c 'export MYSQL_PWD=$MYSQL_ROOT_PASSWORD; exec mysql -N -B -uroot' 2>$null) |
+            ForEach-Object { "$_".Trim() } | Where-Object { $_ -ne '' -and $_ -notmatch '^mysql: ' }
+    )
+    $deferredTables = @()
+    $keptLines = New-Object System.Collections.Generic.List[string]
+    foreach ($line in ($sql -split "`r?`n")) {
+        if ($line -match '^GRANT\s.+ON\s+`docqa`\.`([A-Za-z0-9_]+)`') {
+            $table = $Matches[1]
+            if ($existingTables -contains $table) {
+                $keptLines.Add($line)
+            } else {
+                $deferredTables += $table
+            }
+        } else {
+            $keptLines.Add($line)
+        }
+    }
+    if ($deferredTables.Count -gt 0) {
+        Write-Host ("   待补授权（表尚未创建，服务启动后补）：{0}" -f ($deferredTables -join ', '))
+    }
+    $sqlToRun = $keptLines -join "`n"
+    $sqlToRun | docker exec -i docqa-mysql sh -c 'export MYSQL_PWD=$MYSQL_ROOT_PASSWORD; exec mysql --default-character-set=utf8mb4 -N -B -uroot docqa' 2>&1 |
         Select-Object -Last 4 | ForEach-Object { Write-Host "   $_" }
     if ($LASTEXITCODE -ne 0) { throw '授权重放失败；确认 docqa 库与 flyway_schema_history 表已导入。' }
 } else {
@@ -251,6 +305,11 @@ Write-Host ("   public schema 现有 {0} 张表" -f ($vecTables -join '').Trim()
 Write-Host '   提示：本步不重建向量。文档向量需由 Linux 侧 worker 写入，否则问答检索恒为 0 条。'
 
 if ($InfraOnly) {
+    if ($deferredTables -and $deferredTables.Count -gt 0) {
+        Write-Host ''
+        Write-Host ("注意：{0} 的授权尚未下发（表要等 document-service 的 Flyway 创建）。" -f ($deferredTables -join ', '))
+        Write-Host '      只起中间件不会补授权；下次完整启动会在服务就绪后补齐并对账。'
+    }
     Write-Host ''
     Write-Host 'DocQA 基础设施已启动（127.0.0.1 专属端口段，可与其他本地项目并行）：'
     Write-Host ("  MySQL {0} / PG {1} / Redis {2} / MinIO {3} / RMQ {4},{5}" -f `
@@ -299,6 +358,48 @@ foreach ($svc in $javaServices) {
     Start-Process -FilePath 'java' -WorkingDirectory $backend -ArgumentList $argList `
         -RedirectStandardOutput (Join-Path $logs ($svc.Name + '.out.log')) `
         -RedirectStandardError  (Join-Path $logs ($svc.Name + '.err.log')) -WindowStyle Hidden
+}
+
+if ($deferredTables -and $deferredTables.Count -gt 0 -and -not $SkipGrants) {
+    Write-Host '==> [6b] 补齐新表授权并对账'
+    $waitDeadline = (Get-Date).AddSeconds(180)
+    $pending = @($deferredTables)
+    while ($pending.Count -gt 0 -and (Get-Date) -lt $waitDeadline) {
+        Start-Sleep -Seconds 5
+        $nowTables = @(
+            ("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='docqa';" |
+                docker exec -i docqa-mysql sh -c 'export MYSQL_PWD=$MYSQL_ROOT_PASSWORD; exec mysql -N -B -uroot' 2>$null) |
+                ForEach-Object { "$_".Trim() } | Where-Object { $_ -ne '' -and $_ -notmatch '^mysql: ' }
+        )
+        $pending = @($pending | Where-Object { $nowTables -notcontains $_ })
+    }
+    if ($pending.Count -gt 0) {
+        throw ("等待 180s 后这些表仍未创建：{0}；document-service 的 Flyway 没跑成功，先看 logs/document-service.err.log。" -f ($pending -join ', '))
+    }
+    $sql | docker exec -i docqa-mysql sh -c 'export MYSQL_PWD=$MYSQL_ROOT_PASSWORD; exec mysql --default-character-set=utf8mb4 -N -B -uroot docqa' 2>&1 |
+        Select-Object -Last 2 | ForEach-Object { Write-Host "   $_" }
+    if ($LASTEXITCODE -ne 0) { throw '补齐授权失败。' }
+
+    # 覆盖率对账：缺 GRANT 在运行期只表现为 ERROR 1142 → SQLState 42000 →
+    # BadSqlGrammarException（日志里只剩异常类名），所以在启动期就把它拦下来。
+    $gapSql = @"
+SELECT t.TABLE_NAME
+  FROM information_schema.TABLES t
+  LEFT JOIN information_schema.TABLE_PRIVILEGES p
+    ON p.TABLE_SCHEMA = t.TABLE_SCHEMA AND p.TABLE_NAME = t.TABLE_NAME
+   AND p.GRANTEE = '''ss_app''@''%'''
+ WHERE t.TABLE_SCHEMA = 'docqa' AND t.TABLE_TYPE = 'BASE TABLE'
+   AND t.TABLE_NAME <> 'flyway_schema_history' AND p.TABLE_NAME IS NULL
+ ORDER BY t.TABLE_NAME;
+"@
+    $gaps = @(
+        ($gapSql | docker exec -i docqa-mysql sh -c 'export MYSQL_PWD=$MYSQL_ROOT_PASSWORD; exec mysql -N -B -uroot docqa' 2>$null) |
+            ForEach-Object { "$_".Trim() } | Where-Object { $_ -ne '' -and $_ -notmatch '^mysql: ' }
+    )
+    if ($gaps.Count -gt 0) {
+        throw ("未授给 ss_app 的表：{0}；把表名补进 ops/sql/least-privilege.sql.tmpl 与 ops/sql/apply-least-privilege.ps1 的 `$businessTables 后重跑。" -f ($gaps -join ', '))
+    }
+    Write-Host '   覆盖率对账通过：所有业务表都已授给 ss_app'
 }
 
 $svcPort = @{}

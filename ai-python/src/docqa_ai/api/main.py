@@ -32,6 +32,12 @@ from docqa_ai.governance.budget import Deadline, RedisBudgetStore
 from docqa_ai.governance.experiment_budget import ExperimentBudgetStore, RedisExperimentBudgetStore
 from docqa_ai.governance.experiment_egress import BudgetedEmbeddingProvider, BudgetedRerankProvider
 from docqa_ai.governance.kill_switch import RedisKillSwitch
+from docqa_ai.governance.model_connection import (
+    CredentialCipher,
+    PlannerResolver,
+    RedisModelConnectionStore,
+    ResolvedPlanner,
+)
 from docqa_ai.governance.tool_rate_limit import RedisToolRateLimiter
 from docqa_ai.logging_setup import configure_logging, log_event
 from docqa_ai.metrics import ToolMetrics, build_metrics
@@ -170,15 +176,18 @@ def build_repositories(
 def build_experiment_ledger(settings: Settings, redis_client: Redis) -> ExperimentBudgetStore | None:
     """全局额度账本只在「真会往外发字节」的组合下构造。
 
-    谓词与配置里的启动守卫同源（D-106 ②）：三个 Provider 全离线 ⇒ None ⇒ 一个 Redis 键都不写，
-    默认配置与 S5 逐字节一致（D-113）；只要有一个切真 ⇒ 守卫已保证额度为正，
-    不会出现「额度 0 把每个请求都软降级」的假死。
+    谓词与配置里的启动守卫同源（D-106 ②）：三个 Provider 全离线**且未打开界面模型连接**
+    ⇒ None ⇒ 一个 Redis 键都不写，默认配置与 S5 逐字节一致（D-113）；只要有一个切真
+    （或打开了界面连接）⇒ 守卫已保证额度为正，不会出现「额度 0 把每个请求都软降级」的假死。
     """
 
     real_egress = (
         settings.embedding_provider != "offline"
         or settings.llm_provider != "offline"
         or settings.rerank_provider != "offline"
+        # 界面配置的模型连接同样真实外呼：env 全 offline 时若不构造账本，
+        # 管理员在界面激活的真模型就成了不受额度约束的出口（守卫已保证此时额度为正）。
+        or settings.model_connections_enabled
     )
     if not real_egress:
         return None
@@ -314,7 +323,9 @@ def build_default_service(
     experiment = build_experiment_ledger(settings, redis_client)
     embedder = build_embedder(settings, experiment)
     if settings.llm_provider == "offline":
-        planner = OfflinePlanner(settings.llm_model)
+        # 离线抽取式 planner 用自己的身份：此前这里传 settings.llm_model，于是
+        # 「provider=offline 却在审计里报 model=qwen-plus」——审计必须说真话。
+        planner = OfflinePlanner()
     else:
         planner = OpenAIPlanner(
             settings.llm_base_url,
@@ -363,6 +374,22 @@ def build_default_service(
         if settings.tool_rate_limit_enabled
         else None
     )
+    resolver = None
+    if settings.model_connections_enabled:
+        resolver = PlannerResolver(
+            RedisModelConnectionStore(
+                redis_client,
+                settings.model_connection_key_prefix,
+                settings.model_connection_cache_ms,
+            ),
+            CredentialCipher(
+                settings.cred_master_key.get_secret_value(),
+                settings.cred_previous_key_entries,
+            ),
+            ResolvedPlanner(planner=planner, model=planner.model, provider=settings.llm_provider),
+            allowed_hosts=settings.llm_allowed_host_entries,
+            allow_private=settings.llm_allow_private,
+        )
     service = AgentAskService(
         settings,
         budget,
@@ -378,6 +405,7 @@ def build_default_service(
         metrics=metrics,
         business=business,
         pg_provider=pg_provider,
+        planner_resolver=resolver,
     )
     log_event(
         LOGGER,
@@ -387,6 +415,15 @@ def build_default_service(
         model=settings.llm_model,
         webTools=len(web.tools) if web is not None else 0,
     )
+    if resolver is not None:
+        # 上面那行报的是 env 回退项；界面连接生效时实际模型以每请求解析结果为准。
+        log_event(
+            LOGGER,
+            logging.INFO,
+            "Model connection resolution enabled; env provider is now the fallback",
+            step="model_connection",
+            status="enabled",
+        )
     return service, redis_client
 
 

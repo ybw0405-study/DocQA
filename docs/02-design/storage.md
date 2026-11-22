@@ -918,6 +918,77 @@ ALTER TABLE reminder_trigger
 - **追加写表不加外键**。`audit_event` 与 `agent_execution` 保持既有约定（用户可能已软禁用或数据已归档），靠 `tenant_id` 谓词与只追加约束保证隔离。
 - **本期不做 Schema / Dedicated 路由**。`tenant.isolation` 列先落盘，三级隔离路由是 P1 的范围；SHARED 级别靠应用层强制租户谓词，数据库层靠复合外键防写错。
 
+### 2.19 model_connection（界面配置的生成模型连接）
+
+DDL 的事实来源是 V13 迁移；下面的片段与迁移逐字一致（契约测试 `MigrationV13ContractTest` 对账），改表必须先改迁移，再同步本节。
+
+```sql
+CREATE TABLE model_connection (
+  id                 CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  tenant_id          CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  name               VARCHAR(64)  NOT NULL,
+  preset_id          VARCHAR(32)  CHARACTER SET ascii COLLATE ascii_bin NULL,
+  base_url           VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  model              VARCHAR(64)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  enabled            BOOLEAN      NOT NULL DEFAULT TRUE,
+  is_active          BOOLEAN      NOT NULL DEFAULT FALSE,
+  active_slot        TINYINT      GENERATED ALWAYS AS (IF(enabled = 1 AND is_active = 1, 1, NULL)) STORED,
+  credential         VARBINARY(1024) NULL,
+  credential_key_id  CHAR(12) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  probe_status       VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT 'UNKNOWN',
+  last_probed_at     DATETIME(3) NULL,
+  created_at         DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at         DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                       ON UPDATE CURRENT_TIMESTAMP(3),
+  updated_by         CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_model_connection_tenant_name (tenant_id, name),
+  UNIQUE KEY uk_model_connection_tenant_active (tenant_id, active_slot)
+    COMMENT '每租户至多一条生效连接；非生效行 active_slot 为 NULL，不参与唯一性',
+  KEY idx_model_connection_tenant_created (tenant_id, created_at, id)
+    COMMENT '管理面按租户列出连接并 keyset 分页',
+  CONSTRAINT fk_model_connection_tenant FOREIGN KEY (tenant_id)
+    REFERENCES tenant (id) ON DELETE CASCADE,
+  CONSTRAINT chk_model_connection_base_url CHECK (
+    base_url LIKE 'https://%' OR base_url LIKE 'http://%'
+  ),
+  CONSTRAINT chk_model_connection_model CHECK (CHAR_LENGTH(model) >= 1),
+  CONSTRAINT chk_model_connection_probe_status CHECK (
+    probe_status IN ('UNKNOWN','OK','FAILED')
+  ),
+  CONSTRAINT chk_model_connection_credential_pair CHECK (
+    (credential IS NULL) = (credential_key_id IS NULL)
+  )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='管理员配置的生成模型连接；凭据只存 AES-256-GCM 密文，每租户至多一条生效';
+```
+
+| 字段 | 说明 |
+|---|---|
+| `id` | 连接主键，UUID；同时是凭据密文 AAD 的第一段，密文无法被搬到别的连接下解密 |
+| `tenant_id` | 所属租户，外键兜底；AAD 的第二段，跨租户搬运密文同样解不开 |
+| `name` | 连接显示名，租户内唯一；创建按它 upsert，因此管理面写操作按值幂等（D-197，不声明幂等头） |
+| `preset_id` | 前端预设标识（如 `deepseek`、`qwen`），仅用于回显厂商与申请 Key 的入口；自定义端点为 `NULL` |
+| `base_url` | OpenAI 兼容端点根地址，只允许 `http://` / `https://`；出网前还要过主机白名单与私网判定 |
+| `model` | 实际下发给厂商的模型名；探测到的候选清单是瞬态 UI 数据，不落库 |
+| `enabled` | 停用后不参与生效判定，但保留配置与密文，便于重新启用 |
+| `is_active` | 管理员选定的生效连接意愿；与 `enabled` 同时为真才真正生效 |
+| `active_slot` | STORED 生成列：`enabled AND is_active` 时为 `1`，否则 `NULL`；配合唯一键把「每租户至多一条生效」变成存储层约束 |
+| `credential` | AES-256-GCM 密文，格式 `12B IV \|\| ciphertext \|\| 16B tag`；**明文 API Key 不落库、不进日志、不回显前端** |
+| `credential_key_id` | 封装时主密钥的 keyId（主密钥 SHA-256 前 12 位十六进制）；轮换后按它从 keyring 选旧密钥解密 |
+| `probe_status` | `UNKNOWN` / `OK` / `FAILED` 三态，让管理面区分「从未探测」与「探测失败」，不把失败显示成未配置 |
+| `last_probed_at` | 最近一次连通性探测时刻；`NULL` 表示从未探测 |
+| `updated_by` | 最近一次操作的管理员 `userId`；不建外键，审计事实以 `audit_event.user_id` 为准 |
+
+设计要点：
+
+- **MySQL 是唯一事实来源，Redis 只是分发通道**。网关把生效连接的密文与非密文字段发布到 `agent:model-connection:tenant:{tenantId}`（见 §3），Python 用同一把主密钥本地解密后按请求构造 planner。明文 Key 只出现在「浏览器→网关那一次请求体」与「真正发起模型调用的进程内存」两处，不过内部 ask HTTP、不过 Redis 明文、不进任何日志。
+- **每租户单生效由存储层保证**。MySQL 没有部分索引，所以用生成列把生效条件投影成 `1`/`NULL` 再建唯一键；切换生效必须在一个事务里先清旧再设新，否则唯一键直接拒绝。应用层不需要「先查再改」的竞态窗口。
+- **凭据两列同生同死**。`chk_model_connection_credential_pair` 禁止「有密文却没 keyId」的死行——那种行永远解不开，只会在问答时塌成上游不可用。
+- **解密失败必须硬失败**。未知 keyId（旧主密钥已从 keyring 移除）或 AAD 不匹配时拒绝执行并报错，绝不静默退回离线抽取式：静默降级正是本次要消除的行为。
+- **轮换不自动重封装**。旧主密钥留在 `DOCQA_CRED_MASTER_KEY_PREVIOUS` 直到每条连接重新授权；未重新授权的连接仍用旧 keyId 解密，新写入一律用当前主密钥。
+- 本表允许 UPDATE 与 DELETE（与 §2.10 的追加写表不同），因为连接本身就是可修改、可删除的运营配置；删除连接即删除密文，不留副本。
+
 ## 3. Redis Key 设计
 
 Redis 不是业务事实来源，所有关键数据在 MySQL 或 PGVector 有权威副本。Redis 丢失时优先降级性能和短期协调能力，不允许悄悄改变业务状态或绕过预算。
@@ -938,6 +1009,7 @@ Redis 不是业务事实来源，所有关键数据在 MySQL 或 PGVector 有权
 | `agent:budget:session-tokens`（前缀由 `budget_key_prefix` 决定） | Hash（`callsUsed`、`tokensUsed`，另有只读回显字段 `callLimit`、`tokenLimit`） | **无 TTL** | 全局累计额度（配置给定的调用次数与 token 上限），与上面的**每请求**预算正交：前者管一次问答，后者管整轮实验窗口。每个外呼出口在字节离开本机前 `authorize_call` 预订、返回后 `settle_call` 用真实 `usage` 结算（D-118 ②）。Python 启动时把配置上限写入 `callLimit` / `tokenLimit`，管理面只读展示，**不提供在线重置** | `ai-python`（API 与 Parse Worker 共用同一本账）；启动时补写限额字段 | `ai-python`；`agent-gateway` 管理面只读 | 重置动作是**人工**的（删键或改配置），因此不设 TTL——自动过期等于把额度上限变成滑动窗口，与「本轮上限」的语义冲突。读不到账本时**fail-closed**（503 / rerank 退回融合次序 / worker 可重试），宁可少花一次也不裸奔；反过来**离线 Provider 组合下该键一次都不读写**（账本对象根本不构造，D-113），所以本地与 CI 永不触碰它 |
 | `agent:kill-switch` | String（`1` 为开；键不存在为关） | 无 TTL | 全局 AI 关闭开关；S9 起由管理 API 写入，读路径不变（Java 30s 缓存、Python 5s 缓存） | `agent-gateway`（管理 API） | `agent-gateway`、`ai-python` | 键丢失等于关闭 Kill Switch（流量恢复），因此依赖 Redis 持久化与运维权限；状态语义保持「键在即开」 |
 | `agent:kill-switch:meta` | Hash（`updatedAt` UTC 毫秒、`updatedBy` UUID） | 无 TTL | 记录最近一次管理 API 开关动作，供管理面展示「谁在何时改的」；**不是状态事实** | `agent-gateway`（管理 API） | `agent-gateway` | 丢失只影响展示；开关状态仍由 `agent:kill-switch` 决定 |
+| `agent:model-connection:tenant:{tenantId}` | String（JSON：`id`、`baseUrl`、`model`、`credentialB64`、`keyId`、`revision`） | 无 TTL | 生效模型连接的分发通道，**只承载 AES-256-GCM 密文**（AAD 绑定 `connectionId\|tenantId`）；Python 用同一把主密钥本地解密后按请求构造 planner，明文 Key 不过这条通道。MySQL `model_connection`（§2.19）才是权威副本，网关在每次写提交后与启动就绪时全量重发布 | `agent-gateway`（管理 API） | `ai-python` | 键丢失等于该租户没有界面配置的连接，回退到 env 配置的 provider（默认离线抽取式，零外呼），不越权也不绕过预算；下一次管理写或网关重启即恢复。Redis 不可达时与 kill switch 一致 fail-closed；密文解不开（未知 keyId / AAD 不匹配）则硬失败，绝不静默降级 |
 | `agent:quota:usage:{userId}:{yyyy-MM-dd}` | Hash（`questions`、`tokens`） | 48 小时 | S9 按用户日配额计数；`questions` 在准入时原子自增，`tokens` 在拿到真实用量后累加 | `agent-gateway` | `agent-gateway` | 丢失等于当日配额从 0 重新计；配额是业务约束而非安全边界，接受该退化 |
 | `agent:state:{traceId}` | String（`RUNNING`/终态摘要） | 30 分钟 | 在途状态展示与排障；不替代 `agent_execution` 终态快照 | `agent-gateway` | `agent-gateway`、运维查询 | 运维看不到在途状态；终态执行、消息和审计仍可从事务数据和 MQ 中恢复 |
 | `audit:relay:cursor` | String（`recorded_at` + `id`） | 无 TTL | 审计 outbox relay 的扫描游标；`agent_execution.audit_outbox` 才是耐久事实 | `agent-gateway` relay | `agent-gateway` relay | 游标丢失后从保留窗口起点重放；`audit-service` 按 `eventId` 去重，不丢事件，只增加重复投递 |

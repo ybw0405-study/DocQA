@@ -38,6 +38,9 @@ _ALLOWED_FIELDS = frozenset(
         "toolName",
         "source",
         "traceContinuation",
+        # service.py / main.py 的四处错误日志一直在传 errorType，但此前不在白名单里被静默丢弃，
+        # 上游 503 因此在日志中没有任何可诊断信息（模型连接配错时尤其致命）。
+        "errorType",
     }
 )
 

@@ -26,6 +26,7 @@ from docqa_ai.governance.budget import (
 )
 from docqa_ai.governance.experiment_budget import ExperimentBudgetStore
 from docqa_ai.governance.kill_switch import KillSwitch
+from docqa_ai.governance.model_connection import PlannerResolver, ResolvedPlanner
 from docqa_ai.governance.tool_rate_limit import ToolRateLimiter
 from docqa_ai.logging_setup import log_event
 from docqa_ai.metrics import ToolMetrics
@@ -88,6 +89,7 @@ class _Prepared:
     mcp_tool_count: int
     plan_context: PlanContext
     tools: ToolRegistry
+    resolved: ResolvedPlanner
 
 
 def _audit_pii_block(collector: AuditCollector, categories: tuple[str, ...], count: int) -> None:
@@ -180,12 +182,14 @@ class AgentAskService:
         metrics: ToolMetrics | None = None,
         business: BusinessMetrics | None = None,
         pg_provider: PgConnectionProvider | None = None,
+        planner_resolver: PlannerResolver | None = None,
     ) -> None:
         self._settings = settings
         self._budget = budget
         self._kill_switch = kill_switch
         self._retrieval = retrieval
         self._planner = planner
+        self._planner_resolver = planner_resolver
         self._tools = tools
         self._tracer = tracer or trace.get_tracer("docqa_ai")
         self._clock = clock or (lambda: datetime.now(UTC))
@@ -232,6 +236,9 @@ class AgentAskService:
             await self._web.aclose()
         # CON-2 的共享 httpx client 与 CON-1 的连接池都在应用关闭时统一释放。
         await _aclose_if_present(self._planner)
+        if self._planner_resolver is not None:
+            # resolver 缓存的是界面连接构造的 planner；回退项就是上面那个，不重复关闭。
+            await self._planner_resolver.aclose()
         await _aclose_if_present(self._retrieval)
         if self._pg_provider is not None:
             await self._pg_provider.aclose()
@@ -261,6 +268,7 @@ class AgentAskService:
                 prepared.history_truncated,
                 collector,
                 started,
+                model=prepared.resolved.model,
             )
         except AgentError:
             raise
@@ -287,6 +295,8 @@ class AgentAskService:
                 errorCode=AGT_UPSTREAM_003,
             )
             raise kill_switch_open(audit_events=collector.events(), trace_id=request.trace_id)
+        # 解析提前到预算之前：软降级路径也要报同一个模型身份，不能两条路径各说一套。
+        resolved = await self._resolve_planner(request)
         try:
             budget_snapshot = await self._budget.snapshot(request.trace_id)
         except BudgetError as exc:
@@ -335,6 +345,7 @@ class AgentAskService:
                     history_truncated,
                     collector,
                     started,
+                    model=resolved.model,
                 )
         retrieved = await self._retrieve(question, request, deadline, collector)
         blocks = self._context_blocks(retrieved, request, history)
@@ -357,7 +368,7 @@ class AgentAskService:
             round_number=1,
             max_rounds=request.max_rounds,
             max_output_tokens=self._max_output_tokens(budget_snapshot),
-            model=self._settings.llm_model,
+            model=resolved.model,
             tool_specs=tools.specs(allowed_tools),
         )
         return _Prepared(
@@ -365,7 +376,21 @@ class AgentAskService:
             mcp_tool_count=mcp_tool_count,
             plan_context=plan_context,
             tools=tools,
+            resolved=resolved,
         )
+
+    async def _resolve_planner(self, request: AgentAskRequest) -> ResolvedPlanner:
+        """每请求解析一次：有界面连接就用它，没有就用启动期按 env 构造的那个。
+
+        解析结果同时决定图用哪个 planner 与审计报哪个模型，两者不会各说一套。
+        """
+        if self._planner_resolver is None:
+            return ResolvedPlanner(
+                planner=self._planner,
+                model=getattr(self._planner, "model", self._settings.llm_model),
+                provider=self._settings.llm_provider,
+            )
+        return await self._planner_resolver.resolve(request.tenant_id)
 
     def _build_graph(
         self,
@@ -376,13 +401,13 @@ class AgentAskService:
         answer_sink: Callable[[str], None] | None = None,
     ) -> AgentGraph:
         return AgentGraph(
-            self._planner,
+            prepared.resolved.planner,
             prepared.tools,
             self._budget,
             deadline,
             request.trace_id,
             max_output_tokens=prepared.plan_context.max_output_tokens,
-            planner_name=self._settings.llm_provider,
+            planner_name=prepared.resolved.provider,
             scopes=tuple(request.document_scopes),
             retrieval=self._retrieval,
             tracer=self._tracer,
@@ -454,6 +479,7 @@ class AgentAskService:
                 prepared.history_truncated,
                 collector,
                 started,
+                model=prepared.resolved.model,
             )
             yield AskStreamEvent(kind="done", response=response)
         except asyncio.CancelledError:
@@ -608,6 +634,8 @@ class AgentAskService:
         history_truncated: bool,
         collector: AuditCollector,
         started: float,
+        *,
+        model: str,
     ) -> AgentAskResponse:
         scopes = {scope.document_id for scope in request.document_scopes}
         block_map = {block.index: block for block in blocks}
@@ -683,7 +711,7 @@ class AgentAskService:
             "chunkCount": len(blocks),
             "confidence": confidence,
             "budgetStatus": budget_status,
-            "model": self._settings.llm_model,
+            "model": model,
             "historyTruncated": history_truncated,
         }
         if clamped_rounds:
