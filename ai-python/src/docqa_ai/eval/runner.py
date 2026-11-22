@@ -122,9 +122,7 @@ async def _run_query(
     service: RetrievalService,
 ) -> QueryResult:
     result = await service.retrieve(question, [indexed.scope])
-    returned: list[ChunkRef] = [
-        (str(indexed.document_id), chunk.chunk_index) for chunk in result.chunks
-    ]
+    returned: list[ChunkRef] = [(str(indexed.document_id), chunk.chunk_index) for chunk in result.chunks]
     relevant_refs = [(str(indexed.document_id), idx) for idx in relevant]
     return compute_metrics(query_id, question, returned, relevant_refs, ks=_KS)
 
@@ -199,8 +197,7 @@ def _render_table(payload: dict[str, Any]) -> str:
     for q in payload["per_query"]:
         hit1 = "✓" if q["recall_at_k"].get("1", 0) >= 1.0 else "✗"
         lines.append(
-            f"  {hit1}  {q['query_id']:<14} R@1={q['recall_at_k'].get('1',0):.2f} "
-            f"MRR={q['mrr']:.2f}  {q['question']}"
+            f"  {hit1}  {q['query_id']:<14} R@1={q['recall_at_k'].get('1', 0):.2f} MRR={q['mrr']:.2f}  {q['question']}"
         )
     lines.append("=" * 72)
     return "\n".join(lines)

@@ -89,9 +89,7 @@ def _synthetic_docs() -> list[CorpusDocument]:
                 document_id=doc_id,
                 title=title,
                 chunks=((0, content),),
-                queries=(
-                    Query(query_id=f"{qid}-q1", question=content.split("，")[0] + "？", relevant=(0,)),
-                ),
+                queries=(Query(query_id=f"{qid}-q1", question=content.split("，")[0] + "？", relevant=(0,)),),
             )
         )
     return docs

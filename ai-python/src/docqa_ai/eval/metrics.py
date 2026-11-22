@@ -116,9 +116,7 @@ class EvalSummary:
         }
 
 
-def evaluate_queries(
-    results: Sequence[QueryResult], ks: Sequence[int] = (1, 3, 5)
-) -> EvalSummary:
+def evaluate_queries(results: Sequence[QueryResult], ks: Sequence[int] = (1, 3, 5)) -> EvalSummary:
     """汇总多个查询的均值指标。"""
     if not results:
         return EvalSummary(query_count=0, recall_at_k={}, mrr=0.0, ndcg_at_k={}, per_query=())
