@@ -24,6 +24,21 @@ updates:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
+      # Spring Boot / Cloud 的 minor 是 feature train，跨 train 有传递依赖断裂等
+      # 破坏性变化（PR #30 实证：boot 3.3→3.5 致 MinIO 的 okhttp 类缺失）；
+      # jjwt 处于 0.x，minor 即 breaking。三者只放行 patch，train 升级手工迁移。
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
+      - dependency-name: "org.springframework.cloud:*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
+      - dependency-name: "io.jsonwebtoken:*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
 
   - package-ecosystem: "pip"
     directory: "/ai-python"
@@ -79,10 +94,10 @@ updates:
         patterns:
           - "*"
 
-  # 根 Dockerfile 的基础镜像按 digest 固定；dependabot 仍会提议 tag 升级
-  # （同步刷新 digest）。主版本升级（如 temurin 17→26、node 20→26）与
-  # 「版本下限矩阵」冲突，和其它生态一样排除 semver-major，由维护者手工评估。
-  # ops/docker-compose.infra.yml 的镜像钉扎由人工维护，dependabot 不改 compose。
+  # 仅安全更新，不做版本更新 PR：复合 tag 会让 dependabot 漏判运行时大版本
+  # （PR #34 实证：maven:3.9-eclipse-temurin-17→26 只被识别为 maven 3.9 的 patch，
+  # 实为 Java 17→26；python 3.12→3.15 同样与钉扎的运行时矩阵脱节）。
+  # 基础镜像升级由维护者手工评估并按真实 digest 钉扎（Dockerfile 与 compose 同策）。
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -92,13 +107,9 @@ updates:
       prefix: "build(docker)"
     labels:
       - "dependencies"
-    groups:
-      docker-minor-patch:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
     ignore:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
