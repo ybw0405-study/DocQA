@@ -15,7 +15,7 @@
     <description>RRULE reminder rules, due scanning and reminder.due event publishing</description>
 
     <properties>
-        <jjwt.version>0.12.6</jjwt.version>
+        <jjwt.version>0.12.7</jjwt.version>
     </properties>
 
     <dependencies>

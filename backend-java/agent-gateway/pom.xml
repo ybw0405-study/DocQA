@@ -15,7 +15,7 @@
     <description>Ask orchestration, Python boundary, audit outbox and servlet gateway routes</description>
 
     <properties>
-        <jjwt.version>0.12.6</jjwt.version>
+        <jjwt.version>0.12.7</jjwt.version>
         <!--
           resilience4j 版本一律由 spring-boot-dependencies BOM 管理（Boot 3.3.5 → 2.1.0），
           此处**不得**覆盖。历史缺陷 S11-3-M3：曾把 resilience4j-spring-boot3 单独钉到 2.2.0，

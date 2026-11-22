@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -15,9 +15,9 @@
     <description>Document upload, MinIO multipart storage and parse event orchestration</description>
 
     <properties>
-        <jjwt.version>0.12.6</jjwt.version>
+        <jjwt.version>0.12.7</jjwt.version>
         <minio.version>8.6.0</minio.version>
-        <redisson.version>3.34.1</redisson.version>
+        <redisson.version>3.52.0</redisson.version>
     </properties>
 
     <dependencies>
