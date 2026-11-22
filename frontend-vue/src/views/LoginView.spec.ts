@@ -211,7 +211,9 @@ describe('LoginView', () => {
 
     await submit(wrapper, 'right-password', '  demo  ');
 
-    expect(captured).toBe('demo');
+    // handler 里还有一层 await request.json()，flushPromises 未必等得到它落值，
+    // 整文件并发跑时微任务队列更拥挤——用 waitFor 等断言成立而非赌时序。
+    await vi.waitFor(() => expect(captured).toBe('demo'));
   });
 
   it('renders only the fixed notice key and never echoes whatever the query string carries', async () => {
