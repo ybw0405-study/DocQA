@@ -125,7 +125,7 @@ onBeforeUnmount(() => {
             <span class="ask__role">{{ ROLE_LABELS[row.role] }}</span>
             <span class="muted">{{ formatDateTime(row.createdAt) }}</span>
           </p>
-          <!-- 消息正文按 pii-v1 脱敏后仍是不可信文本，只做文本插值。 -->
+          <!-- 消息正文按 pii-v2 脱敏后仍是不可信文本，只做文本插值。 -->
           <p class="ask__content">
             {{ row.content }}<span
               v-if="row.key === conversations.streamKey"

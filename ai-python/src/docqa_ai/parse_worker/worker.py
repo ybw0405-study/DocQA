@@ -302,7 +302,7 @@ class ParseWorker:
     async def _embed(self, texts: list[str]) -> list[tuple[float, ...]]:
         timeout = self._settings.embedding_timeout_ms / 1000.0
         # D-110 ②：掩码放在这个唯一的出口上，而不是调用点——「哪条路径忘了掩」正是需要结构上不可能发生的错误。
-        # 与查询侧同源同规则（`pii.masker.VERSION = pii-v1`，与 Java 一致），因此两侧的向量口径对称。
+        # 与查询侧同源同规则（`pii.masker.VERSION = pii-v2`，与 Java 一致），因此两侧的向量口径对称。
         # 落库的 content 与 content_hash 仍是原文：读侧掩码在召回之后（`rag/service.py`），本条只管离开本机的字节。
         payload = [mask_text(text).masked for text in texts]
         # 配置值表达「一次愿意提交多少行」，Provider 自报值表达「端点最多收多少行」，

@@ -150,7 +150,7 @@ extra（`.[mq]`）提供。生产部署必须安装 `.[mq]`、设置真实 NameS
 - Python 只写 PGVector 的一张向量表（`DOCQA_AI_PG_TABLE`，默认 `chunk_embedding_1024`），
   不写 MySQL `document` / `chunk`。离线伪向量与真实模型向量分属两张表，不可互灌。
 - **出网前掩码**：解析 Worker 的 `_embed` 唯一出口在把文本交给任何 embedding Provider 之前
-  逐条 `mask_text`，与查询侧同源同规则（`pii.masker.VERSION = pii-v1`，与 Java 一致）。
+  逐条 `mask_text`，与查询侧同源同规则（`pii.masker.VERSION = pii-v2`，与 Java 一致；v1 仅三类，v2 另含银行卡/护照/社保号）。
   读侧同一条红线由 rerank 通道补齐：候选正文在**名次决定之前**逐篇 `mask_text`。两处都
   **只是改变离开本机的字节**，落库的 `content` 与 `content_hash` **仍是原文**。
 - 审计事件随响应返回，由 Java `audit-service` 落库；仅在响应失败时走 `audit-event` 兜底。

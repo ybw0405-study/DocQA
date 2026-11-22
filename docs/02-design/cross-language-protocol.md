@@ -31,7 +31,7 @@ Java 对外接口与 Python 内部接口的错误码不同：Python 返回 `AGT-
 | `conversationId` | UUID 字符串 | `agent-gateway` 从路径参数取得，并已校验归属 | 作为会话记忆/检查点命名空间和审计关联；不得用于跨用户读取 | 缺失/非 UUID：422 `AGT-UPSTREAM-004`，`field=conversationId` |
 | `question` | string，1..4000 字符，去除首尾空白后非空 | `agent-gateway` 从请求体归一化后传入 | **只用于第二层 PII 差分检测**；不得写入日志、审计、Prompt 或发送给 LLM | 缺失/空白/超长：422 `AGT-UPSTREAM-004`，`field=question` |
 | `piiMaskedQuestion` | string，1..4000 字符，不能为空 | `agent-gateway` 第一层脱敏后的文本 | 第二层复检通过后，作为唯一的用户问题输入 Prompt | 缺失/空白：422 `AGT-UPSTREAM-004`；若仍含原始 PII：422 `AGT-VALIDATION-003` |
-| `piiMaskingVersion` | string，`^pii-v[0-9]+$`，当前 `pii-v1` | `agent-gateway` 读取脱敏器版本 | 校验是否在支持列表；按版本执行对应复检规则 | 缺失/不支持：422 `AGT-UPSTREAM-004`，`field=piiMaskingVersion` |
+| `piiMaskingVersion` | string，`^pii-v[0-9]+$`，当前 `pii-v2`（兼容 `pii-v1`） | `agent-gateway` 读取脱敏器版本 | 校验是否在支持列表；按版本执行对应复检规则 | 缺失/不支持：422 `AGT-UPSTREAM-004`，`field=piiMaskingVersion` |
 | `tokenBudget` | integer，1..8000 | `agent-gateway` 按用户/请求策略计算 | 作为总 token 硬上限；每次 LLM 调用前和调用后原子检查并累计 | 缺失/非整数/<=0/大于 8000：422 `AGT-UPSTREAM-004`，`field=tokenBudget` |
 | `maxToolCalls` | integer，0..3 | `agent-gateway` | 工具调用硬上限；达到上限后禁止再调用任何工具 | 缺失/越界：422 `AGT-UPSTREAM-004`，`field=maxToolCalls` |
 | `maxRounds` | integer，1..3 | `agent-gateway` | LLM 决策轮次硬上限；达到上限后只能结束并返回已有结果 | 缺失/越界：422 `AGT-UPSTREAM-004`，`field=maxRounds` |
@@ -334,6 +334,9 @@ flowchart TD
 | Java 第一层 | 中国大陆手机号 | 正则匹配 `+86`/空格/连字符变体，替换为 `[PHONE]` | `pii-v1`；不保留后四位 |
 | Java 第一层 | 18 位居民身份证号 | 匹配 18 位（末位可为 X），替换为 `[ID_CARD]`；兼容 15 位旧号 | `pii-v1`；不保留出生日期片段 |
 | Java 第一层 | 邮箱 | 匹配常见 RFC 5322 子集，替换为 `[EMAIL]` | `pii-v1`；不保留域名 |
+| Java 第一层 | 银行卡号（v2 新增） | 16~19 位 + 常见卡组织前缀（62/4/51-55）+ Luhn 校验，替换为 `[BANK_CARD]` | `pii-v2`；无前缀或 Luhn 失败的长数字不遮，避免误伤订单号 |
+| Java 第一层 | 护照号（v2 新增） | `E/G/S/D/P` + 8 位数字，替换为 `[PASSPORT]` | `pii-v2`；2019 版及现行 |
+| Java 第一层 | 社保号（v2 新增） | 美式 `123-45-6789`，替换为 `[SSN]` | `pii-v2`；带分隔符，误报面窄 |
 | Java 第一层 | 归一化 | NFKC、全角数字转半角、移除零宽字符后再检测；掩码作用于归一化副本 | 防止全角/零宽绕过 |
 | Python 第二层 | 同一组手机号/身份证/邮箱规则 | 对 `piiMaskedQuestion` 和历史消息复检；命中即判定 Java 漏脱敏 | 规则版本必须与 `piiMaskingVersion` 匹配 |
 | Python 第二层 | 差分检测 | 比较 `question` 与 `piiMaskedQuestion` 的 PII 类别；只记录类别和数量，不记录原文 | 用于证明第一层确实执行 |
@@ -349,7 +352,11 @@ ID_CARD: (?<!\d)[1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[0
 EMAIL:   [A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}
 ```
 
-掩码占位符固定为 `[PHONE]`、`[ID_CARD]`、`[EMAIL]`，不生成可逆哈希、不保留原文片段。`pii-v1` 只能按“规则/顺序/占位符”整体升级；任何变更都必须递增版本并同时更新 Java/Python 契约测试。
+掩码占位符固定为 `[PHONE]`、`[ID_CARD]`、`[EMAIL]`（`pii-v1`），`pii-v2` 增加 `[BANK_CARD]`、`[PASSPORT]`、`[SSN]`；不生成可逆哈希、不保留原文片段。`pii-v1` 只能按“规则/顺序/占位符”整体升级；任何变更都必须递增版本并同时更新 Java/Python 契约测试。
+
+`pii-v2` 兼容期：Python 同时接受 `pii-v1` 与 `pii-v2`，并在第二层差分复检时**按请求声明的版本**执行对应规则——v1 客户端只承诺遮三类，用 v2 规则复检会把未遮的卡号误判成「Java 漏脱敏」而 422。检索片段 / Prompt / 输出的掩码仍用默认 v2（更严格只会多遮，不会漏遮）。
+
+Java 的 `PiiMasker` 始终按 v2 规则掩码（更严格，不会漏遮），`python.masking-version` 配置只决定**向 Python 声明的版本**。默认 `pii-v2` 与掩码规则一致；若显式回退到 `pii-v1`，Java 遮得比声明的多，Python 按 v1 复检只会更宽松——两个方向都不会造成漏遮或误判 422。
 
 ### 4.3 发现 Java 漏脱敏：阻断，而不是继续告警
 

@@ -57,7 +57,7 @@ def request_payload(**overrides: Any) -> dict[str, Any]:
         "conversationId": str(CONVERSATION_ID),
         "question": "Python 的 GIL 是什么？",
         "piiMaskedQuestion": "Python 的 GIL 是什么？",
-        "piiMaskingVersion": "pii-v1",
+        "piiMaskingVersion": "pii-v2",
         "tokenBudget": 8000,
         "maxToolCalls": 1,
         "maxRounds": 2,

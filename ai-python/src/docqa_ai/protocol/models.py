@@ -22,7 +22,7 @@ PROTOCOL_VERSION = "1.0"
 # 响应信封的 protocolVersion 仍回写 PROTOCOL_VERSION——网关 PythonResponseValidator 对同步与
 # 流式两条路径都硬校验响应为 "1.0"，且「旧字段不动」要求旧端点行为逐字节不变。
 STREAM_PROTOCOL_VERSION = "1.1"
-SUPPORTED_MASKING_VERSIONS = frozenset({"pii-v1"})
+SUPPORTED_MASKING_VERSIONS = frozenset({"pii-v1", "pii-v2"})
 
 
 class StrictModel(BaseModel):

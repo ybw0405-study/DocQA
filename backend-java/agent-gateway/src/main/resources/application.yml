@@ -94,7 +94,7 @@ docqa:
     max-tool-calls: 3
     max-rounds: 3
     prompt-version: p1
-    masking-version: pii-v1
+    masking-version: pii-v2
     allowed-tools:
       - document_search
       - calculator

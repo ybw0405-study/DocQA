@@ -68,4 +68,50 @@ class PiiMaskerTest {
         assertThat(result.masked()).isEmpty();
         assertThat(result.count()).isZero();
     }
+
+    @Test
+    void v2MasksBankCardWithLuhn() {
+        // 6222021234567894 是 Luhn 合法的银联号（测试号）。
+        PiiMaskingResult result = masker.mask("卡号 6222021234567894 请核对");
+
+        assertThat(result.masked()).isEqualTo("卡号 [BANK_CARD] 请核对");
+        assertThat(result.categories()).containsExactly("BANK_CARD");
+        assertThat(result.count()).isEqualTo(1);
+    }
+
+    @Test
+    void v2DoesNotMaskLongNumberWithoutCardPrefix() {
+        PiiMaskingResult result = masker.mask("订单号 1380013800012345");
+
+        assertThat(result.count()).isZero();
+        assertThat(result.masked()).contains("1380013800012345");
+    }
+
+    @Test
+    void v2DoesNotMaskLuhnInvalidCardPrefix() {
+        PiiMaskingResult result = masker.mask("编号 6222021234567890");
+
+        assertThat(result.count()).isZero();
+    }
+
+    @Test
+    void v2MasksPassportAndSsn() {
+        PiiMaskingResult result = masker.mask("护照 E12345678，SSN 123-45-6789");
+
+        assertThat(result.categories()).containsExactly("PASSPORT", "SSN");
+        assertThat(result.masked()).doesNotContain("E12345678", "123-45-6789");
+    }
+
+    @Test
+    void v1RulesDoNotApplyV2Categories() {
+        String text = "卡号 6222021234567894 护照 E12345678";
+
+        assertThat(masker.mask(text, PiiMasker.LEGACY_VERSION).count()).isZero();
+        assertThat(masker.mask(text, PiiMasker.VERSION).count()).isEqualTo(2);
+    }
+
+    @Test
+    void versionConstantIsV2() {
+        assertThat(PiiMasker.VERSION).isEqualTo("pii-v2");
+    }
 }

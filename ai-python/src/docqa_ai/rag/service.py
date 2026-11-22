@@ -283,7 +283,7 @@ class RetrievalService:
                 rerank_span.set_attribute("retrieval.kept", len(kept))
                 rerank_span.set_attribute("retrieval.dropped", len(ranked) - len(kept))
                 # D-116：掩码提到名次决定之前发生。它本来就要对 kept 逐篇做，换的只是时机，
-                # 因此外发给第三方的每一串正文都已经过 `pii-v1`；落库与对外的 content 仍是掩码后的同一份。
+                # 因此外发给第三方的每一串正文都已经过 `pii-v2`；落库与对外的 content 仍是掩码后的同一份。
                 masked_items = [mask_text(candidate.content) for candidate in kept]
                 order, rerank_fallback = await self._rerank(question, masked_items, rerank_span, deadline)
             if lexical.fallback:
