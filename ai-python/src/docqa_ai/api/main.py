@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import time
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -34,6 +35,7 @@ from docqa_ai.governance.budget import Deadline, RedisBudgetStore
 from docqa_ai.governance.experiment_budget import ExperimentBudgetStore, RedisExperimentBudgetStore
 from docqa_ai.governance.experiment_egress import BudgetedEmbeddingProvider, BudgetedRerankProvider
 from docqa_ai.governance.kill_switch import RedisKillSwitch
+from docqa_ai.governance.memory import MemoryStore, build_memory_store, setup_memory_store
 from docqa_ai.governance.model_connection import (
     CredentialCipher,
     PlannerResolver,
@@ -50,6 +52,7 @@ from docqa_ai.protocol.errors import (
     deadline_exceeded,
     internal_error,
     protocol_violation,
+    upstream_unavailable,
 )
 from docqa_ai.protocol.models import (
     PROTOCOL_VERSION,
@@ -310,6 +313,7 @@ def build_default_service(
     *,
     pg_provider: PgConnectionProvider | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
+    memory: MemoryStore | None = None,
 ) -> tuple[AgentAskService, Redis]:
     redis_client = Redis.from_url(
         settings.redis_url,
@@ -411,6 +415,7 @@ def build_default_service(
         planner_resolver=resolver,
         checkpointer=checkpointer,
         redis=redis_client,
+        memory=memory,
     )
     log_event(
         LOGGER,
@@ -510,12 +515,18 @@ def create_app(
                 # setup() 幂等且自带版本表；PG 不可达时启动直接失败，不留到运行期才暴露。
                 checkpointer = build_checkpointer(settings)
                 await setup_checkpointer(checkpointer)
+            memory = None
+            if settings.memory_enabled:
+                # 与 checkpoint 同一守卫形态：启用即在启动期开池建表，失败不留到运行期。
+                memory = build_memory_store(settings)
+                await setup_memory_store(memory)
             service, redis_client = build_default_service(
                 settings,
                 app.state.tracer,
                 app.state.metrics,
                 app.state.business_metrics,
                 checkpointer=checkpointer,
+                memory=memory,
             )
             app.state.agent_service = service
             app.state.redis_client = redis_client
@@ -786,6 +797,50 @@ def create_app(
                 yield _sse_frame("error", json.dumps(exc.to_problem().as_dict(), ensure_ascii=False))
 
         return StreamingResponse(frames(), media_type="text/event-stream")
+
+    def _memory_store_or_503(request: Request) -> MemoryStore:
+        """内部管理端点共用：记忆未启用时 503（不静默返回空清单假装功能存在）。"""
+        service = getattr(request.app.state, "agent_service", None)
+        memory = getattr(service, "memory", None)
+        if memory is None:
+            raise upstream_unavailable("Long-term memory is not enabled on this data plane.")
+        return memory
+
+    def _parse_identity(tenant_id: str, user_id: str, instance: str) -> tuple[uuid.UUID, uuid.UUID]:
+        try:
+            return uuid.UUID(tenant_id), uuid.UUID(user_id)
+        except ValueError as exc:
+            raise protocol_violation(
+                "tenantId and userId must be UUIDs",
+                errors=[FieldError(field="tenantId/userId", message="expected UUID values")],
+                instance=instance,
+            ) from exc
+
+    @app.get("/internal/memories")
+    async def internal_list_memories(request: Request, tenantId: str = "", userId: str = "") -> JSONResponse:
+        """网关管理面代理入口：落在 internal-token/HMAC 中间件之后（白名单只豁免 /health*）。"""
+        memory = _memory_store_or_503(request)
+        tenant, user = _parse_identity(tenantId, userId, "/internal/memories")
+        facts = await memory.list_facts(tenant, user)
+        return JSONResponse(
+            content={
+                "items": [
+                    {"key": fact.key, "text": fact.text, "createdAt": fact.created_at.isoformat()} for fact in facts
+                ]
+            }
+        )
+
+    @app.delete("/internal/memories/{key}")
+    async def internal_delete_memory(request: Request, key: str, tenantId: str = "", userId: str = "") -> Response:
+        memory = _memory_store_or_503(request)
+        tenant, user = _parse_identity(tenantId, userId, f"/internal/memories/{key}")
+        try:
+            uuid.UUID(key)
+        except ValueError:
+            return JSONResponse(status_code=404, content={"detail": "memory not found"})
+        if not await memory.forget(tenant, user, key):
+            return JSONResponse(status_code=404, content={"detail": "memory not found"})
+        return Response(status_code=204)
 
     return app
 

@@ -159,6 +159,23 @@ LangFuse v3 自托管追踪面由 compose 的 `langfuse` profile 承载（web / 
   也可直接开 `http://127.0.0.1:13000`，用 `admin@docqa.local` + local.env 里的
   `DOCQA_LANGFUSE_INIT_USER_PASSWORD` 登录。
 
+### 长期记忆（显式指令 + 管理页）
+
+数据面开关 `DOCQA_AI_MEMORY_ENABLED=true` 才启用（默认关闭，行为与之前逐字节一致）；
+存储复用 checkpoint 同一个 Postgres 库（`DOCQA_AI_MEMORY_DSN` 留空回退 `DOCQA_AI_PG_DSN`），
+启用而无 DSN 时启动直接报错。
+
+- **写入只认显式指令**：问题以「记住：/记住:/记住，/记住 」或 `remember:` 开头才写入，
+  判定发生在 PII 校验与 kill switch 之后、planner 解析之前；命中即回固定确认，
+  **零 LLM 调用、零检索**。事实会再按 v2 掩码复检，残留敏感信息一律拒写（422）。
+- **上限与 TTL**：每用户至多 50 条（溢出淘汰最旧）、保留 90 天；按 `(tenantId, userId)`
+  命名空间隔离，跨租户互不可见。
+- **注入是不可信参考**：非指令问题最多带 5 条记忆、总量受 `DOCQA_AI_MEMORY_MAX_CHARS`
+  （默认 800 字符）约束，经 `<memory>` 围栏 + 转义 + 注入前再掩码进入 prompt；
+  记忆不改变可用工具与引用规则。
+- **管理页** `/admin/memories`（导航「记忆」，仅 ADMIN）：按用户 ID 查询清单、两步确认删除；
+  没有写入口。网关经内部端点代理数据面，未启用记忆时页面如实报 503 而不是空清单。
+
 ### 回滚
 
 旧链路文件全部保留、未修改：`docs/00-infra/start-local.ps1`、`run-local.ps1`、

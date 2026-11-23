@@ -439,6 +439,7 @@ const TYPES = {
   notifications: 'src/types/notifications.ts',
   admin: 'src/types/admin.ts',
   modelConnections: 'src/types/modelConnections.ts',
+  memories: 'src/types/memories.ts',
   users: 'src/types/users.ts',
 } as const;
 
@@ -516,6 +517,9 @@ const MIRRORED_OBJECTS: { schema: string; file: string; iface: string }[] = [
   { schema: 'ModelProbeData', file: TYPES.modelConnections, iface: 'ModelProbeData' },
   { schema: 'ModelPreset', file: TYPES.modelConnections, iface: 'ModelPreset' },
   { schema: 'ModelPresetListData', file: TYPES.modelConnections, iface: 'ModelPresetListData' },
+  // 契约 2.8.0 长期记忆管理面：读侧形态 → 列表体；管理面没有写请求。
+  { schema: 'MemoryItem', file: TYPES.memories, iface: 'MemoryItem' },
+  { schema: 'MemoryListData', file: TYPES.memories, iface: 'MemoryListData' },
 ];
 
 const ENVELOPE_SCHEMAS = [
@@ -549,6 +553,7 @@ const ENVELOPE_SCHEMAS = [
   'ModelConnectionListEnvelope',
   'ModelProbeEnvelope',
   'ModelPresetListEnvelope',
+  'MemoryListEnvelope',
 ];
 
 /** 未镜像的契约 schema 必须在此显式列名并写原因；两边都没覆盖会让覆盖测试变红。 */
@@ -702,6 +707,9 @@ const MIRRORED_CONSTRAINTS: { schema: string; field: string; keyword: string; fi
   { schema: 'ChangePasswordRequest', field: 'newPassword', keyword: 'minLength', file: TYPES.api, constName: 'PASSWORD_MIN_LENGTH' },
   { schema: 'ChangePasswordRequest', field: 'newPassword', keyword: 'maxLength', file: TYPES.api, constName: 'PASSWORD_MAX_LENGTH' },
   { schema: 'UserListData', field: 'items', keyword: 'maxItems', file: TYPES.users, constName: 'USER_LIST_LIMIT_MAX' },
+  // 长期记忆：文本上限与问答 question 同源；条数上限就是数据面每用户淘汰阈值。
+  { schema: 'MemoryItem', field: 'text', keyword: 'maxLength', file: TYPES.memories, constName: 'MEMORY_TEXT_MAX_LENGTH' },
+  { schema: 'MemoryListData', field: 'items', keyword: 'maxItems', file: TYPES.memories, constName: 'MEMORY_FACTS_MAX' },
 ];
 
 /** 数组项级约束的镜像位置，缩进与字段级不同，因此单独成表。 */
@@ -965,8 +973,8 @@ describe('契约 ↔ 前端类型对账', () => {
 
     expect(unaccounted, `契约新增/改名的 schema 未经裁决：${unaccounted.join(', ')}`).toEqual([]);
     expect(stale, `前端镜像表里的 schema 在契约中已不存在：${stale.join(', ')}`).toEqual([]);
-    // 契约 2.8.0 的 schema 计数（2.7.0 的 113 个 + 可观测性入口 2 个）。契约一旦增删，这一条先红，逼着来做一次裁决。
-    expect(SCHEMA_NAMES).toHaveLength(115);
+    // 契约 2.9.0 的 schema 计数（2.7.0 的 113 个 + 可观测性入口 2 个 + 长期记忆管理面 3 个）。契约一旦增删，这一条先红，逼着来做一次裁决。
+    expect(SCHEMA_NAMES).toHaveLength(118);
   });
 
   it('mirrors every object schema field-for-field', () => {
@@ -1290,6 +1298,9 @@ describe('契约 ↔ 前端类型对账', () => {
       authorizeModelConnection: ['ConnectionId'],
       probeModelConnection: ['ConnectionId'],
       updateModelConnectionActivation: ['ConnectionId'],
+      // 契约 2.8.0 长期记忆管理面：读与删都按值幂等，不声明幂等键（D-197）。
+      listMemories: ['MemoryUserId'],
+      deleteMemory: ['MemoryKey', 'MemoryUserId'],
     };
     for (const [operationId, names] of Object.entries(expectedParameters)) {
       const refs = operationParameterRefs(operationBody(operationId));
@@ -1366,8 +1377,8 @@ describe('契约 ↔ 前端类型对账', () => {
   });
 
   it('routes every error response through the single mirrored ProblemDetail', () => {
-    // 契约 2.5.0 的 components.responses 计数，全部复用同一个 ProblemDetail。
-    expect(RESPONSE_BLOCKS).toHaveLength(35);
+    // 契约 2.8.0 的 components.responses 计数（2.5.0 的 35 个 + MemoryNotFound），全部复用同一个 ProblemDetail。
+    expect(RESPONSE_BLOCKS).toHaveLength(36);
     const offContract = RESPONSE_BLOCKS.filter(
       (block) => !block.body.some((line) => line.trim() === "$ref: '#/components/schemas/ProblemDetail'"),
     ).map((block) => block.name);

@@ -57,6 +57,14 @@ const CONTRACT_TARGET_IDENTITY = [
     file: 'src/api/users.ts',
     shapes: [/userId\??: string/, /\$\{encodeURIComponent\(userId\)\}/],
   },
+  /**
+   * 契约 2.8.0 的长期记忆管理面：记忆按 (tenantId, userId) 命名空间隔离，查询与删除都必须
+   * 携带**被治理用户**的标识（契约参数 MemoryUserId）；租户仍只由已验签 JWT 决定。
+   */
+  {
+    file: 'src/api/memories.ts',
+    shapes: [/userId\??: string/, /userId=\$\{encodeURIComponent\(userId\)\}/],
+  },
 ];
 
 /**

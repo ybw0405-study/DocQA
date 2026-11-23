@@ -41,6 +41,7 @@ const adminNav: readonly NavItem[] = [
   { name: 'admin-audit', label: '审计', paths: ['M4.2 2.8h7.6v10.4H4.2z', 'M6 6.4l1.4 1.4 2.6-2.6', 'M6 10.4h4'] },
   { name: 'admin-usage', label: '用量', paths: ['M3 12.8h10', 'M4.6 12.8V8.4', 'M8 12.8V4.6', 'M11.4 12.8V9.4'] },
   { name: 'admin-model-connections', label: '模型', paths: ['M5.4 2.8v3.4', 'M10.6 2.8v3.4', 'M3.8 6.2h8.4v2.2a4.2 4.2 0 0 1-8.4 0z', 'M8 12.6v1.8'] },
+  { name: 'admin-memories', label: '记忆', paths: ['M4.6 2.6h6.8v10.8L8 10.8l-3.4 2.6z', 'M6.4 5.4h3.2'] },
   { name: 'admin-users', label: '用户', paths: ['M6.2 3.4a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4z', 'M2.8 13c.5-2.1 1.9-3.2 3.4-3.2s2.9 1.1 3.4 3.2', 'M10.6 4.2a1.8 1.8 0 1 1 0 3.6', 'M11.4 9.9c1.2.3 2 1.3 2.3 3.1'] },
 ];
 

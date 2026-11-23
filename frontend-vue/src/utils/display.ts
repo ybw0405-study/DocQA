@@ -197,6 +197,7 @@ export const EMPTY_STATE_TEXT = {
   auditFiltered: '当前查询条件下没有审计事件。',
   usageNone: '所选窗口内没有执行记录。',
   modelConnectionsNone: '还没有模型连接：问答此时使用部署配置的模型，新建一条即可在界面里切换。',
+  memoriesNone: '这个用户还没有长期记忆：记忆只由本人在问答里用「记住：…」显式写入。',
 } as const;
 
 export function formatBytes(bytes: number): string {
