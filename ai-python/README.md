@@ -195,6 +195,32 @@ extra（`.[mq]`）提供。生产部署必须安装 `.[mq]`、设置真实 NameS
 - 审计事件随响应返回，由 Java `audit-service` 落库；仅在响应失败时走 `audit-event` 兜底。
 - 日志与审计 payload 不包含问题、回答、提示词、文档正文等原文，PII 命中只记录类别与数量。
 
+## 评测（eval）
+
+两个离线确定性套件 + nightly 真模型门禁：
+
+- `--suite retrieval`：Recall@k / MRR / nDCG@k（10 文档 17 查询，离线特征哈希 embedding）。
+- `--suite agent`：治理不变量回归——引用 ⊆ 授权 scope 且 ≤3、小预算 → `BUDGET_EXHAUSTED`
+  兜底答、PII 硬拦、轮次/循环兜底、kill switch、审计事件（`AGENT_COMPLETED` / `TOOL_EXECUTED`）。
+  planner 是脚本替身，Redis 用 fakeredis，复用生产 `AgentAskService` / `AgentGraph` 构造路径。
+- 基线提交在 `src/docqa_ai/eval/baselines/*.json`。有意变更语料/指标/治理行为后重录并随代码
+  一起评审提交：
+
+  ```bash
+  .venv/Scripts/python -m docqa_ai.eval --suite all --update-baseline
+  ```
+
+  CI 每个 PR 跑 `python -m docqa_ai.eval --suite all --check-baseline`：指标回归、用例失败
+  或用例集漂移即红。
+- nightly（`.github/workflows/eval-nightly.yml`，每日 18:00 UTC + 手动 dispatch）：真实
+  embedding/rerank 检索 eval + 自建 LLM judge（`eval/judge.py`）逐回答评 faithfulness，
+  均值 ≥ 0.8 才通过，JSON 报告上传 artifact。需要仓库 secret `DASHSCOPE_API_KEY`；可选
+  `DOCQA_EMBEDDING_BASE_URL` / `DOCQA_EMBEDDING_API_KEY` / `DOCQA_EMBEDDING_MODEL` 覆盖
+  默认 DashScope 端点。
+- 刻意不引 RAGAS：它会把 langchain-community/datasets/nest-asyncio 拖进 `--require-hashes`
+  依赖锁，哈希面与版本 churn 太大；自建 judge 复用 providers 的 OpenAI 兼容 HTTP 形态，
+  可审计且零新依赖。
+
 ## 验证
 
 ```bash
