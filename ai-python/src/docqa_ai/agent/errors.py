@@ -13,3 +13,11 @@ class PiiLeakError(Exception):
         super().__init__("final prompt gate detected PII")
         self.categories = categories
         self.count = count
+
+
+class CheckpointBusyError(Exception):
+    """Raised when the per-conversation checkpoint lock is held (or Redis is unreachable).
+
+    同一会话的续跑必须单飞：两个请求同时重入同一个 thread 会重复执行工具、重复花费。
+    映射到既有 upstream_unavailable，不新增错误码。
+    """

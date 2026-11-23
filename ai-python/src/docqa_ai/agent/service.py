@@ -6,15 +6,20 @@ import inspect
 import logging
 import time
 from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from opentelemetry import trace
 from opentelemetry.trace import Tracer
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
 
-from docqa_ai.agent.errors import DeadlineExceeded, PiiLeakError, PlannerProtocolError
-from docqa_ai.agent.graph import BUDGET_FALLBACK_ANSWER, AgentGraph, GraphResult
+from docqa_ai.agent.checkpoint import close_checkpointer
+from docqa_ai.agent.errors import CheckpointBusyError, DeadlineExceeded, PiiLeakError, PlannerProtocolError
+from docqa_ai.agent.graph import BUDGET_FALLBACK_ANSWER, AgentGraph, GraphResult, question_fingerprint
 from docqa_ai.business_metrics import BusinessMetrics
 from docqa_ai.config import Settings
 from docqa_ai.governance.audit import AuditCollector, ensure_at_least_one
@@ -135,7 +140,9 @@ def _map_agent_error(
         )
         error_factory = deadline_exceeded if expired else upstream_unavailable
         return error_factory(audit_events=collector.events(), trace_id=request.trace_id)
-    if isinstance(exc, (PlannerUnavailable, PlannerProtocolError, RetrievalUnavailable, BudgetError)):
+    if isinstance(
+        exc, (PlannerUnavailable, PlannerProtocolError, RetrievalUnavailable, BudgetError, CheckpointBusyError)
+    ):
         collector.add(
             "AGENT_FAILED",
             "agent_service",
@@ -183,6 +190,8 @@ class AgentAskService:
         business: BusinessMetrics | None = None,
         pg_provider: PgConnectionProvider | None = None,
         planner_resolver: PlannerResolver | None = None,
+        checkpointer: BaseCheckpointSaver | None = None,
+        redis: Redis | None = None,
     ) -> None:
         self._settings = settings
         self._budget = budget
@@ -200,6 +209,8 @@ class AgentAskService:
         self._metrics = metrics
         self._business = business
         self._pg_provider = pg_provider
+        self._checkpointer = checkpointer
+        self._redis = redis
 
     @property
     def pg_provider(self) -> PgConnectionProvider | None:
@@ -242,6 +253,8 @@ class AgentAskService:
         await _aclose_if_present(self._retrieval)
         if self._pg_provider is not None:
             await self._pg_provider.aclose()
+        if self._checkpointer is not None:
+            await close_checkpointer(self._checkpointer)
 
     async def ask(self, request: AgentAskRequest, *, deadline: Deadline | None = None) -> AgentAskResponse:
         started = time.monotonic()
@@ -251,14 +264,22 @@ class AgentAskService:
             prepared = await self._prepare(request, deadline, collector, started)
             if isinstance(prepared, AgentAskResponse):
                 return prepared
-            graph = self._build_graph(request, deadline, prepared)
-            with self._tracer.start_as_current_span("agent.graph") as span:
-                span.set_attribute("tenant.id", str(request.tenant_id))
-                span.set_attribute("agent.rounds_limit", request.max_rounds)
-                span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
-                span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)
-                result = await graph.run(prepared.plan_context)
-                span.set_attribute("agent.budget_exhausted", result.budget_exhausted)
+            async with self._checkpoint_guard(request, deadline):
+                decision = await self._checkpoint_decision(request, prepared, collector, started)
+                if isinstance(decision, AgentAskResponse):
+                    return decision
+                thread_id, resume = decision
+                graph = self._build_graph(request, deadline, prepared)
+                with self._tracer.start_as_current_span("agent.graph") as span:
+                    span.set_attribute("tenant.id", str(request.tenant_id))
+                    span.set_attribute("agent.rounds_limit", request.max_rounds)
+                    span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
+                    span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)
+                    result = await graph.run(prepared.plan_context, thread_id=thread_id, resume=resume)
+                    span.set_attribute("agent.budget_exhausted", result.budget_exhausted)
+                if thread_id is not None:
+                    # checkpoint 是崩溃恢复态而不是历史：终态完成即删，下一问永远从头开始。
+                    await self._checkpointer.adelete_thread(thread_id)
             final_snapshot = await self._budget.snapshot(request.trace_id)
             return self._build_response(
                 request,
@@ -419,7 +440,121 @@ class AgentAskService:
             business=self._business,
             answer_sink=answer_sink,
             tenant_id=request.tenant_id,
+            checkpointer=self._checkpointer,
         )
+
+    @asynccontextmanager
+    async def _checkpoint_guard(self, request: AgentAskRequest, deadline: Deadline) -> AsyncIterator[None]:
+        """同一会话的 checkpoint 续跑单飞锁（SET NX，TTL=deadline）。
+
+        被占用或 Redis 不可达都抛 CheckpointBusyError，走既有 upstream_unavailable 映射：
+        两个请求同时重入同一个 thread 会重复执行工具、重复花费，宁可拒绝也不并发续跑。
+        """
+
+        if self._checkpointer is None:
+            yield
+            return
+        if self._redis is None:
+            raise CheckpointBusyError("checkpoint single-flight lock requires a redis client")
+        key = f"agent:ckpt:{request.tenant_id}:{request.conversation_id}"
+        try:
+            acquired = await self._redis.set(key, request.trace_id, nx=True, px=max(1, deadline.remaining_ms()))
+        except RedisError as exc:
+            raise CheckpointBusyError("checkpoint lock unavailable") from exc
+        if not acquired:
+            raise CheckpointBusyError("checkpoint lock is held by another request")
+        try:
+            yield
+        finally:
+            await self._release_checkpoint_lock(key, request.trace_id)
+
+    async def _release_checkpoint_lock(self, key: str, trace_id: str) -> None:
+        # 只删自己持有的锁：TTL 到期后锁可能已属于下一个请求，无条件 DEL 会误释放。
+        if self._redis is None:
+            return
+        try:
+            pipe = self._redis.pipeline()
+            try:
+                await pipe.watch(key)
+                if await pipe.get(key) == trace_id:
+                    pipe.multi()
+                    pipe.delete(key)
+                    await pipe.execute()
+                else:
+                    await pipe.unwatch()
+            finally:
+                await pipe.reset()
+        except RedisError:
+            # 锁自带 TTL=deadline，释放失败最坏延迟到过期收敛，不影响预算硬停。
+            LOGGER.warning("Checkpoint lock release failed: key=%s", key)
+
+    async def _checkpoint_decision(
+        self,
+        request: AgentAskRequest,
+        prepared: _Prepared,
+        collector: AuditCollector,
+        started: float,
+    ) -> tuple[str | None, bool] | AgentAskResponse:
+        """续跑判定：checkpoint 非空、未终态、问题指纹一致才 resume；否则删旧 thread 新跑。
+
+        返回值是 (thread_id, resume)；持久化用量已触顶时直接返回与 `_budget_stop`
+        同形态的零外呼响应，不再给 LLM 花一分钱。
+        """
+
+        if self._checkpointer is None:
+            return None, False
+        thread_id = f"{request.tenant_id}:{request.conversation_id}"
+        checkpoint_tuple = await self._checkpointer.aget_tuple({"configurable": {"thread_id": thread_id}})
+        values = dict(checkpoint_tuple.checkpoint.get("channel_values", {})) if checkpoint_tuple is not None else {}
+        resumable = (
+            bool(values)
+            and not values.get("terminal", False)
+            and values.get("question_fingerprint") == question_fingerprint(prepared.plan_context.question)
+        )
+        if values and not resumable:
+            await self._checkpointer.adelete_thread(thread_id)
+        if not resumable:
+            return thread_id, False
+        spent = int(values.get("token_in", 0)) + int(values.get("token_out", 0))
+        if spent >= request.token_budget or int(values.get("round_number", 0)) >= request.max_rounds:
+            log_event(
+                LOGGER,
+                logging.WARNING,
+                "Checkpoint resume stopped by persisted budget",
+                step="checkpoint",
+                status="degraded",
+                budgetStatus="BUDGET_EXHAUSTED",
+            )
+            try:
+                budget_snapshot = await self._budget.snapshot(request.trace_id)
+            except BudgetError as exc:
+                # 与 _prepare 同一语义：预算 hash TTL 过期 ⇒ BUDGET_STATE_MISSING 503，不静默超花。
+                collector.add(
+                    "BUDGET_STATE_MISSING",
+                    "agent_service",
+                    severity="ERROR",
+                    errorCode=AGT_UPSTREAM_001,
+                )
+                raise upstream_unavailable(audit_events=collector.events(), trace_id=request.trace_id) from exc
+            await self._checkpointer.adelete_thread(thread_id)
+            return self._build_response(
+                request,
+                GraphResult(
+                    answer=BUDGET_FALLBACK_ANSWER,
+                    citation_indexes=(),
+                    token_in=0,
+                    token_out=0,
+                    budget_exhausted=True,
+                    tool_executions=(),
+                ),
+                budget_snapshot,
+                (),
+                prepared.history_truncated,
+                collector,
+                started,
+                model=prepared.resolved.model,
+            )
+        return thread_id, True
 
     async def ask_stream(
         self,
@@ -445,31 +580,41 @@ class AgentAskService:
                 yield AskStreamEvent(kind="done", response=prepared)
                 return
 
-            def sink(text: str) -> None:
-                queue.put_nowait(("delta", text))
+            async with self._checkpoint_guard(request, deadline):
+                decision = await self._checkpoint_decision(request, prepared, collector, started)
+                if isinstance(decision, AgentAskResponse):
+                    yield AskStreamEvent(kind="done", response=decision)
+                    return
+                thread_id, resume = decision
 
-            graph = self._build_graph(request, deadline, prepared, answer_sink=sink)
+                def sink(text: str) -> None:
+                    queue.put_nowait(("delta", text))
 
-            async def runner() -> GraphResult:
-                try:
-                    with self._tracer.start_as_current_span("agent.graph") as span:
-                        span.set_attribute("tenant.id", str(request.tenant_id))
-                        span.set_attribute("agent.rounds_limit", request.max_rounds)
-                        span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
-                        span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)
-                        result = await graph.run(prepared.plan_context)
-                        span.set_attribute("agent.budget_exhausted", result.budget_exhausted)
-                        return result
-                finally:
-                    queue.put_nowait(("end", None))
+                graph = self._build_graph(request, deadline, prepared, answer_sink=sink)
 
-            graph_task = asyncio.create_task(runner())
-            while True:
-                kind, payload = await queue.get()
-                if kind == "end":
-                    break
-                yield AskStreamEvent(kind="delta", text=str(payload))
-            result = await graph_task
+                async def runner() -> GraphResult:
+                    try:
+                        with self._tracer.start_as_current_span("agent.graph") as span:
+                            span.set_attribute("tenant.id", str(request.tenant_id))
+                            span.set_attribute("agent.rounds_limit", request.max_rounds)
+                            span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
+                            span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)
+                            result = await graph.run(prepared.plan_context, thread_id=thread_id, resume=resume)
+                            span.set_attribute("agent.budget_exhausted", result.budget_exhausted)
+                            return result
+                    finally:
+                        queue.put_nowait(("end", None))
+
+                graph_task = asyncio.create_task(runner())
+                while True:
+                    kind, payload = await queue.get()
+                    if kind == "end":
+                        break
+                    yield AskStreamEvent(kind="delta", text=str(payload))
+                result = await graph_task
+                if thread_id is not None:
+                    # 与同步路径同一语义：终态完成即删恢复态，不留历史。
+                    await self._checkpointer.adelete_thread(thread_id)
             final_snapshot = await self._budget.snapshot(request.trace_id)
             response = self._build_response(
                 request,

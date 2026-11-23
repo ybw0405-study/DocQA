@@ -1198,6 +1198,28 @@ LIMIT :lexical_limit;
 - **连接符只能是 ` | `，这不是风格而是召回下限。** 实测掺进一个语料中不存在的词位后，三条件 `&` 命中数为 **0** 而 `|` 仍为 **9333**（E25）——「问句里有一个术语没命中就整条判死」会让词法通道在最需要它的长问句上静默失效。同理，**不得**发多字 CJK 词位（恒 0 命中，E26）、**不得**对查询做全半角归一（与正文词位不同形，E29）、**不得**用 `websearch_to_tsquery` 代替自建引号转义（发不出 `<->`，E27）。
 - **`ts_rank` 只作排序键，永远不得被解释或传递为相关性。** 它既随命中词组集合移动也随词频移动，9333 个命中行只有 3 个不同值、最大并列组 5333（E32/E33）；`SELECT` 列表不含该列，对外 `score` 对纯词法命中恒为 `0.0`（D-82/D-83），覆盖度另由 Python 用返回的 content 计算。
 
+### 4.5 LangGraph checkpoint 运行时建表（断点续跑）
+
+`checkpoint_enabled=true` 时，Python 数据面用官方 `AsyncPostgresSaver` 持久化 agent 图的每个 super-step，进程崩溃后同一会话可续跑。表落在**同一个 PGVector 库**（`docqa_vec.public`，`checkpoint_dsn` 为空时回退 `pg_dsn`），不新建数据库；建表由 saver 的 `setup()` 在应用 lifespan 里执行一次，**不写手工迁移**——`setup()` 幂等且自带版本表，因此 `start-dev` 的 001–004 迁移清单与 `tests/test_migrations.py` 都不感知这批表。
+
+运行时创建的 4 张表（事实来源是 `langgraph-checkpoint-postgres` 的内置迁移，升级该依赖时以它的 `MIGRATIONS` 为准）：
+
+| 表 | 用途 | 生命周期 |
+|---|---|---|
+| `checkpoint_migrations` | saver 自带的建表版本号，`setup()` 据此幂等推进 | 常驻，一行一个已应用版本 |
+| `checkpoints` | 每个 super-step 一行：`thread_id + checkpoint_ns + checkpoint_id` 定位，存通道元数据与父指针 | 崩溃恢复态，终态完成即按 `thread_id` 删除 |
+| `checkpoint_blobs` | 通道值的序列化载荷（JsonPlus，全 JSON 原语），按 `thread_id + checkpoint_ns + channel + version` 去重 | 随所属 thread 删除 |
+| `checkpoint_writes` | 同一 super-step 内已完成任务的中间写入，续跑时不重复执行已成功的任务 | 随所属 thread 删除 |
+
+设计要点：
+
+- **checkpoint 是崩溃恢复态，不是会话历史。** 终态完成（含预算软停止）后服务立即 `adelete_thread`；会话历史的事实来源仍是 MySQL `message`（§2.5）。续跑仅当 checkpoint 非空、`terminal=false` 且 `question_fingerprint`（掩码后问题的 SHA-256）与新请求一致；不同问题先删旧 thread 再从头跑。
+- **租户隔离靠 thread 命名**：`thread_id = {tenantId}:{conversationId}`，与检索谓词同一租户边界；state 只存掩码后的观测/回答与计数，问题原文只以指纹形式存在，deadline 不入 state（墙钟不跨重启存活，续跑用新请求自己的 deadline）。
+- **连接参数与检索池刻意不同**：saver 需要 `autocommit=True`、`prepare_threshold=0`、`row_factory=dict_row`，因此独立小池（min 1 / max 8），不复用 `rag/pg_connection.open_pool`；`setup()` 在启动期开池并建表，PG 不可达时进程直接起不来，不留到运行期才暴露。
+- **防重复花费**：续跑前若持久化的 `token_in + token_out >= tokenBudget` 或 `round_number >= maxRounds`，直接返回与图内 `_budget_stop` 同形态的零外呼响应；每请求预算 hash（§3 `agent:budget:{traceId}`）TTL 过期仍走既有 `BUDGET_STATE_MISSING` 503，不静默超花。
+- **并发单飞**：同一会话的续跑由 Redis `SET NX agent:ckpt:{tenantId}:{conversationId}`（TTL=请求 deadline，值为本请求 traceId，释放时校验持有者）保证单飞；被占用或 Redis 不可达都走既有 `AGT-UPSTREAM-001` 映射，不新增错误码。锁丢失的最坏后果由 TTL 与终态删 thread 收敛。
+- 开关默认关闭：不构造 saver、不建表、不写任何 checkpoint 键，行为与引入前逐字节一致。
+
 ---
 
 拦截的是什么问题：拦截“文档状态、提醒重复展开、审计被覆盖、Redis 状态被当成事实、向量维度漂移”这类存储层错误，确保跨语言链路的每个事实都有唯一存储位置和可验证的恢复路径。

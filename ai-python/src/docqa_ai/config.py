@@ -205,6 +205,11 @@ class Settings(BaseSettings):
     pg_table: str = Field(default=OFFLINE_VECTOR_TABLE, pattern=r"^[a-z][a-z0-9_]{0,63}$")
     pg_connect_timeout_s: int = Field(default=3, ge=1, le=30)
 
+    # LangGraph checkpoint 持久化与断点续跑。默认关闭：不构造 saver、不写任何 checkpoint 表，
+    # 行为与改动前逐字节一致。checkpoint_dsn 为空时回退 pg_dsn（同库 public schema，不新建库）。
+    checkpoint_enabled: bool = False
+    checkpoint_dsn: str = ""
+
     mq_enabled: bool = False
     rocketmq_namesrv: str = Field(
         default="127.0.0.1:9876",
@@ -317,6 +322,8 @@ class Settings(BaseSettings):
                 "pg_table must point at a dedicated vector space when embedding_provider is not offline (D-99); "
                 f"{OFFLINE_VECTOR_TABLE} holds offline-hashing vectors and is not comparable"
             )
+        if self.checkpoint_enabled and not (self.checkpoint_dsn or self.pg_dsn):
+            raise ValueError("checkpoint_dsn or pg_dsn is required when checkpoint_enabled=true")
         if self.minio_secure is None:
             self.minio_secure = self.minio_endpoint.lower().startswith("https://")
         if self.mq_enabled and not self.rocketmq_namesrv:
@@ -385,5 +392,7 @@ class Settings(BaseSettings):
             "otel_enabled": self.otel_enabled,
             "pg_configured": bool(self.pg_dsn),
             "pg_table": self.pg_table,
+            "checkpoint_enabled": self.checkpoint_enabled,
+            "checkpoint_dsn_configured": bool(self.checkpoint_dsn),
             "internal_token_configured": bool(self.internal_token.get_secret_value()),
         }
