@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import TypedDict
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from opentelemetry import trace
 from opentelemetry.trace import Tracer
@@ -70,8 +72,11 @@ class AgentState(TypedDict, total=False):
     terminal: bool
     pending_tool: tuple[str, str] | None
     tool_refused: bool
-    tool_executions: tuple[ToolExecution, ...]
+    # checkpoint 序列化只认 JSON 原语：存 dict 而不是 frozen dataclass，run() 出口再重建。
+    tool_executions: tuple[dict, ...]
     tool_signatures: tuple[str, ...]
+    question_fingerprint: str
+    # deadline 刻意不入 state：墙钟不该跨重启存活，续跑用新请求自己的 deadline。
 
 
 class AgentGraph:
@@ -98,6 +103,7 @@ class AgentGraph:
         business: BusinessMetrics | None = None,
         answer_sink: Callable[[str], None] | None = None,
         tenant_id: object | None = None,
+        checkpointer: BaseCheckpointSaver | None = None,
     ) -> None:
         self._planner = planner
         self._tools = tools
@@ -117,27 +123,43 @@ class AgentGraph:
         self._business = business
         self._answer_sink = answer_sink
         self._tenant_id = tenant_id
+        self._checkpointer = checkpointer
         self._rounds_used = 0
         self._context: PlanContext | None = None
         self._graph = self._build()
 
-    async def run(self, context: PlanContext) -> GraphResult:
+    async def run(
+        self,
+        context: PlanContext,
+        *,
+        thread_id: str | None = None,
+        resume: bool = False,
+    ) -> GraphResult:
         self._context = context
-        state: AgentState = {
-            "round_number": 0,
-            "observations": (),
-            "token_in": 0,
-            "token_out": 0,
-            "budget_exhausted": False,
-            "terminal": False,
-            "pending_tool": None,
-            "tool_refused": False,
-            "tool_executions": (),
-            "tool_signatures": (),
-        }
+        if resume and thread_id is None:
+            raise ValueError("resume requires a thread_id")
+        config = {"configurable": {"thread_id": thread_id}} if thread_id is not None else None
         status = "FAILED"
         try:
-            final = await self._graph.ainvoke(state)
+            if resume:
+                # 续跑不喂初始 state：LangGraph 从最后完成的 super-step 重入，
+                # planner / answer_sink / deadline 等每请求闭包由本实例重新绑定，sink 永不持久化。
+                final = await self._graph.ainvoke(None, config)
+            else:
+                state: AgentState = {
+                    "round_number": 0,
+                    "observations": (),
+                    "token_in": 0,
+                    "token_out": 0,
+                    "budget_exhausted": False,
+                    "terminal": False,
+                    "pending_tool": None,
+                    "tool_refused": False,
+                    "tool_executions": (),
+                    "tool_signatures": (),
+                    "question_fingerprint": question_fingerprint(context.question),
+                }
+                final = await self._graph.ainvoke(state, config)
             status = "BUDGET_EXHAUSTED" if final.get("budget_exhausted") else "SUCCESS"
             return GraphResult(
                 answer=str(final.get("answer", "")),
@@ -145,7 +167,11 @@ class AgentGraph:
                 token_in=int(final.get("token_in", 0)),
                 token_out=int(final.get("token_out", 0)),
                 budget_exhausted=bool(final.get("budget_exhausted", False)),
-                tool_executions=tuple(final.get("tool_executions", ())),
+                # 序列化会把 tuple 降成 list；GraphResult 对外形态不变，在出口归一回 tuple。
+                tool_executions=tuple(
+                    ToolExecution(**{**item, "pii_categories": tuple(item["pii_categories"])})
+                    for item in final.get("tool_executions", ())
+                ),
             )
         finally:
             # 轮次是「每次问答」的量，只能在这里聚一次；放在 _plan 里会退化成每轮记 1，
@@ -160,7 +186,7 @@ class AgentGraph:
         builder.add_edge(START, "plan")
         builder.add_conditional_edges("plan", self._route, {"tool": "tool", "end": END})
         builder.add_edge("tool", "plan")
-        return builder.compile()
+        return builder.compile(checkpointer=self._checkpointer)
 
     @staticmethod
     def _route(state: AgentState) -> str:
@@ -374,13 +400,13 @@ class AgentGraph:
             # outcome 的取值域是 success / failure / rate_limited（有界），可直接当标签。
             self._business.agent_tool_call(tool_name, outcome)
         executions = tuple(state.get("tool_executions", ())) + (
-            ToolExecution(
-                tool_name=tool_name,
-                success=success,
-                masked_count=masked_count,
-                pii_categories=categories,
-                source=source,
-            ),
+            {
+                "tool_name": tool_name,
+                "success": success,
+                "masked_count": masked_count,
+                "pii_categories": categories,
+                "source": source,
+            },
         )
         observations = tuple(state.get("observations", ())) + (observation,)
         signatures = tuple(state.get("tool_signatures", ())) + (_tool_signature(tool_name, argument),)
@@ -452,6 +478,12 @@ class AgentGraph:
                 {"role": "user", "content": build_user_prompt(context)},
             ]
         )
+
+
+def question_fingerprint(masked_question: str) -> str:
+    """续跑判等键：只对掩码后的问题取 sha256，原文不进 state 也不进日志。"""
+
+    return hashlib.sha256(masked_question.encode("utf-8")).hexdigest()
 
 
 def _tool_signature(name: str, argument: str) -> str:

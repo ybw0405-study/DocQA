@@ -15,6 +15,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
@@ -23,6 +24,7 @@ from opentelemetry.trace import Tracer
 from pydantic import ValidationError
 from redis.asyncio import Redis
 
+from docqa_ai.agent.checkpoint import build_checkpointer, setup_checkpointer
 from docqa_ai.agent.service import AgentAskService
 from docqa_ai.api.internal_auth import SIGNATURE_HEADER, TIMESTAMP_HEADER
 from docqa_ai.api.internal_auth import verify as verify_internal_signature
@@ -307,6 +309,7 @@ def build_default_service(
     business: BusinessMetrics | None = None,
     *,
     pg_provider: PgConnectionProvider | None = None,
+    checkpointer: BaseCheckpointSaver | None = None,
 ) -> tuple[AgentAskService, Redis]:
     redis_client = Redis.from_url(
         settings.redis_url,
@@ -406,6 +409,8 @@ def build_default_service(
         business=business,
         pg_provider=pg_provider,
         planner_resolver=resolver,
+        checkpointer=checkpointer,
+        redis=redis_client,
     )
     log_event(
         LOGGER,
@@ -500,8 +505,17 @@ def create_app(
             # 所以 fail-fast 落到启动阶段：生产缺内部令牌时进程直接起不来，而不是裸奔监听。
             raise RuntimeError(app.state.startup_guard_error)
         if app.state.owns_service:
+            checkpointer = None
+            if settings.checkpoint_enabled:
+                # setup() 幂等且自带版本表；PG 不可达时启动直接失败，不留到运行期才暴露。
+                checkpointer = build_checkpointer(settings)
+                await setup_checkpointer(checkpointer)
             service, redis_client = build_default_service(
-                settings, app.state.tracer, app.state.metrics, app.state.business_metrics
+                settings,
+                app.state.tracer,
+                app.state.metrics,
+                app.state.business_metrics,
+                checkpointer=checkpointer,
             )
             app.state.agent_service = service
             app.state.redis_client = redis_client
