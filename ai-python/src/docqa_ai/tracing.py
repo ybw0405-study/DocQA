@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -55,6 +56,14 @@ def current_traceparent() -> str | None:
     return f"00-{context.trace_id:032x}-{context.span_id:016x}-{flags}"
 
 
+def _secret_text(value: object) -> str:
+    """SecretStr 与裸 str 都接受：测试注入的 settings 替身可能不带 pydantic 类型。"""
+    getter = getattr(value, "get_secret_value", None)
+    if callable(getter):
+        return str(getter())
+    return str(value) if value is not None else ""
+
+
 def build_tracing(settings: object, exporter: SpanExporter | None = None) -> tuple[Tracer, TracerProvider]:
     """Build a tracer. Tests inject an in-memory exporter; production may use OTLP."""
 
@@ -71,6 +80,22 @@ def build_tracing(settings: object, exporter: SpanExporter | None = None) -> tup
     elif getattr(settings, "otel_enabled", False):
         endpoint = getattr(settings, "otel_endpoint", "") or None
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+    # LangFuse 第二路导出：挂在既有 processor 之后，同 spans 同 sampler，既有管道不动。
+    # 开关关闭时不构造任何 exporter ⇒ 结构上零外呼，行为与改动前逐字节一致。
+    # 密钥缺失/非回环未放行等配置错误由 Settings 的启动守卫拦下，这里不做静默降级。
+    if getattr(settings, "langfuse_tracing_enabled", False):
+        credentials = base64.b64encode(
+            f"{_secret_text(getattr(settings, 'langfuse_public_key', ''))}:"
+            f"{_secret_text(getattr(settings, 'langfuse_secret_key', ''))}".encode()
+        ).decode()
+        provider.add_span_processor(
+            BatchSpanProcessor(
+                OTLPSpanExporter(
+                    endpoint=getattr(settings, "langfuse_otlp_endpoint", ""),
+                    headers={"Authorization": f"Basic {credentials}"},
+                )
+            )
+        )
     return provider.get_tracer("docqa_ai"), provider
 
 

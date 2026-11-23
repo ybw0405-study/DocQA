@@ -66,6 +66,11 @@ function toggle(event: AuditEventItem): void {
   expandedId.value = expandedId.value === event.eventId ? null : event.eventId;
 }
 
+/** 基地址来自服务端配置、运行时拼接（先例 ModelConnectionWizard 的 keyUrl）；产物里不烘焙任何绝对地址。 */
+function traceHref(event: AuditEventItem): string {
+  return `${audit.langfuseBaseUrl}/trace/${event.traceId}`;
+}
+
 const busy = computed(() => audit.loading || audit.submitting);
 
 async function applyFilters(): Promise<void> {
@@ -95,6 +100,7 @@ async function reload(): Promise<void> {
 
 onMounted(() => {
   void audit.loadFirst();
+  void audit.loadObservability();
 });
 </script>
 
@@ -233,7 +239,15 @@ onMounted(() => {
                 <span :class="severityChip(event.severity)">{{ AUDIT_SEVERITY_LABELS[event.severity] }}</span>
               </td>
               <td class="mono-id">
-                {{ event.traceId }}
+                <a
+                  v-if="audit.langfuseBaseUrl !== ''"
+                  :href="traceHref(event)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >{{ event.traceId }}</a>
+                <template v-else>
+                  {{ event.traceId }}
+                </template>
               </td>
               <td class="mono-id">
                 {{ event.userId }}

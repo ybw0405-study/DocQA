@@ -499,6 +499,8 @@ const MIRRORED_OBJECTS: { schema: string; file: string; iface: string }[] = [
   { schema: 'UsageSummary', file: TYPES.admin, iface: 'UsageSummary' },
   { schema: 'AiQuotaListData', file: TYPES.admin, iface: 'AiQuotaListData' },
   { schema: 'AuditEventListData', file: TYPES.admin, iface: 'AuditEventListData' },
+  // 契约 2.8.0 可观测性入口：只有一个基地址字段，空串 = 禁用。
+  { schema: 'ObservabilityData', file: TYPES.admin, iface: 'ObservabilityData' },
   // S10-7 用户管理面：改密请求 → 列表行 → 两个写请求 → keyset 列表体。
   { schema: 'ChangePasswordRequest', file: TYPES.users, iface: 'ChangePasswordRequest' },
   { schema: 'UserSummaryData', file: TYPES.users, iface: 'UserSummary' },
@@ -541,6 +543,7 @@ const ENVELOPE_SCHEMAS = [
   'AiQuotaEnvelope',
   'AiQuotaListEnvelope',
   'AuditEventListEnvelope',
+  'ObservabilityEnvelope',
   'UsageEnvelope',
   'ModelConnectionEnvelope',
   'ModelConnectionListEnvelope',
@@ -962,8 +965,8 @@ describe('契约 ↔ 前端类型对账', () => {
 
     expect(unaccounted, `契约新增/改名的 schema 未经裁决：${unaccounted.join(', ')}`).toEqual([]);
     expect(stale, `前端镜像表里的 schema 在契约中已不存在：${stale.join(', ')}`).toEqual([]);
-    // 契约 2.7.0 的 schema 计数（模型连接管理面 10 个 + 预设目录 4 个）。契约一旦增删，这一条先红，逼着来做一次裁决。
-    expect(SCHEMA_NAMES).toHaveLength(113);
+    // 契约 2.8.0 的 schema 计数（2.7.0 的 113 个 + 可观测性入口 2 个）。契约一旦增删，这一条先红，逼着来做一次裁决。
+    expect(SCHEMA_NAMES).toHaveLength(115);
   });
 
   it('mirrors every object schema field-for-field', () => {
@@ -1277,6 +1280,8 @@ describe('契约 ↔ 前端类型对账', () => {
         'KeysetCursor',
       ],
       getAiUsage: ['TimeFrom', 'TimeTo', 'UsageBucket', 'UsageTopUsers'],
+      // 契约 2.8.0 可观测性入口：只读部署配置，无参数、无幂等键。
+      getObservability: [],
       // 契约 2.7.0 模型连接管理面：同样按值幂等，不声明幂等键（D-197）。
       listModelConnections: [],
       listModelConnectionPresets: [],

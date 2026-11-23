@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import {
   getAiControls,
   getAiUsage,
+  getObservability,
   getTenantAiControls,
   listAiQuotas,
   listAuditEvents,
@@ -322,6 +323,30 @@ describe('admin api', () => {
     await getAiUsage({ bucket: 'day', topUsers: 50 });
 
     expect(callLog.adminOps.map((entry) => entry.search)).toEqual(['', '?bucket=day&topUsers=50']);
+  });
+
+  it('reads the observability entry as an empty base url when LangFuse is not deployed', async () => {
+    const data = await getObservability();
+
+    expect(callLog.adminOps).toEqual([
+      {
+        method: 'GET',
+        path: '/api/v1/admin/observability',
+        search: '',
+        key: null,
+        body: null,
+      },
+    ]);
+    // 空串 = 禁用：api 层不补默认地址，界面据此保持 traceId 纯文本。
+    expect(data).toEqual({ langfuseBaseUrl: '' });
+  });
+
+  it('passes a configured LangFuse base url through verbatim', async () => {
+    adminStubState.langfuseBaseUrl = 'http://127.0.0.1:13000';
+
+    const data = await getObservability();
+
+    expect(data.langfuseBaseUrl).toBe('http://127.0.0.1:13000');
   });
 
   it('keeps the admin rejection readable as a forbidden code with its trace', async () => {

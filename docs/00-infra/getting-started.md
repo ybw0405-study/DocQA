@@ -39,7 +39,7 @@ Copy-Item ops/env/local.env.example ops/env/local.env
 | PostgreSQL + pgvector | `127.0.0.1:15432` | RocketMQ Broker / VIP | `127.0.0.1:20911` / `20909` |
 | Redis | `127.0.0.1:16380` | Python 数据面 API | `127.0.0.1:18000` |
 | MinIO API / Console | `127.0.0.1:19100` / `19101` | Java 网关 / user / document / reminder | `18080` / `18081` / `18082` / `18083` |
-| 前端 Vite | `127.0.0.1:5173` | | |
+| 前端 Vite | `127.0.0.1:5173` | LangFuse（可选，`-WithLangfuse`） | `127.0.0.1:13000` |
 
 > RocketMQ 的 broker 会把 `brokerIP1:listenPort` 注册进 NameServer，客户端按此直连；
 > `ops/infra/broker.conf` 显式写 `brokerIP1=127.0.0.1` / `listenPort=20911`，VIP 端口为 `listenPort-2=20909`，
@@ -132,6 +132,32 @@ PG 侧没有 Flyway 账本，只能这样补：首次搬迁只导回了 MySQL，
   否则测试连接返回 `EGRESS_BLOCKED`。网关探测与数据面调用读同一组变量，判定一致。
 - **既有限制**：本机若没有文档向量（解析/向量 Worker 需 Linux `librocketmq`），检索恒为 0 条，
   问答会降级为「现有资料不足」。换模型改变的是生成侧，不会凭空补出检索结果。
+
+### LangFuse 追踪（可选，默认不启动）
+
+```powershell
+.\scripts\start-dev.ps1 -WithLangfuse
+```
+
+LangFuse v3 自托管追踪面由 compose 的 `langfuse` profile 承载（web / worker / ClickHouse /
+队列专用 Redis 四个容器），**默认 `start-dev.ps1` 不启动它们**：ClickHouse + worker 约
+**+2–3GB 内存**，只有显式 `-WithLangfuse` 才拉起。复用既有 `postgres-vector`（独立库
+`langfuse`）与 MinIO（bucket `langfuse`），`[4.6/8]` 幂等建库建桶；队列 Redis 是
+`noeviction` 的独立实例（共享 Redis 的 `allkeys-lru` 会逐出 BullMQ 任务键，不能复用）。
+
+- **首启 bootstrap**：容器 env 里的 `LANGFUSE_INIT_*` 确定性建好组织 `DocQA`、项目
+  `docqa-ai`、账号 `admin@docqa.local` 与一对项目 API 密钥。密钥对、`NEXTAUTH_SECRET`、
+  `SALT`、`ENCRYPTION_KEY`（64 位 hex）及各口令由脚本首次 `-WithLangfuse` 时自动生成并写回
+  gitignored 的 `ops/env/local.env`（不回显、不入库）；数据面导出用同一对 pk/sk。
+- **数据面导出**：`-WithLangfuse` 时脚本给 Python 子进程注入
+  `DOCQA_AI_LANGFUSE_TRACING_ENABLED=true`，在既有 OTLP 管道之后追加第二路
+  `BatchSpanProcessor`（同 spans 同 sampler，既有管道不动）。span 属性只有计数 / model /
+  outcome，问题与回答原文不进任何导出。开关默认 false，行为与改动前逐字节一致。
+- **追踪在哪看**：问一题后打开管理页「审计」，traceId 单元格变成外链
+  （`{base}/trace/{traceId}`，基地址由网关 `GET /api/v1/admin/observability` 运行时下发，
+  空 = 未部署即纯文本）；点进去即是 LangFuse 里同 traceId 的完整 span 树。
+  也可直接开 `http://127.0.0.1:13000`，用 `admin@docqa.local` + local.env 里的
+  `DOCQA_LANGFUSE_INIT_USER_PASSWORD` 登录。
 
 ### 回滚
 

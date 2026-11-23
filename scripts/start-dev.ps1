@@ -13,7 +13,8 @@
 param(
     [switch]$NoBuild,     # 跳过 mvn package（jar 已是最新时使用）
     [switch]$InfraOnly,   # 只起中间件，不构建、不起任何应用层进程
-    [switch]$SkipGrants   # 跳过授权重放（账号已建好时使用）
+    [switch]$SkipGrants,  # 跳过授权重放（账号已建好时使用）
+    [switch]$WithLangfuse # 追加 LangFuse v3 追踪面（compose langfuse profile，约 +2–3GB 内存）
 )
 
 $ErrorActionPreference = 'Continue'
@@ -107,6 +108,74 @@ if (-not (Get-Conf 'DOCQA_CRED_MASTER_KEY')) {
     Write-Host '   已生成凭据主密钥并写入 ops/env/local.env（未回显）；模型连接的 API Key 将用它加密。'
 }
 
+# LangFuse 本地秘密：与主密钥同一纪律——只在缺失/占位符时生成一次并写回 gitignored 的
+# local.env，绝不回显、不入库。只在 -WithLangfuse 时执行，默认启动路径逐字节不变。
+function Set-LocalEnvValue([string]$Name, [string]$Value) {
+    [Environment]::SetEnvironmentVariable($Name, $Value, 'Process')
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    $lines = [System.IO.File]::ReadAllLines($envFile, $utf8NoBom)
+    $replaced = $false
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($lines[$i] -match ('^\s*' + [regex]::Escape($Name) + '\s*=')) {
+            $lines[$i] = "$Name=$Value"
+            $replaced = $true
+            break
+        }
+    }
+    if (-not $replaced) { $lines = @($lines) + @("$Name=$Value") }
+    [System.IO.File]::WriteAllLines($envFile, $lines, $utf8NoBom)
+}
+
+function Test-Placeholder([string]$Value) {
+    return (-not $Value) -or $Value.StartsWith('CHANGE_ME')
+}
+
+function New-RandomBase64([int]$Bytes) {
+    $buf = [byte[]]::new($Bytes)
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($buf)
+    return [Convert]::ToBase64String($buf)
+}
+
+if ($WithLangfuse) {
+    $generated = $false
+    foreach ($name in @(
+        'DOCQA_LANGFUSE_NEXTAUTH_SECRET', 'DOCQA_LANGFUSE_SALT',
+        'DOCQA_LANGFUSE_REDIS_PASSWORD', 'DOCQA_CLICKHOUSE_PASSWORD',
+        'DOCQA_LANGFUSE_INIT_USER_PASSWORD'
+    )) {
+        if (Test-Placeholder (Get-Conf $name)) {
+            Set-LocalEnvValue $name (New-RandomBase64 32)
+            $generated = $true
+        }
+    }
+    if (Test-Placeholder (Get-Conf 'DOCQA_LANGFUSE_ENCRYPTION_KEY')) {
+        # LangFuse 要求 64 位十六进制（32 字节）；base64 形态会被首启直接拒绝。
+        $buf = [byte[]]::new(32)
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($buf)
+        Set-LocalEnvValue 'DOCQA_LANGFUSE_ENCRYPTION_KEY' (($buf | ForEach-Object { $_.ToString('x2') }) -join '')
+        $generated = $true
+    }
+    $pk = Get-Conf 'DOCQA_LANGFUSE_INIT_PUBLIC_KEY'
+    $sk = Get-Conf 'DOCQA_LANGFUSE_INIT_SECRET_KEY'
+    if ((Test-Placeholder $pk) -or (Test-Placeholder $sk)) {
+        $pk = 'pk-lf-' + [guid]::NewGuid().ToString()
+        $sk = 'sk-lf-' + [guid]::NewGuid().ToString()
+        Set-LocalEnvValue 'DOCQA_LANGFUSE_INIT_PUBLIC_KEY' $pk
+        Set-LocalEnvValue 'DOCQA_LANGFUSE_INIT_SECRET_KEY' $sk
+        $generated = $true
+    }
+    # 数据面导出与首启 bootstrap 必须是同一对密钥，否则 OTLP 401 且追踪静默缺失。
+    if (Test-Placeholder (Get-Conf 'DOCQA_AI_LANGFUSE_PUBLIC_KEY')) {
+        Set-LocalEnvValue 'DOCQA_AI_LANGFUSE_PUBLIC_KEY' $pk
+    }
+    if (Test-Placeholder (Get-Conf 'DOCQA_AI_LANGFUSE_SECRET_KEY')) {
+        Set-LocalEnvValue 'DOCQA_AI_LANGFUSE_SECRET_KEY' $sk
+    }
+    if ($generated) {
+        Write-Host '   已生成 LangFuse 本地秘密并写入 ops/env/local.env（未回显）。'
+    }
+}
+
 $aiPort = [int](Get-Conf 'DOCQA_AI_PORT')
 # 与 frontend-vue/vite.config.ts 的 server.port 同源；改一处必须改另一处。
 $webPort = 5173
@@ -151,7 +220,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop 未运行；请先打开 Docker
 
 # 管道给 docker exec -i 的 SQL 必须是 UTF-8 字节（PS5.1 默认 ASCII 会毁掉中文）
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-docker compose -f $compose up -d
+if ($WithLangfuse) {
+    docker compose -f $compose --profile langfuse up -d
+} else {
+    docker compose -f $compose up -d
+}
 if ($LASTEXITCODE -ne 0) { throw 'docker compose up 失败；查看上面的输出。' }
 
 # -----------------------------------------------------------------------------
@@ -304,6 +377,33 @@ Write-Host ("   public schema 现有 {0} 张表" -f ($vecTables -join '').Trim()
 # Windows 侧起不来。空表只会让检索返回 0 条，不会报错，所以这里显式提示一次。
 Write-Host '   提示：本步不重建向量。文档向量需由 Linux 侧 worker 写入，否则问答检索恒为 0 条。'
 
+# -----------------------------------------------------------------------------
+# 4.6 LangFuse 初始化（仅 -WithLangfuse）：复用 postgres-vector 与 minio，
+#     这里只补「新库 langfuse + bucket langfuse」两个幂等前置。
+#     建库先查 pg_database：CREATE DATABASE 不可重复执行，也不能进事务块。
+#     MinIO 顶层目录即 bucket，mkdir -p 就是幂等建桶，免 mc 依赖。
+# -----------------------------------------------------------------------------
+if ($WithLangfuse) {
+    Write-Host '==> [4.6/8] LangFuse 初始化（幂等：建库 + bucket）'
+    $lfDb = docker exec docqa-pg psql -U docqa -d docqa_vec -tA -c "SELECT 1 FROM pg_database WHERE datname='langfuse';" 2>$null
+    if (($lfDb -join '').Trim() -ne '1') {
+        docker exec docqa-pg psql -U docqa -d docqa_vec -v ON_ERROR_STOP=1 -c 'CREATE DATABASE langfuse;' 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw '创建 PG 库 langfuse 失败；docker logs docqa-pg 查看。' }
+        Write-Host '   已创建 PG 库 langfuse'
+    }
+    $bucketOk = $false
+    foreach ($i in 1..10) {
+        docker exec docqa-minio mkdir -p /data/langfuse *> $null
+        if ($LASTEXITCODE -eq 0) { $bucketOk = $true; break }
+        Start-Sleep -Seconds 3
+    }
+    if (-not $bucketOk) { throw '创建 minio bucket langfuse 失败；docker logs docqa-minio 查看。' }
+    # compose 无 restart 键：web/worker 可能在建库完成前已退出，这里再收敛一次把退出的容器拉起。
+    docker compose -f $compose --profile langfuse up -d *> $null
+    if ($LASTEXITCODE -ne 0) { throw 'LangFuse 容器收敛失败；查看上面的输出。' }
+    Write-Host '   minio bucket langfuse 就绪；组织/项目/密钥对由容器首启 bootstrap 完成'
+}
+
 if ($InfraOnly) {
     if ($deferredTables -and $deferredTables.Count -gt 0) {
         Write-Host ''
@@ -315,6 +415,10 @@ if ($InfraOnly) {
     Write-Host ("  MySQL {0} / PG {1} / Redis {2} / MinIO {3} / RMQ {4},{5}" -f `
         (Get-Conf 'DOCQA_DB_PORT'), (Get-Conf 'DOCQA_PG_PORT'), (Get-Conf 'DOCQA_REDIS_PORT'), `
         (Get-Conf 'DOCQA_MINIO_PORT'), (Get-Conf 'DOCQA_ROCKETMQ_NAMESRV_PORT'), (Get-Conf 'DOCQA_ROCKETMQ_BROKER_PORT'))
+    if ($WithLangfuse) {
+        Write-Host ("  LangFuse {0} / ClickHouse {1} / 队列 Redis {2}" -f `
+            (Get-Conf 'DOCQA_LANGFUSE_PORT'), (Get-Conf 'DOCQA_CLICKHOUSE_HTTP_PORT'), (Get-Conf 'DOCQA_LANGFUSE_REDIS_PORT'))
+    }
     return
 }
 
@@ -339,6 +443,10 @@ if (-not $NoBuild) {
 # -----------------------------------------------------------------------------
 # 6. 起 Java 服务（保持 Windows 原生进程）
 # -----------------------------------------------------------------------------
+# 网关只把 LangFuse 入口地址下发给管理面（空 = 禁用）；仅本次运行注入，不写 local.env。
+if ($WithLangfuse) {
+    $env:DOCQA_LANGFUSE_BASE_URL = ('http://127.0.0.1:{0}' -f (Get-Conf 'DOCQA_LANGFUSE_PORT'))
+}
 $javaServices = @(
     @{ Name = 'user-service';     Port = 18081 },
     @{ Name = 'document-service'; Port = 18082 },
@@ -359,6 +467,7 @@ foreach ($svc in $javaServices) {
         -RedirectStandardOutput (Join-Path $logs ($svc.Name + '.out.log')) `
         -RedirectStandardError  (Join-Path $logs ($svc.Name + '.err.log')) -WindowStyle Hidden
 }
+if ($WithLangfuse) { $env:DOCQA_LANGFUSE_BASE_URL = $null }
 
 if ($deferredTables -and $deferredTables.Count -gt 0 -and -not $SkipGrants) {
     Write-Host '==> [6b] 补齐新表授权并对账'
@@ -426,12 +535,15 @@ if ($llmOfflineFallback) { $env:DOCQA_AI_LLM_PROVIDER = 'offline' }
 # 本地 dev 默认打开界面模型连接解析：没有生效连接时回退 env provider（行为不变），
 # 有连接则按请求用界面配置的模型。额度前置由 local.env 的正值保证。
 $env:DOCQA_AI_MODEL_CONNECTIONS_ENABLED = 'true'
+# 第二路 OTLP 导出只在显式 -WithLangfuse 时打开；pk/sk/endpoint 由 local.env 注入。
+if ($WithLangfuse) { $env:DOCQA_AI_LANGFUSE_TRACING_ENABLED = 'true' }
 Start-Process -FilePath $py -ArgumentList @('-u', '-m', 'docqa_ai.api.main') -WorkingDirectory $ai `
     -RedirectStandardOutput (Join-Path $logs 'ai-api.out.log') `
     -RedirectStandardError  (Join-Path $logs 'ai-api.err.log') -WindowStyle Hidden
 $env:DOCQA_AI_ENVIRONMENT = $null
 if ($llmOfflineFallback) { $env:DOCQA_AI_LLM_PROVIDER = $null }
 $env:DOCQA_AI_MODEL_CONNECTIONS_ENABLED = $null
+if ($WithLangfuse) { $env:DOCQA_AI_LANGFUSE_TRACING_ENABLED = $null }
 
 $deadline = (Get-Date).AddSeconds(90)
 while ((Get-Date) -lt $deadline -and -not (Test-Port $aiPort)) { Start-Sleep -Milliseconds 700 }
@@ -476,6 +588,9 @@ Write-Host ("  前端          http://127.0.0.1:{0}" -f $webPort)
 Write-Host ("  网关          http://127.0.0.1:{0}" -f $svcPort['agent-gateway'])
 Write-Host ("  Python 数据面 http://127.0.0.1:{0}" -f $aiPort)
 Write-Host ("  MinIO 控制台  http://127.0.0.1:{0}" -f (Get-Conf 'DOCQA_MINIO_CONSOLE_PORT'))
+if ($WithLangfuse) {
+    Write-Host ("  LangFuse      http://127.0.0.1:{0}（首启账号 admin@docqa.local，口令在 local.env，未回显）" -f (Get-Conf 'DOCQA_LANGFUSE_PORT'))
+}
 Write-Host ("  基础设施      MySQL {0} / PG {1} / Redis {2} / RMQ {3},{4},{5}" -f `
     (Get-Conf 'DOCQA_DB_PORT'), (Get-Conf 'DOCQA_PG_PORT'), (Get-Conf 'DOCQA_REDIS_PORT'), `
     (Get-Conf 'DOCQA_ROCKETMQ_NAMESRV_PORT'), (Get-Conf 'DOCQA_ROCKETMQ_BROKER_PORT'), `

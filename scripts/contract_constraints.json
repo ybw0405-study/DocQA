@@ -16,3850 +16,3857 @@
   ],
   "entries": [
     {
-      "line": 3484,
+      "line": 3531,
       "keyword": "minLength",
       "value": 8,
-      "schema": "",
-      "field": ""
-    },
-    {
-      "line": 3485,
-      "keyword": "maxLength",
-      "value": 64,
-      "schema": "",
-      "field": ""
-    },
-    {
-      "line": 3486,
-      "keyword": "pattern",
-      "value": "^[A-Za-z0-9._:-]+$",
-      "schema": "",
-      "field": ""
-    },
-    {
-      "line": 3501,
-      "keyword": "minLength",
-      "value": 8,
-      "schema": "",
-      "field": ""
-    },
-    {
-      "line": 3502,
-      "keyword": "maxLength",
-      "value": 64,
-      "schema": "",
-      "field": ""
-    },
-    {
-      "line": 3503,
-      "keyword": "pattern",
-      "value": "^[A-Za-z0-9._:-]+$",
-      "schema": "",
-      "field": ""
-    },
-    {
-      "line": 3512,
-      "keyword": "format",
-      "value": "uuid",
-      "schema": "",
-      "field": ""
-    },
-    {
-      "line": 3521,
-      "keyword": "format",
-      "value": "uuid",
       "schema": "",
       "field": ""
     },
     {
       "line": 3532,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3533,
+      "keyword": "pattern",
+      "value": "^[A-Za-z0-9._:-]+$",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3548,
+      "keyword": "minLength",
+      "value": 8,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3549,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3550,
+      "keyword": "pattern",
+      "value": "^[A-Za-z0-9._:-]+$",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3559,
       "keyword": "format",
       "value": "uuid",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3544,
+      "line": 3568,
       "keyword": "format",
       "value": "uuid",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3557,
+      "line": 3579,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3591,
+      "keyword": "format",
+      "value": "uuid",
+      "schema": "",
+      "field": ""
+    },
+    {
+      "line": 3604,
       "keyword": "minimum",
       "value": 1,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3558,
+      "line": 3605,
       "keyword": "maximum",
       "value": 100,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3574,
+      "line": 3621,
       "keyword": "maxLength",
       "value": 200,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3575,
+      "line": 3622,
       "keyword": "pattern",
       "value": "^[A-Za-z0-9_-]+$",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3596,
+      "line": 3643,
       "keyword": "minLength",
       "value": 1,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3597,
+      "line": 3644,
       "keyword": "maxLength",
       "value": 120,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3611,
+      "line": 3658,
       "keyword": "minLength",
       "value": 1,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3612,
+      "line": 3659,
       "keyword": "maxLength",
       "value": 24,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3645,
+      "line": 3692,
       "keyword": "format",
       "value": "uuid",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3657,
+      "line": 3704,
       "keyword": "format",
       "value": "uuid",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3686,
+      "line": 3733,
       "keyword": "minimum",
       "value": 1,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3687,
+      "line": 3734,
       "keyword": "maximum",
       "value": 200,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3699,
+      "line": 3746,
       "keyword": "minimum",
       "value": 1,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3700,
+      "line": 3747,
       "keyword": "maximum",
       "value": 500,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3711,
+      "line": 3758,
       "keyword": "pattern",
       "value": "^[0-9a-f]{32}$",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3720,
+      "line": 3767,
       "keyword": "format",
       "value": "uuid",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3729,
+      "line": 3776,
       "keyword": "pattern",
       "value": "^[A-Z][A-Z0-9_]{0,63}$",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3740,
+      "line": 3787,
       "keyword": "format",
       "value": "date-time",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3751,
+      "line": 3798,
       "keyword": "format",
       "value": "date-time",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3762,
+      "line": 3809,
       "keyword": "enum",
       "value": "",
       "schema": "",
       "field": ""
     },
     {
-      "line": 3776,
+      "line": 3823,
       "keyword": "minimum",
       "value": 1,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3777,
+      "line": 3824,
       "keyword": "maximum",
       "value": 50,
       "schema": "",
       "field": ""
     },
     {
-      "line": 3790,
+      "line": 3837,
       "keyword": "enum",
       "value": "",
       "schema": "ApiEnvelope",
       "field": "code"
     },
     {
-      "line": 3795,
+      "line": 3842,
       "keyword": "minLength",
       "value": 1,
       "schema": "ApiEnvelope",
       "field": "msg"
     },
     {
-      "line": 3796,
+      "line": 3843,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ApiEnvelope",
       "field": "msg"
     },
     {
-      "line": 3803,
+      "line": 3850,
       "keyword": "pattern",
       "value": "^[0-9a-f]{32}$",
       "schema": "ApiEnvelope",
       "field": "traceId"
     },
     {
-      "line": 3809,
+      "line": 3856,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "LoginRequest",
       "field": ""
     },
     {
-      "line": 3816,
+      "line": 3863,
       "keyword": "minLength",
       "value": 1,
       "schema": "LoginRequest",
       "field": "username"
     },
     {
-      "line": 3817,
+      "line": 3864,
       "keyword": "maxLength",
       "value": 100,
       "schema": "LoginRequest",
       "field": "username"
     },
     {
-      "line": 3822,
+      "line": 3869,
       "keyword": "format",
       "value": "password",
       "schema": "LoginRequest",
       "field": "password"
     },
     {
-      "line": 3823,
+      "line": 3870,
       "keyword": "minLength",
       "value": 1,
       "schema": "LoginRequest",
       "field": "password"
     },
     {
-      "line": 3824,
+      "line": 3871,
       "keyword": "maxLength",
       "value": 72,
       "schema": "LoginRequest",
       "field": "password"
     },
     {
-      "line": 3841,
+      "line": 3888,
       "keyword": "pattern",
       "value": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$",
       "schema": "LoginData",
       "field": "accessToken"
     },
     {
-      "line": 3847,
+      "line": 3894,
       "keyword": "enum",
       "value": "",
       "schema": "LoginData",
       "field": "tokenType"
     },
     {
-      "line": 3852,
+      "line": 3899,
       "keyword": "minimum",
       "value": 1,
       "schema": "LoginData",
       "field": "expiresIn"
     },
     {
-      "line": 3853,
+      "line": 3900,
       "keyword": "maximum",
       "value": 900,
       "schema": "LoginData",
       "field": "expiresIn"
     },
     {
-      "line": 3879,
+      "line": 3926,
       "keyword": "format",
       "value": "uuid",
       "schema": "CurrentUserData",
       "field": "userId"
     },
     {
-      "line": 3884,
+      "line": 3931,
       "keyword": "minLength",
       "value": 3,
       "schema": "CurrentUserData",
       "field": "username"
     },
     {
-      "line": 3885,
+      "line": 3932,
       "keyword": "maxLength",
       "value": 32,
       "schema": "CurrentUserData",
       "field": "username"
     },
     {
-      "line": 3894,
+      "line": 3941,
       "keyword": "minItems",
       "value": 1,
       "schema": "CurrentUserData",
       "field": "roles"
     },
     {
-      "line": 3895,
+      "line": 3942,
       "keyword": "maxItems",
       "value": 2,
       "schema": "CurrentUserData",
       "field": "roles"
     },
     {
-      "line": 3896,
+      "line": 3943,
       "keyword": "uniqueItems",
       "value": true,
       "schema": "CurrentUserData",
       "field": "roles"
     },
     {
-      "line": 3904,
+      "line": 3951,
       "keyword": "minimum",
       "value": 1,
       "schema": "CurrentUserData",
       "field": "accessTokenExpiresIn"
     },
     {
-      "line": 3905,
+      "line": 3952,
       "keyword": "maximum",
       "value": 900,
       "schema": "CurrentUserData",
       "field": "accessTokenExpiresIn"
     },
     {
-      "line": 3924,
+      "line": 3971,
       "keyword": "enum",
       "value": "",
       "schema": "UserRole",
       "field": ""
     },
     {
-      "line": 3932,
+      "line": 3979,
       "keyword": "enum",
       "value": "",
       "schema": "UserStatus",
       "field": ""
     },
     {
-      "line": 3939,
+      "line": 3986,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "RegisterRequest",
       "field": ""
     },
     {
-      "line": 3946,
+      "line": 3993,
       "keyword": "minLength",
       "value": 3,
       "schema": "RegisterRequest",
       "field": "username"
     },
     {
-      "line": 3947,
+      "line": 3994,
       "keyword": "maxLength",
       "value": 32,
       "schema": "RegisterRequest",
       "field": "username"
     },
     {
-      "line": 3948,
+      "line": 3995,
       "keyword": "pattern",
       "value": "^[A-Za-z0-9_.-]{3,32}$",
       "schema": "RegisterRequest",
       "field": "username"
     },
     {
-      "line": 3955,
+      "line": 4002,
       "keyword": "format",
       "value": "password",
       "schema": "RegisterRequest",
       "field": "password"
     },
     {
-      "line": 3957,
+      "line": 4004,
       "keyword": "minLength",
       "value": 10,
       "schema": "RegisterRequest",
       "field": "password"
     },
     {
-      "line": 3958,
+      "line": 4005,
       "keyword": "maxLength",
       "value": 72,
       "schema": "RegisterRequest",
       "field": "password"
     },
     {
-      "line": 3959,
+      "line": 4006,
       "keyword": "pattern",
       "value": "^(?=.*[A-Za-z])(?=.*\\d).{10,72}$",
       "schema": "RegisterRequest",
       "field": "password"
     },
     {
-      "line": 3968,
+      "line": 4015,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "ChangePasswordRequest",
       "field": ""
     },
     {
-      "line": 3975,
+      "line": 4022,
       "keyword": "format",
       "value": "password",
       "schema": "ChangePasswordRequest",
       "field": "currentPassword"
     },
     {
-      "line": 3977,
+      "line": 4024,
       "keyword": "minLength",
       "value": 1,
       "schema": "ChangePasswordRequest",
       "field": "currentPassword"
     },
     {
-      "line": 3978,
+      "line": 4025,
       "keyword": "maxLength",
       "value": 72,
       "schema": "ChangePasswordRequest",
       "field": "currentPassword"
     },
     {
-      "line": 3983,
+      "line": 4030,
       "keyword": "format",
       "value": "password",
       "schema": "ChangePasswordRequest",
       "field": "newPassword"
     },
     {
-      "line": 3985,
+      "line": 4032,
       "keyword": "minLength",
       "value": 10,
       "schema": "ChangePasswordRequest",
       "field": "newPassword"
     },
     {
-      "line": 3986,
+      "line": 4033,
       "keyword": "maxLength",
       "value": 72,
       "schema": "ChangePasswordRequest",
       "field": "newPassword"
     },
     {
-      "line": 3987,
+      "line": 4034,
       "keyword": "pattern",
       "value": "^(?=.*[A-Za-z])(?=.*\\d).{10,72}$",
       "schema": "ChangePasswordRequest",
       "field": "newPassword"
     },
     {
-      "line": 3993,
+      "line": 4040,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "UserRolesUpdateRequest",
       "field": ""
     },
     {
-      "line": 3999,
+      "line": 4046,
       "keyword": "maxItems",
       "value": 2,
       "schema": "UserRolesUpdateRequest",
       "field": "roles"
     },
     {
-      "line": 4000,
+      "line": 4047,
       "keyword": "uniqueItems",
       "value": true,
       "schema": "UserRolesUpdateRequest",
       "field": "roles"
     },
     {
-      "line": 4013,
+      "line": 4060,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "UserStatusUpdateRequest",
       "field": ""
     },
     {
-      "line": 4035,
+      "line": 4082,
       "keyword": "format",
       "value": "uuid",
       "schema": "UserSummaryData",
       "field": "userId"
     },
     {
-      "line": 4039,
+      "line": 4086,
       "keyword": "minLength",
       "value": 3,
       "schema": "UserSummaryData",
       "field": "username"
     },
     {
-      "line": 4040,
+      "line": 4087,
       "keyword": "maxLength",
       "value": 32,
       "schema": "UserSummaryData",
       "field": "username"
     },
     {
-      "line": 4046,
+      "line": 4093,
       "keyword": "minItems",
       "value": 1,
       "schema": "UserSummaryData",
       "field": "roles"
     },
     {
-      "line": 4047,
+      "line": 4094,
       "keyword": "maxItems",
       "value": 2,
       "schema": "UserSummaryData",
       "field": "roles"
     },
     {
-      "line": 4048,
+      "line": 4095,
       "keyword": "uniqueItems",
       "value": true,
       "schema": "UserSummaryData",
       "field": "roles"
     },
     {
-      "line": 4053,
+      "line": 4100,
       "keyword": "format",
       "value": "date-time",
       "schema": "UserSummaryData",
       "field": "createdAt"
     },
     {
-      "line": 4057,
+      "line": 4104,
       "keyword": "format",
       "value": "date-time",
       "schema": "UserSummaryData",
       "field": "lastLoginAt"
     },
     {
-      "line": 4058,
+      "line": 4105,
       "keyword": "nullable",
       "value": true,
       "schema": "UserSummaryData",
       "field": "lastLoginAt"
     },
     {
-      "line": 4082,
+      "line": 4129,
       "keyword": "maxItems",
       "value": 100,
       "schema": "UserListData",
       "field": "items"
     },
     {
-      "line": 4087,
+      "line": 4134,
       "keyword": "nullable",
       "value": true,
       "schema": "UserListData",
       "field": "nextCursor"
     },
     {
-      "line": 4088,
+      "line": 4135,
       "keyword": "maxLength",
       "value": 200,
       "schema": "UserListData",
       "field": "nextCursor"
     },
     {
-      "line": 4093,
+      "line": 4140,
       "keyword": "minimum",
       "value": 1,
       "schema": "UserListData",
       "field": "limit"
     },
     {
-      "line": 4094,
+      "line": 4141,
       "keyword": "maximum",
       "value": 100,
       "schema": "UserListData",
       "field": "limit"
     },
     {
-      "line": 4110,
+      "line": 4157,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "UploadInitRequest",
       "field": ""
     },
     {
-      "line": 4119,
+      "line": 4166,
       "keyword": "minLength",
       "value": 1,
       "schema": "UploadInitRequest",
       "field": "fileName"
     },
     {
-      "line": 4120,
+      "line": 4167,
       "keyword": "maxLength",
       "value": 255,
       "schema": "UploadInitRequest",
       "field": "fileName"
     },
     {
-      "line": 4121,
+      "line": 4168,
       "keyword": "pattern",
       "value": "^[^/\\\\\\u0000-\\u001F]+$",
       "schema": "UploadInitRequest",
       "field": "fileName"
     },
     {
-      "line": 4126,
+      "line": 4173,
       "keyword": "format",
       "value": "int64",
       "schema": "UploadInitRequest",
       "field": "sizeBytes"
     },
     {
-      "line": 4127,
+      "line": 4174,
       "keyword": "minimum",
       "value": 1,
       "schema": "UploadInitRequest",
       "field": "sizeBytes"
     },
     {
-      "line": 4128,
+      "line": 4175,
       "keyword": "maximum",
       "value": 52428800,
       "schema": "UploadInitRequest",
       "field": "sizeBytes"
     },
     {
-      "line": 4133,
+      "line": 4180,
       "keyword": "enum",
       "value": "",
       "schema": "UploadInitRequest",
       "field": "contentType"
     },
     {
-      "line": 4142,
+      "line": 4189,
       "keyword": "pattern",
       "value": "^[a-f0-9]{32}$",
       "schema": "UploadInitRequest",
       "field": "md5"
     },
     {
-      "line": 4155,
+      "line": 4202,
       "keyword": "minimum",
       "value": 1,
       "schema": "PresignedPart",
       "field": "partNumber"
     },
     {
-      "line": 4156,
+      "line": 4203,
       "keyword": "maximum",
       "value": 10000,
       "schema": "PresignedPart",
       "field": "partNumber"
     },
     {
-      "line": 4160,
+      "line": 4207,
       "keyword": "format",
       "value": "uri",
       "schema": "PresignedPart",
       "field": "url"
     },
     {
-      "line": 4161,
+      "line": 4208,
       "keyword": "maxLength",
       "value": 2048,
       "schema": "PresignedPart",
       "field": "url"
     },
     {
-      "line": 4166,
+      "line": 4213,
       "keyword": "format",
       "value": "date-time",
       "schema": "PresignedPart",
       "field": "expiresAt"
     },
     {
-      "line": 4184,
+      "line": 4231,
       "keyword": "format",
       "value": "uuid",
       "schema": "UploadInitData",
       "field": "documentId"
     },
     {
-      "line": 4188,
+      "line": 4235,
       "keyword": "format",
       "value": "uuid",
       "schema": "UploadInitData",
       "field": "uploadId"
     },
     {
-      "line": 4199,
+      "line": 4246,
       "keyword": "minimum",
       "value": 5242880,
       "schema": "UploadInitData",
       "field": "partSize"
     },
     {
-      "line": 4200,
+      "line": 4247,
       "keyword": "maximum",
       "value": 5242880,
       "schema": "UploadInitData",
       "field": "partSize"
     },
     {
-      "line": 4205,
+      "line": 4252,
       "keyword": "minimum",
       "value": 0,
       "schema": "UploadInitData",
       "field": "partCount"
     },
     {
-      "line": 4206,
+      "line": 4253,
       "keyword": "maximum",
       "value": 10,
       "schema": "UploadInitData",
       "field": "partCount"
     },
     {
-      "line": 4211,
+      "line": 4258,
       "keyword": "format",
       "value": "date-time",
       "schema": "UploadInitData",
       "field": "expiresAt"
     },
     {
-      "line": 4212,
+      "line": 4259,
       "keyword": "nullable",
       "value": true,
       "schema": "UploadInitData",
       "field": "expiresAt"
     },
     {
-      "line": 4217,
+      "line": 4264,
       "keyword": "maxItems",
       "value": 10,
       "schema": "UploadInitData",
       "field": "parts"
     },
     {
-      "line": 4237,
+      "line": 4284,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "CompleteUploadRequest",
       "field": ""
     },
     {
-      "line": 4243,
+      "line": 4290,
       "keyword": "minItems",
       "value": 1,
       "schema": "CompleteUploadRequest",
       "field": "parts"
     },
     {
-      "line": 4244,
+      "line": 4291,
       "keyword": "maxItems",
       "value": 10,
       "schema": "CompleteUploadRequest",
       "field": "parts"
     },
     {
-      "line": 4251,
+      "line": 4298,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "CompletedPart",
       "field": ""
     },
     {
-      "line": 4258,
+      "line": 4305,
       "keyword": "minimum",
       "value": 1,
       "schema": "CompletedPart",
       "field": "partNumber"
     },
     {
-      "line": 4259,
+      "line": 4306,
       "keyword": "maximum",
       "value": 10000,
       "schema": "CompletedPart",
       "field": "partNumber"
     },
     {
-      "line": 4263,
+      "line": 4310,
       "keyword": "minLength",
       "value": 1,
       "schema": "CompletedPart",
       "field": "etag"
     },
     {
-      "line": 4264,
+      "line": 4311,
       "keyword": "maxLength",
       "value": 128,
       "schema": "CompletedPart",
       "field": "etag"
     },
     {
-      "line": 4280,
+      "line": 4327,
       "keyword": "format",
       "value": "uuid",
       "schema": "CompleteUploadData",
       "field": "documentId"
     },
     {
-      "line": 4283,
+      "line": 4330,
       "keyword": "format",
       "value": "uuid",
       "schema": "CompleteUploadData",
       "field": "uploadId"
     },
     {
-      "line": 4288,
+      "line": 4335,
       "keyword": "format",
       "value": "date-time",
       "schema": "CompleteUploadData",
       "field": "parseRequestedAt"
     },
     {
-      "line": 4292,
+      "line": 4339,
       "keyword": "minimum",
       "value": 0,
       "schema": "CompleteUploadData",
       "field": "retryCount"
     },
     {
-      "line": 4293,
+      "line": 4340,
       "keyword": "maximum",
       "value": 3,
       "schema": "CompleteUploadData",
       "field": "retryCount"
     },
     {
-      "line": 4309,
+      "line": 4356,
       "keyword": "enum",
       "value": "",
       "schema": "DocumentStatus",
       "field": ""
     },
     {
-      "line": 4335,
+      "line": 4382,
       "keyword": "format",
       "value": "uuid",
       "schema": "DocumentStatusData",
       "field": "documentId"
     },
     {
-      "line": 4338,
+      "line": 4385,
       "keyword": "maxLength",
       "value": 255,
       "schema": "DocumentStatusData",
       "field": "fileName"
     },
     {
-      "line": 4342,
+      "line": 4389,
       "keyword": "maxLength",
       "value": 120,
       "schema": "DocumentStatusData",
       "field": "title"
     },
     {
-      "line": 4343,
+      "line": 4390,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentStatusData",
       "field": "title"
     },
     {
-      "line": 4347,
+      "line": 4394,
       "keyword": "maxItems",
       "value": 20,
       "schema": "DocumentStatusData",
       "field": "tags"
     },
     {
-      "line": 4350,
+      "line": 4397,
       "keyword": "maxLength",
       "value": 24,
       "schema": "DocumentStatusData",
       "field": "tags"
     },
     {
-      "line": 4358,
+      "line": 4405,
       "keyword": "minimum",
       "value": 0,
       "schema": "DocumentStatusData",
       "field": "retryCount"
     },
     {
-      "line": 4359,
+      "line": 4406,
       "keyword": "maximum",
       "value": 3,
       "schema": "DocumentStatusData",
       "field": "retryCount"
     },
     {
-      "line": 4362,
+      "line": 4409,
       "keyword": "minimum",
       "value": 1,
       "schema": "DocumentStatusData",
       "field": "maxRetry"
     },
     {
-      "line": 4363,
+      "line": 4410,
       "keyword": "maximum",
       "value": 10,
       "schema": "DocumentStatusData",
       "field": "maxRetry"
     },
     {
-      "line": 4366,
+      "line": 4413,
       "keyword": "maxLength",
       "value": 64,
       "schema": "DocumentStatusData",
       "field": "errorCode"
     },
     {
-      "line": 4367,
+      "line": 4414,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentStatusData",
       "field": "errorCode"
     },
     {
-      "line": 4369,
+      "line": 4416,
       "keyword": "pattern",
       "value": "^[A-Z]{2,4}-[A-Z_]+-[0-9]{3}$",
       "schema": "DocumentStatusData",
       "field": "errorCode"
     },
     {
-      "line": 4372,
+      "line": 4419,
       "keyword": "maxLength",
       "value": 512,
       "schema": "DocumentStatusData",
       "field": "errorMessage"
     },
     {
-      "line": 4373,
+      "line": 4420,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentStatusData",
       "field": "errorMessage"
     },
     {
-      "line": 4377,
+      "line": 4424,
       "keyword": "minLength",
       "value": 1,
       "schema": "DocumentStatusData",
       "field": "indexVersion"
     },
     {
-      "line": 4378,
+      "line": 4425,
       "keyword": "maxLength",
       "value": 32,
       "schema": "DocumentStatusData",
       "field": "indexVersion"
     },
     {
-      "line": 4383,
+      "line": 4430,
       "keyword": "minLength",
       "value": 1,
       "schema": "DocumentStatusData",
       "field": "pendingIndexVersion"
     },
     {
-      "line": 4384,
+      "line": 4431,
       "keyword": "maxLength",
       "value": 32,
       "schema": "DocumentStatusData",
       "field": "pendingIndexVersion"
     },
     {
-      "line": 4385,
+      "line": 4432,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentStatusData",
       "field": "pendingIndexVersion"
     },
     {
-      "line": 4390,
+      "line": 4437,
       "keyword": "minimum",
       "value": 0,
       "schema": "DocumentStatusData",
       "field": "chunkCount"
     },
     {
-      "line": 4394,
+      "line": 4441,
       "keyword": "minimum",
       "value": 0,
       "schema": "DocumentStatusData",
       "field": "vectorRows"
     },
     {
-      "line": 4395,
+      "line": 4442,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentStatusData",
       "field": "vectorRows"
     },
     {
-      "line": 4401,
+      "line": 4448,
       "keyword": "format",
       "value": "date-time",
       "schema": "DocumentStatusData",
       "field": "vectorConfirmedAt"
     },
     {
-      "line": 4402,
+      "line": 4449,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentStatusData",
       "field": "vectorConfirmedAt"
     },
     {
-      "line": 4408,
+      "line": 4455,
       "keyword": "format",
       "value": "date-time",
       "schema": "DocumentStatusData",
       "field": "indexedAt"
     },
     {
-      "line": 4409,
+      "line": 4456,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentStatusData",
       "field": "indexedAt"
     },
     {
-      "line": 4412,
+      "line": 4459,
       "keyword": "format",
       "value": "date-time",
       "schema": "DocumentStatusData",
       "field": "createdAt"
     },
     {
-      "line": 4415,
+      "line": 4462,
       "keyword": "format",
       "value": "date-time",
       "schema": "DocumentStatusData",
       "field": "updatedAt"
     },
     {
-      "line": 4419,
+      "line": 4466,
       "keyword": "enum",
       "value": "",
       "schema": "VectorConsistency",
       "field": ""
     },
     {
-      "line": 4442,
+      "line": 4489,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "DocumentRenameRequest",
       "field": ""
     },
     {
-      "line": 4448,
+      "line": 4495,
       "keyword": "minLength",
       "value": 1,
       "schema": "DocumentRenameRequest",
       "field": "title"
     },
     {
-      "line": 4449,
+      "line": 4496,
       "keyword": "maxLength",
       "value": 120,
       "schema": "DocumentRenameRequest",
       "field": "title"
     },
     {
-      "line": 4460,
+      "line": 4507,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "DocumentTagsUpdateRequest",
       "field": ""
     },
     {
-      "line": 4466,
+      "line": 4513,
       "keyword": "maxItems",
       "value": 20,
       "schema": "DocumentTagsUpdateRequest",
       "field": "tags"
     },
     {
-      "line": 4475,
+      "line": 4522,
       "keyword": "minLength",
       "value": 1,
       "schema": "DocumentTagsUpdateRequest",
       "field": "tags"
     },
     {
-      "line": 4476,
+      "line": 4523,
       "keyword": "maxLength",
       "value": 24,
       "schema": "DocumentTagsUpdateRequest",
       "field": "tags"
     },
     {
-      "line": 4483,
+      "line": 4530,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "AskRequest",
       "field": ""
     },
     {
-      "line": 4490,
+      "line": 4537,
       "keyword": "minLength",
       "value": 1,
       "schema": "AskRequest",
       "field": "question"
     },
     {
-      "line": 4491,
+      "line": 4538,
       "keyword": "maxLength",
       "value": 4000,
       "schema": "AskRequest",
       "field": "question"
     },
     {
-      "line": 4496,
+      "line": 4543,
       "keyword": "minItems",
       "value": 1,
       "schema": "AskRequest",
       "field": "documentIds"
     },
     {
-      "line": 4497,
+      "line": 4544,
       "keyword": "maxItems",
       "value": 20,
       "schema": "AskRequest",
       "field": "documentIds"
     },
     {
-      "line": 4498,
+      "line": 4545,
       "keyword": "uniqueItems",
       "value": true,
       "schema": "AskRequest",
       "field": "documentIds"
     },
     {
-      "line": 4505,
+      "line": 4552,
       "keyword": "format",
       "value": "uuid",
       "schema": "AskRequest",
       "field": "documentIds"
     },
     {
-      "line": 4517,
+      "line": 4564,
       "keyword": "format",
       "value": "uuid",
       "schema": "Citation",
       "field": "documentId"
     },
     {
-      "line": 4520,
+      "line": 4567,
       "keyword": "minimum",
       "value": 0,
       "schema": "Citation",
       "field": "chunkIndex"
     },
     {
-      "line": 4523,
+      "line": 4570,
       "keyword": "format",
       "value": "double",
       "schema": "Citation",
       "field": "score"
     },
     {
-      "line": 4524,
+      "line": 4571,
       "keyword": "minimum",
       "value": 0,
       "schema": "Citation",
       "field": "score"
     },
     {
-      "line": 4525,
+      "line": 4572,
       "keyword": "maximum",
       "value": 1,
       "schema": "Citation",
       "field": "score"
     },
     {
-      "line": 4528,
+      "line": 4575,
       "keyword": "maxLength",
       "value": 200,
       "schema": "Citation",
       "field": "snippet"
     },
     {
-      "line": 4532,
+      "line": 4579,
       "keyword": "maxLength",
       "value": 255,
       "schema": "Citation",
       "field": "fileName"
     },
     {
-      "line": 4537,
+      "line": 4584,
       "keyword": "enum",
       "value": "",
       "schema": "BudgetStatus",
       "field": ""
     },
     {
-      "line": 4563,
+      "line": 4610,
       "keyword": "format",
       "value": "uuid",
       "schema": "AskData",
       "field": "conversationId"
     },
     {
-      "line": 4566,
+      "line": 4613,
       "keyword": "format",
       "value": "uuid",
       "schema": "AskData",
       "field": "messageId"
     },
     {
-      "line": 4569,
+      "line": 4616,
       "keyword": "maxLength",
       "value": 8000,
       "schema": "AskData",
       "field": "answer"
     },
     {
-      "line": 4573,
+      "line": 4620,
       "keyword": "maxItems",
       "value": 20,
       "schema": "AskData",
       "field": "citations"
     },
     {
-      "line": 4578,
+      "line": 4625,
       "keyword": "format",
       "value": "double",
       "schema": "AskData",
       "field": "confidence"
     },
     {
-      "line": 4579,
+      "line": 4626,
       "keyword": "minimum",
       "value": 0,
       "schema": "AskData",
       "field": "confidence"
     },
     {
-      "line": 4580,
+      "line": 4627,
       "keyword": "maximum",
       "value": 1,
       "schema": "AskData",
       "field": "confidence"
     },
     {
-      "line": 4586,
+      "line": 4633,
       "keyword": "minimum",
       "value": 0,
       "schema": "AskData",
       "field": "tokenUsed"
     },
     {
-      "line": 4587,
+      "line": 4634,
       "keyword": "maximum",
       "value": 8000,
       "schema": "AskData",
       "field": "tokenUsed"
     },
     {
-      "line": 4590,
+      "line": 4637,
       "keyword": "minimum",
       "value": 0,
       "schema": "AskData",
       "field": "toolCallsMade"
     },
     {
-      "line": 4591,
+      "line": 4638,
       "keyword": "maximum",
       "value": 3,
       "schema": "AskData",
       "field": "toolCallsMade"
     },
     {
-      "line": 4594,
+      "line": 4641,
       "keyword": "minimum",
       "value": 0,
       "schema": "AskData",
       "field": "roundsUsed"
     },
     {
-      "line": 4595,
+      "line": 4642,
       "keyword": "maximum",
       "value": 3,
       "schema": "AskData",
       "field": "roundsUsed"
     },
     {
-      "line": 4604,
+      "line": 4651,
       "keyword": "format",
       "value": "date-time",
       "schema": "AskData",
       "field": "createdAt"
     },
     {
-      "line": 4626,
+      "line": 4673,
       "keyword": "enum",
       "value": "",
       "schema": "AskStreamMeta",
       "field": "event"
     },
     {
-      "line": 4638,
+      "line": 4685,
       "keyword": "format",
       "value": "uuid",
       "schema": "AskStreamMeta",
       "field": "data"
     },
     {
-      "line": 4641,
+      "line": 4688,
       "keyword": "format",
       "value": "uuid",
       "schema": "AskStreamMeta",
       "field": "data"
-    },
-    {
-      "line": 4645,
-      "keyword": "pattern",
-      "value": "^[0-9a-f]{32}$",
-      "schema": "AskStreamMeta",
-      "field": "data"
-    },
-    {
-      "line": 4659,
-      "keyword": "enum",
-      "value": "",
-      "schema": "AskStreamDelta",
-      "field": "event"
-    },
-    {
-      "line": 4681,
-      "keyword": "enum",
-      "value": "",
-      "schema": "AskStreamDone",
-      "field": "event"
     },
     {
       "line": 4692,
       "keyword": "pattern",
       "value": "^[0-9a-f]{32}$",
-      "schema": "AskStreamDone",
+      "schema": "AskStreamMeta",
       "field": "data"
     },
     {
       "line": 4706,
       "keyword": "enum",
       "value": "",
+      "schema": "AskStreamDelta",
+      "field": "event"
+    },
+    {
+      "line": 4728,
+      "keyword": "enum",
+      "value": "",
+      "schema": "AskStreamDone",
+      "field": "event"
+    },
+    {
+      "line": 4739,
+      "keyword": "pattern",
+      "value": "^[0-9a-f]{32}$",
+      "schema": "AskStreamDone",
+      "field": "data"
+    },
+    {
+      "line": 4753,
+      "keyword": "enum",
+      "value": "",
       "schema": "AskStreamError",
       "field": "event"
     },
     {
-      "line": 4713,
+      "line": 4760,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "CreateConversationRequest",
       "field": ""
     },
     {
-      "line": 4717,
+      "line": 4764,
       "keyword": "minLength",
       "value": 1,
       "schema": "CreateConversationRequest",
       "field": "title"
     },
     {
-      "line": 4718,
+      "line": 4765,
       "keyword": "maxLength",
       "value": 200,
       "schema": "CreateConversationRequest",
       "field": "title"
     },
     {
-      "line": 4723,
+      "line": 4770,
       "keyword": "maxItems",
       "value": 20,
       "schema": "CreateConversationRequest",
       "field": "documentScopeIds"
     },
     {
-      "line": 4724,
+      "line": 4771,
       "keyword": "uniqueItems",
       "value": true,
       "schema": "CreateConversationRequest",
       "field": "documentScopeIds"
     },
     {
-      "line": 4728,
+      "line": 4775,
       "keyword": "format",
       "value": "uuid",
       "schema": "CreateConversationRequest",
       "field": "documentScopeIds"
     },
     {
-      "line": 4741,
+      "line": 4788,
       "keyword": "format",
       "value": "uuid",
       "schema": "ConversationData",
       "field": "conversationId"
     },
     {
-      "line": 4744,
+      "line": 4791,
       "keyword": "minLength",
       "value": 1,
       "schema": "ConversationData",
       "field": "title"
     },
     {
-      "line": 4745,
+      "line": 4792,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ConversationData",
       "field": "title"
     },
     {
-      "line": 4748,
+      "line": 4795,
       "keyword": "maxItems",
       "value": 20,
       "schema": "ConversationData",
       "field": "documentScopeIds"
     },
     {
-      "line": 4751,
+      "line": 4798,
       "keyword": "format",
       "value": "uuid",
       "schema": "ConversationData",
       "field": "documentScopeIds"
     },
     {
-      "line": 4757,
+      "line": 4804,
       "keyword": "format",
       "value": "date-time",
       "schema": "ConversationData",
       "field": "createdAt"
     },
     {
-      "line": 4781,
+      "line": 4828,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "DeadlineReminderCreateRequest",
       "field": ""
     },
     {
-      "line": 4790,
+      "line": 4837,
       "keyword": "enum",
       "value": "",
       "schema": "DeadlineReminderCreateRequest",
       "field": "kind"
     },
     {
-      "line": 4794,
+      "line": 4841,
       "keyword": "minLength",
       "value": 1,
       "schema": "DeadlineReminderCreateRequest",
       "field": "title"
     },
     {
-      "line": 4795,
+      "line": 4842,
       "keyword": "maxLength",
       "value": 200,
       "schema": "DeadlineReminderCreateRequest",
       "field": "title"
     },
     {
-      "line": 4799,
+      "line": 4846,
       "keyword": "maxLength",
       "value": 1000,
       "schema": "DeadlineReminderCreateRequest",
       "field": "description"
     },
     {
-      "line": 4800,
+      "line": 4847,
       "keyword": "nullable",
       "value": true,
       "schema": "DeadlineReminderCreateRequest",
       "field": "description"
     },
     {
-      "line": 4803,
+      "line": 4850,
       "keyword": "maxLength",
       "value": 64,
       "schema": "DeadlineReminderCreateRequest",
       "field": "timezone"
     },
     {
-      "line": 4804,
+      "line": 4851,
       "keyword": "pattern",
       "value": "^UTC$|^[A-Za-z]+(?:/[A-Za-z0-9_+\\-]+)+$",
       "schema": "DeadlineReminderCreateRequest",
       "field": "timezone"
     },
     {
-      "line": 4809,
+      "line": 4856,
       "keyword": "format",
       "value": "date-time",
       "schema": "DeadlineReminderCreateRequest",
       "field": "dueAt"
     },
     {
-      "line": 4814,
+      "line": 4861,
       "keyword": "minimum",
       "value": 0,
       "schema": "DeadlineReminderCreateRequest",
       "field": "leadMinutes"
     },
     {
-      "line": 4815,
+      "line": 4862,
       "keyword": "maximum",
       "value": 10080,
       "schema": "DeadlineReminderCreateRequest",
       "field": "leadMinutes"
     },
     {
-      "line": 4822,
+      "line": 4869,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "CustomReminderCreateRequest",
       "field": ""
     },
     {
-      "line": 4832,
+      "line": 4879,
       "keyword": "enum",
       "value": "",
       "schema": "CustomReminderCreateRequest",
       "field": "kind"
     },
     {
-      "line": 4836,
+      "line": 4883,
       "keyword": "minLength",
       "value": 1,
       "schema": "CustomReminderCreateRequest",
       "field": "title"
     },
     {
-      "line": 4837,
+      "line": 4884,
       "keyword": "maxLength",
       "value": 200,
       "schema": "CustomReminderCreateRequest",
       "field": "title"
     },
     {
-      "line": 4840,
+      "line": 4887,
       "keyword": "maxLength",
       "value": 1000,
       "schema": "CustomReminderCreateRequest",
       "field": "description"
     },
     {
-      "line": 4841,
+      "line": 4888,
       "keyword": "nullable",
       "value": true,
       "schema": "CustomReminderCreateRequest",
       "field": "description"
     },
     {
-      "line": 4844,
+      "line": 4891,
       "keyword": "maxLength",
       "value": 64,
       "schema": "CustomReminderCreateRequest",
       "field": "timezone"
     },
     {
-      "line": 4845,
+      "line": 4892,
       "keyword": "pattern",
       "value": "^UTC$|^[A-Za-z]+(?:/[A-Za-z0-9_+\\-]+)+$",
       "schema": "CustomReminderCreateRequest",
       "field": "timezone"
     },
     {
-      "line": 4848,
+      "line": 4895,
       "keyword": "minLength",
       "value": 6,
       "schema": "CustomReminderCreateRequest",
       "field": "rrule"
     },
     {
-      "line": 4849,
+      "line": 4896,
       "keyword": "maxLength",
       "value": 1024,
       "schema": "CustomReminderCreateRequest",
       "field": "rrule"
     },
     {
-      "line": 4850,
+      "line": 4897,
       "keyword": "pattern",
       "value": "^FREQ=(SECONDLY|MINUTELY|HOURLY|DAILY|WEEKLY|MONTHLY|YEARLY)(;[A-Z]+=[^;\\r\\n]+)*$",
       "schema": "CustomReminderCreateRequest",
       "field": "rrule"
     },
     {
-      "line": 4855,
+      "line": 4902,
       "keyword": "format",
       "value": "date-time",
       "schema": "CustomReminderCreateRequest",
       "field": "dtstart"
     },
     {
-      "line": 4860,
+      "line": 4907,
       "keyword": "maxItems",
       "value": 365,
       "schema": "CustomReminderCreateRequest",
       "field": "exdates"
     },
     {
-      "line": 4861,
+      "line": 4908,
       "keyword": "uniqueItems",
       "value": true,
       "schema": "CustomReminderCreateRequest",
       "field": "exdates"
     },
     {
-      "line": 4865,
+      "line": 4912,
       "keyword": "format",
       "value": "date-time",
       "schema": "CustomReminderCreateRequest",
       "field": "exdates"
     },
     {
-      "line": 4876,
+      "line": 4923,
       "keyword": "enum",
       "value": "",
       "schema": "ReminderKind",
       "field": ""
     },
     {
-      "line": 4883,
+      "line": 4930,
       "keyword": "enum",
       "value": "",
       "schema": "ReminderStatus",
       "field": ""
     },
     {
-      "line": 4908,
+      "line": 4955,
       "keyword": "format",
       "value": "uuid",
       "schema": "ReminderCreateData",
       "field": "reminderId"
     },
     {
-      "line": 4915,
+      "line": 4962,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ReminderCreateData",
       "field": "title"
     },
     {
-      "line": 4918,
+      "line": 4965,
       "keyword": "maxLength",
       "value": 1024,
       "schema": "ReminderCreateData",
       "field": "rrule"
     },
     {
-      "line": 4921,
+      "line": 4968,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderCreateData",
       "field": "dtstart"
     },
     {
-      "line": 4924,
+      "line": 4971,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ReminderCreateData",
       "field": "timezone"
     },
     {
-      "line": 4927,
+      "line": 4974,
       "keyword": "maxItems",
       "value": 365,
       "schema": "ReminderCreateData",
       "field": "exdates"
     },
     {
-      "line": 4930,
+      "line": 4977,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderCreateData",
       "field": "exdates"
     },
     {
-      "line": 4933,
+      "line": 4980,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderCreateData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 4934,
+      "line": 4981,
       "keyword": "nullable",
       "value": true,
       "schema": "ReminderCreateData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 4938,
+      "line": 4985,
       "keyword": "format",
       "value": "int64",
       "schema": "ReminderCreateData",
       "field": "version"
     },
     {
-      "line": 4939,
+      "line": 4986,
       "keyword": "minimum",
       "value": 0,
       "schema": "ReminderCreateData",
       "field": "version"
     },
     {
-      "line": 4944,
+      "line": 4991,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderCreateData",
       "field": "createdAt"
     },
     {
-      "line": 4947,
+      "line": 4994,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderCreateData",
       "field": "updatedAt"
     },
     {
-      "line": 4978,
+      "line": 5025,
       "keyword": "format",
       "value": "uuid",
       "schema": "DocumentListItemData",
       "field": "documentId"
     },
     {
-      "line": 4981,
+      "line": 5028,
       "keyword": "maxLength",
       "value": 255,
       "schema": "DocumentListItemData",
       "field": "fileName"
     },
     {
-      "line": 4984,
+      "line": 5031,
       "keyword": "maxLength",
       "value": 120,
       "schema": "DocumentListItemData",
       "field": "title"
     },
     {
-      "line": 4985,
+      "line": 5032,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentListItemData",
       "field": "title"
     },
     {
-      "line": 4989,
+      "line": 5036,
       "keyword": "maxItems",
       "value": 20,
       "schema": "DocumentListItemData",
       "field": "tags"
     },
     {
-      "line": 4992,
+      "line": 5039,
       "keyword": "maxLength",
       "value": 24,
       "schema": "DocumentListItemData",
       "field": "tags"
     },
     {
-      "line": 4999,
+      "line": 5046,
       "keyword": "maxLength",
       "value": 127,
       "schema": "DocumentListItemData",
       "field": "contentType"
     },
     {
-      "line": 5002,
+      "line": 5049,
       "keyword": "format",
       "value": "int64",
       "schema": "DocumentListItemData",
       "field": "sizeBytes"
     },
     {
-      "line": 5003,
+      "line": 5050,
       "keyword": "minimum",
       "value": 0,
       "schema": "DocumentListItemData",
       "field": "sizeBytes"
     },
     {
-      "line": 5004,
+      "line": 5051,
       "keyword": "maximum",
       "value": 52428800,
       "schema": "DocumentListItemData",
       "field": "sizeBytes"
     },
     {
-      "line": 5009,
+      "line": 5056,
       "keyword": "minimum",
       "value": 0,
       "schema": "DocumentListItemData",
       "field": "retryCount"
     },
     {
-      "line": 5010,
+      "line": 5057,
       "keyword": "maximum",
       "value": 3,
       "schema": "DocumentListItemData",
       "field": "retryCount"
     },
     {
-      "line": 5013,
+      "line": 5060,
       "keyword": "minimum",
       "value": 1,
       "schema": "DocumentListItemData",
       "field": "maxRetry"
     },
     {
-      "line": 5014,
+      "line": 5061,
       "keyword": "maximum",
       "value": 10,
       "schema": "DocumentListItemData",
       "field": "maxRetry"
     },
     {
-      "line": 5017,
+      "line": 5064,
       "keyword": "maxLength",
       "value": 64,
       "schema": "DocumentListItemData",
       "field": "errorCode"
     },
     {
-      "line": 5018,
+      "line": 5065,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentListItemData",
       "field": "errorCode"
     },
     {
-      "line": 5019,
+      "line": 5066,
       "keyword": "pattern",
       "value": "^[A-Z]{2,4}-[A-Z_]+-[0-9]{3}$",
       "schema": "DocumentListItemData",
       "field": "errorCode"
     },
     {
-      "line": 5023,
+      "line": 5070,
       "keyword": "minLength",
       "value": 1,
       "schema": "DocumentListItemData",
       "field": "indexVersion"
     },
     {
-      "line": 5024,
+      "line": 5071,
       "keyword": "maxLength",
       "value": 32,
       "schema": "DocumentListItemData",
       "field": "indexVersion"
     },
     {
-      "line": 5029,
+      "line": 5076,
       "keyword": "minimum",
       "value": 0,
       "schema": "DocumentListItemData",
       "field": "chunkCount"
     },
     {
-      "line": 5033,
+      "line": 5080,
       "keyword": "format",
       "value": "date-time",
       "schema": "DocumentListItemData",
       "field": "indexedAt"
     },
     {
-      "line": 5034,
+      "line": 5081,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentListItemData",
       "field": "indexedAt"
     },
     {
-      "line": 5037,
+      "line": 5084,
       "keyword": "format",
       "value": "date-time",
       "schema": "DocumentListItemData",
       "field": "createdAt"
     },
     {
-      "line": 5041,
+      "line": 5088,
       "keyword": "format",
       "value": "date-time",
       "schema": "DocumentListItemData",
       "field": "updatedAt"
     },
     {
-      "line": 5051,
+      "line": 5098,
       "keyword": "maxItems",
       "value": 100,
       "schema": "DocumentListData",
       "field": "items"
     },
     {
-      "line": 5056,
+      "line": 5103,
       "keyword": "maxLength",
       "value": 200,
       "schema": "DocumentListData",
       "field": "nextCursor"
     },
     {
-      "line": 5057,
+      "line": 5104,
       "keyword": "nullable",
       "value": true,
       "schema": "DocumentListData",
       "field": "nextCursor"
     },
     {
-      "line": 5061,
+      "line": 5108,
       "keyword": "minimum",
       "value": 1,
       "schema": "DocumentListData",
       "field": "limit"
     },
     {
-      "line": 5062,
+      "line": 5109,
       "keyword": "maximum",
       "value": 100,
       "schema": "DocumentListData",
       "field": "limit"
     },
     {
-      "line": 5093,
+      "line": 5140,
       "keyword": "format",
       "value": "uuid",
       "schema": "ReminderListItemData",
       "field": "reminderId"
     },
     {
-      "line": 5100,
+      "line": 5147,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ReminderListItemData",
       "field": "title"
     },
     {
-      "line": 5103,
+      "line": 5150,
       "keyword": "maxLength",
       "value": 1000,
       "schema": "ReminderListItemData",
       "field": "description"
     },
     {
-      "line": 5104,
+      "line": 5151,
       "keyword": "nullable",
       "value": true,
       "schema": "ReminderListItemData",
       "field": "description"
     },
     {
-      "line": 5107,
+      "line": 5154,
       "keyword": "maxLength",
       "value": 1024,
       "schema": "ReminderListItemData",
       "field": "rrule"
     },
     {
-      "line": 5110,
+      "line": 5157,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderListItemData",
       "field": "dtstart"
     },
     {
-      "line": 5113,
+      "line": 5160,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ReminderListItemData",
       "field": "timezone"
     },
     {
-      "line": 5116,
+      "line": 5163,
       "keyword": "maxItems",
       "value": 365,
       "schema": "ReminderListItemData",
       "field": "exdates"
     },
     {
-      "line": 5119,
+      "line": 5166,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderListItemData",
       "field": "exdates"
     },
     {
-      "line": 5123,
+      "line": 5170,
       "keyword": "minimum",
       "value": 0,
       "schema": "ReminderListItemData",
       "field": "leadMinutes"
     },
     {
-      "line": 5124,
+      "line": 5171,
       "keyword": "maximum",
       "value": 10080,
       "schema": "ReminderListItemData",
       "field": "leadMinutes"
     },
     {
-      "line": 5136,
+      "line": 5183,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderListItemData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 5137,
+      "line": 5184,
       "keyword": "nullable",
       "value": true,
       "schema": "ReminderListItemData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 5143,
+      "line": 5190,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderListItemData",
       "field": "lastTriggeredAt"
     },
     {
-      "line": 5144,
+      "line": 5191,
       "keyword": "nullable",
       "value": true,
       "schema": "ReminderListItemData",
       "field": "lastTriggeredAt"
     },
     {
-      "line": 5147,
+      "line": 5194,
       "keyword": "format",
       "value": "int64",
       "schema": "ReminderListItemData",
       "field": "version"
     },
     {
-      "line": 5148,
+      "line": 5195,
       "keyword": "minimum",
       "value": 0,
       "schema": "ReminderListItemData",
       "field": "version"
     },
     {
-      "line": 5152,
+      "line": 5199,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderListItemData",
       "field": "createdAt"
     },
     {
-      "line": 5155,
+      "line": 5202,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderListItemData",
       "field": "updatedAt"
     },
     {
-      "line": 5165,
+      "line": 5212,
       "keyword": "maxItems",
       "value": 100,
       "schema": "ReminderListData",
       "field": "items"
     },
     {
-      "line": 5170,
+      "line": 5217,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ReminderListData",
       "field": "nextCursor"
     },
     {
-      "line": 5171,
+      "line": 5218,
       "keyword": "nullable",
       "value": true,
       "schema": "ReminderListData",
       "field": "nextCursor"
     },
     {
-      "line": 5177,
+      "line": 5224,
       "keyword": "minimum",
       "value": 1,
       "schema": "ReminderListData",
       "field": "limit"
     },
     {
-      "line": 5178,
+      "line": 5225,
       "keyword": "maximum",
       "value": 100,
       "schema": "ReminderListData",
       "field": "limit"
     },
     {
-      "line": 5192,
+      "line": 5239,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "ReminderStatusUpdateRequest",
       "field": ""
     },
     {
-      "line": 5201,
+      "line": 5248,
       "keyword": "format",
       "value": "int64",
       "schema": "ReminderStatusUpdateRequest",
       "field": "version"
     },
     {
-      "line": 5202,
+      "line": 5249,
       "keyword": "minimum",
       "value": 0,
       "schema": "ReminderStatusUpdateRequest",
       "field": "version"
     },
     {
-      "line": 5221,
+      "line": 5268,
       "keyword": "format",
       "value": "uuid",
       "schema": "ReminderStatusUpdateData",
       "field": "reminderId"
     },
     {
-      "line": 5226,
+      "line": 5273,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderStatusUpdateData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 5227,
+      "line": 5274,
       "keyword": "nullable",
       "value": true,
       "schema": "ReminderStatusUpdateData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 5236,
+      "line": 5283,
       "keyword": "format",
       "value": "int64",
       "schema": "ReminderStatusUpdateData",
       "field": "version"
     },
     {
-      "line": 5237,
+      "line": 5284,
       "keyword": "minimum",
       "value": 0,
       "schema": "ReminderStatusUpdateData",
       "field": "version"
     },
     {
-      "line": 5244,
+      "line": 5291,
       "keyword": "format",
       "value": "date-time",
       "schema": "ReminderStatusUpdateData",
       "field": "updatedAt"
     },
     {
-      "line": 5274,
+      "line": 5321,
       "keyword": "format",
       "value": "uuid",
       "schema": "NotificationData",
       "field": "notificationId"
     },
     {
-      "line": 5277,
+      "line": 5324,
       "keyword": "format",
       "value": "uuid",
       "schema": "NotificationData",
       "field": "reminderId"
     },
     {
-      "line": 5286,
+      "line": 5333,
       "keyword": "maxLength",
       "value": 200,
       "schema": "NotificationData",
       "field": "title"
     },
     {
-      "line": 5290,
+      "line": 5337,
       "keyword": "maxLength",
       "value": 1000,
       "schema": "NotificationData",
       "field": "description"
     },
     {
-      "line": 5291,
+      "line": 5338,
       "keyword": "nullable",
       "value": true,
       "schema": "NotificationData",
       "field": "description"
     },
     {
-      "line": 5294,
+      "line": 5341,
       "keyword": "format",
       "value": "date-time",
       "schema": "NotificationData",
       "field": "plannedTriggerAt"
     },
     {
-      "line": 5308,
+      "line": 5355,
       "keyword": "format",
       "value": "date-time",
       "schema": "NotificationData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 5309,
+      "line": 5356,
       "keyword": "nullable",
       "value": true,
       "schema": "NotificationData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 5315,
+      "line": 5362,
       "keyword": "format",
       "value": "date-time",
       "schema": "NotificationData",
       "field": "deliveredAt"
     },
     {
-      "line": 5321,
+      "line": 5368,
       "keyword": "format",
       "value": "date-time",
       "schema": "NotificationData",
       "field": "readAt"
     },
     {
-      "line": 5322,
+      "line": 5369,
       "keyword": "nullable",
       "value": true,
       "schema": "NotificationData",
       "field": "readAt"
     },
     {
-      "line": 5326,
+      "line": 5373,
       "keyword": "format",
       "value": "date-time",
       "schema": "NotificationData",
       "field": "createdAt"
     },
     {
-      "line": 5336,
+      "line": 5383,
       "keyword": "maxItems",
       "value": 100,
       "schema": "NotificationListData",
       "field": "items"
     },
     {
-      "line": 5341,
+      "line": 5388,
       "keyword": "maxLength",
       "value": 200,
       "schema": "NotificationListData",
       "field": "nextCursor"
     },
     {
-      "line": 5342,
+      "line": 5389,
       "keyword": "nullable",
       "value": true,
       "schema": "NotificationListData",
       "field": "nextCursor"
     },
     {
-      "line": 5346,
+      "line": 5393,
       "keyword": "minimum",
       "value": 1,
       "schema": "NotificationListData",
       "field": "limit"
     },
     {
-      "line": 5347,
+      "line": 5394,
       "keyword": "maximum",
       "value": 100,
       "schema": "NotificationListData",
       "field": "limit"
     },
     {
-      "line": 5361,
+      "line": 5408,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "NotificationReadRequest",
       "field": ""
     },
     {
-      "line": 5373,
+      "line": 5420,
       "keyword": "minItems",
       "value": 1,
       "schema": "NotificationReadRequest",
       "field": "ids"
     },
     {
-      "line": 5374,
+      "line": 5421,
       "keyword": "maxItems",
       "value": 500,
       "schema": "NotificationReadRequest",
       "field": "ids"
     },
     {
-      "line": 5375,
+      "line": 5422,
       "keyword": "uniqueItems",
       "value": true,
       "schema": "NotificationReadRequest",
       "field": "ids"
     },
     {
-      "line": 5378,
+      "line": 5425,
       "keyword": "format",
       "value": "uuid",
       "schema": "NotificationReadRequest",
       "field": "ids"
     },
     {
-      "line": 5391,
+      "line": 5438,
       "keyword": "minimum",
       "value": 0,
       "schema": "NotificationReadData",
       "field": "updated"
     },
     {
-      "line": 5411,
+      "line": 5458,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "ScheduleImportRequest",
       "field": ""
     },
     {
-      "line": 5434,
+      "line": 5481,
       "keyword": "format",
       "value": "binary",
       "schema": "ScheduleImportRequest",
       "field": "file"
     },
     {
-      "line": 5448,
+      "line": 5495,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ScheduleImportRequest",
       "field": "fallbackTimezone"
     },
     {
-      "line": 5449,
+      "line": 5496,
       "keyword": "pattern",
       "value": "^UTC$|^[A-Za-z]+(?:/[A-Za-z0-9_+\\-]+)+$",
       "schema": "ScheduleImportRequest",
       "field": "fallbackTimezone"
     },
     {
-      "line": 5457,
+      "line": 5504,
       "keyword": "minimum",
       "value": 0,
       "schema": "ScheduleImportRequest",
       "field": "leadMinutes"
     },
     {
-      "line": 5458,
+      "line": 5505,
       "keyword": "maximum",
       "value": 10080,
       "schema": "ScheduleImportRequest",
       "field": "leadMinutes"
     },
     {
-      "line": 5478,
+      "line": 5525,
       "keyword": "enum",
       "value": "",
       "schema": "ScheduleImportAction",
       "field": ""
     },
     {
-      "line": 5503,
+      "line": 5550,
       "keyword": "maxLength",
       "value": 255,
       "schema": "ScheduleImportItemData",
       "field": "uid"
     },
     {
-      "line": 5508,
+      "line": 5555,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ScheduleImportItemData",
       "field": "summary"
     },
     {
-      "line": 5513,
+      "line": 5560,
       "keyword": "format",
       "value": "int32",
       "schema": "ScheduleImportItemData",
       "field": "sequence"
     },
     {
-      "line": 5514,
+      "line": 5561,
       "keyword": "minimum",
       "value": 0,
       "schema": "ScheduleImportItemData",
       "field": "sequence"
     },
     {
-      "line": 5519,
+      "line": 5566,
       "keyword": "format",
       "value": "int32",
       "schema": "ScheduleImportItemData",
       "field": "currentSequence"
     },
     {
-      "line": 5520,
+      "line": 5567,
       "keyword": "minimum",
       "value": 0,
       "schema": "ScheduleImportItemData",
       "field": "currentSequence"
     },
     {
-      "line": 5521,
+      "line": 5568,
       "keyword": "nullable",
       "value": true,
       "schema": "ScheduleImportItemData",
       "field": "currentSequence"
     },
     {
-      "line": 5528,
+      "line": 5575,
       "keyword": "format",
       "value": "date-time",
       "schema": "ScheduleImportItemData",
       "field": "dtstart"
     },
     {
-      "line": 5535,
+      "line": 5582,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ScheduleImportItemData",
       "field": "timezone"
     },
     {
-      "line": 5542,
+      "line": 5589,
       "keyword": "maxLength",
       "value": 1024,
       "schema": "ScheduleImportItemData",
       "field": "rrule"
     },
     {
-      "line": 5547,
+      "line": 5594,
       "keyword": "maxItems",
       "value": 365,
       "schema": "ScheduleImportItemData",
       "field": "exdates"
     },
     {
-      "line": 5555,
+      "line": 5602,
       "keyword": "pattern",
       "value": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}Z)?$",
       "schema": "ScheduleImportItemData",
       "field": "exdates"
     },
     {
-      "line": 5561,
+      "line": 5608,
       "keyword": "format",
       "value": "date-time",
       "schema": "ScheduleImportItemData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 5562,
+      "line": 5609,
       "keyword": "nullable",
       "value": true,
       "schema": "ScheduleImportItemData",
       "field": "nextTriggerAt"
     },
     {
-      "line": 5566,
+      "line": 5613,
       "keyword": "format",
       "value": "date-time",
       "schema": "ScheduleImportItemData",
       "field": "followingTriggerAt"
     },
     {
-      "line": 5567,
+      "line": 5614,
       "keyword": "nullable",
       "value": true,
       "schema": "ScheduleImportItemData",
       "field": "followingTriggerAt"
     },
     {
-      "line": 5573,
+      "line": 5620,
       "keyword": "format",
       "value": "uuid",
       "schema": "ScheduleImportItemData",
       "field": "reminderId"
     },
     {
-      "line": 5574,
+      "line": 5621,
       "keyword": "nullable",
       "value": true,
       "schema": "ScheduleImportItemData",
       "field": "reminderId"
     },
     {
-      "line": 5580,
+      "line": 5627,
       "keyword": "maxLength",
       "value": 1000,
       "schema": "ScheduleImportItemData",
       "field": "description"
     },
     {
-      "line": 5581,
+      "line": 5628,
       "keyword": "nullable",
       "value": true,
       "schema": "ScheduleImportItemData",
       "field": "description"
     },
     {
-      "line": 5601,
+      "line": 5648,
       "keyword": "minimum",
       "value": 0,
       "schema": "SchedulePreviewData",
       "field": "itemCount"
     },
     {
-      "line": 5602,
+      "line": 5649,
       "keyword": "maximum",
       "value": 500,
       "schema": "SchedulePreviewData",
       "field": "itemCount"
     },
     {
-      "line": 5606,
+      "line": 5653,
       "keyword": "minimum",
       "value": 0,
       "schema": "SchedulePreviewData",
       "field": "createCount"
-    },
-    {
-      "line": 5609,
-      "keyword": "minimum",
-      "value": 0,
-      "schema": "SchedulePreviewData",
-      "field": "updateCount"
-    },
-    {
-      "line": 5612,
-      "keyword": "minimum",
-      "value": 0,
-      "schema": "SchedulePreviewData",
-      "field": "unchangedCount"
-    },
-    {
-      "line": 5615,
-      "keyword": "minimum",
-      "value": 0,
-      "schema": "SchedulePreviewData",
-      "field": "staleCount"
-    },
-    {
-      "line": 5619,
-      "keyword": "maxLength",
-      "value": 64,
-      "schema": "SchedulePreviewData",
-      "field": "fallbackTimezone"
-    },
-    {
-      "line": 5623,
-      "keyword": "minimum",
-      "value": 0,
-      "schema": "SchedulePreviewData",
-      "field": "leadMinutes"
-    },
-    {
-      "line": 5624,
-      "keyword": "maximum",
-      "value": 10080,
-      "schema": "SchedulePreviewData",
-      "field": "leadMinutes"
-    },
-    {
-      "line": 5627,
-      "keyword": "maxItems",
-      "value": 500,
-      "schema": "SchedulePreviewData",
-      "field": "items"
     },
     {
       "line": 5656,
       "keyword": "minimum",
       "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "updateCount"
+    },
+    {
+      "line": 5659,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "unchangedCount"
+    },
+    {
+      "line": 5662,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "staleCount"
+    },
+    {
+      "line": 5666,
+      "keyword": "maxLength",
+      "value": 64,
+      "schema": "SchedulePreviewData",
+      "field": "fallbackTimezone"
+    },
+    {
+      "line": 5670,
+      "keyword": "minimum",
+      "value": 0,
+      "schema": "SchedulePreviewData",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 5671,
+      "keyword": "maximum",
+      "value": 10080,
+      "schema": "SchedulePreviewData",
+      "field": "leadMinutes"
+    },
+    {
+      "line": 5674,
+      "keyword": "maxItems",
+      "value": 500,
+      "schema": "SchedulePreviewData",
+      "field": "items"
+    },
+    {
+      "line": 5703,
+      "keyword": "minimum",
+      "value": 0,
       "schema": "ScheduleImportData",
       "field": "itemCount"
     },
     {
-      "line": 5657,
+      "line": 5704,
       "keyword": "maximum",
       "value": 500,
       "schema": "ScheduleImportData",
       "field": "itemCount"
     },
     {
-      "line": 5660,
+      "line": 5707,
       "keyword": "minimum",
       "value": 0,
       "schema": "ScheduleImportData",
       "field": "createCount"
     },
     {
-      "line": 5664,
+      "line": 5711,
       "keyword": "minimum",
       "value": 0,
       "schema": "ScheduleImportData",
       "field": "updateCount"
     },
     {
-      "line": 5667,
+      "line": 5714,
       "keyword": "minimum",
       "value": 0,
       "schema": "ScheduleImportData",
       "field": "unchangedCount"
     },
     {
-      "line": 5670,
+      "line": 5717,
       "keyword": "minimum",
       "value": 0,
       "schema": "ScheduleImportData",
       "field": "staleCount"
     },
     {
-      "line": 5678,
+      "line": 5725,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ScheduleImportData",
       "field": "fallbackTimezone"
     },
     {
-      "line": 5681,
+      "line": 5728,
       "keyword": "minimum",
       "value": 0,
       "schema": "ScheduleImportData",
       "field": "leadMinutes"
     },
     {
-      "line": 5682,
+      "line": 5729,
       "keyword": "maximum",
       "value": 10080,
       "schema": "ScheduleImportData",
       "field": "leadMinutes"
     },
     {
-      "line": 5685,
+      "line": 5732,
       "keyword": "maxItems",
       "value": 500,
       "schema": "ScheduleImportData",
       "field": "items"
     },
     {
-      "line": 5712,
+      "line": 5759,
       "keyword": "format",
       "value": "uuid",
       "schema": "MessageHistoryItemData",
       "field": "messageId"
     },
     {
-      "line": 5715,
+      "line": 5762,
       "keyword": "enum",
       "value": "",
       "schema": "MessageHistoryItemData",
       "field": "role"
     },
     {
-      "line": 5725,
+      "line": 5772,
       "keyword": "minimum",
       "value": 0,
       "schema": "MessageHistoryItemData",
       "field": "tokenCount"
     },
     {
-      "line": 5728,
+      "line": 5775,
       "keyword": "pattern",
       "value": "^[0-9a-f]{32}$",
       "schema": "MessageHistoryItemData",
       "field": "traceId"
     },
     {
-      "line": 5732,
+      "line": 5779,
       "keyword": "format",
       "value": "date-time",
       "schema": "MessageHistoryItemData",
       "field": "createdAt"
     },
     {
-      "line": 5744,
+      "line": 5791,
       "keyword": "format",
       "value": "uuid",
       "schema": "MessageHistoryData",
       "field": "conversationId"
     },
     {
-      "line": 5747,
+      "line": 5794,
       "keyword": "maxItems",
       "value": 100,
       "schema": "MessageHistoryData",
       "field": "items"
     },
     {
-      "line": 5752,
+      "line": 5799,
       "keyword": "maxLength",
       "value": 200,
       "schema": "MessageHistoryData",
       "field": "nextCursor"
     },
     {
-      "line": 5753,
+      "line": 5800,
       "keyword": "nullable",
       "value": true,
       "schema": "MessageHistoryData",
       "field": "nextCursor"
     },
     {
-      "line": 5757,
+      "line": 5804,
       "keyword": "minimum",
       "value": 1,
       "schema": "MessageHistoryData",
       "field": "limit"
     },
     {
-      "line": 5758,
+      "line": 5805,
       "keyword": "maximum",
       "value": 100,
       "schema": "MessageHistoryData",
       "field": "limit"
     },
     {
-      "line": 5781,
+      "line": 5828,
       "keyword": "format",
       "value": "uuid",
       "schema": "ConversationListItemData",
       "field": "conversationId"
     },
     {
-      "line": 5784,
+      "line": 5831,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ConversationListItemData",
       "field": "title"
     },
     {
-      "line": 5788,
+      "line": 5835,
       "keyword": "maxItems",
       "value": 20,
       "schema": "ConversationListItemData",
       "field": "documentScopeIds"
     },
     {
-      "line": 5794,
+      "line": 5841,
       "keyword": "format",
       "value": "uuid",
       "schema": "ConversationListItemData",
       "field": "documentScopeIds"
     },
     {
-      "line": 5797,
+      "line": 5844,
       "keyword": "format",
       "value": "date-time",
       "schema": "ConversationListItemData",
       "field": "lastMessageAt"
     },
     {
-      "line": 5798,
+      "line": 5845,
       "keyword": "nullable",
       "value": true,
       "schema": "ConversationListItemData",
       "field": "lastMessageAt"
     },
     {
-      "line": 5804,
+      "line": 5851,
       "keyword": "format",
       "value": "date-time",
       "schema": "ConversationListItemData",
       "field": "createdAt"
     },
     {
-      "line": 5814,
+      "line": 5861,
       "keyword": "maxItems",
       "value": 100,
       "schema": "ConversationListData",
       "field": "items"
     },
     {
-      "line": 5819,
+      "line": 5866,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ConversationListData",
       "field": "nextCursor"
     },
     {
-      "line": 5820,
+      "line": 5867,
       "keyword": "nullable",
       "value": true,
       "schema": "ConversationListData",
       "field": "nextCursor"
     },
     {
-      "line": 5824,
+      "line": 5871,
       "keyword": "minimum",
       "value": 1,
       "schema": "ConversationListData",
       "field": "limit"
     },
     {
-      "line": 5825,
+      "line": 5872,
       "keyword": "maximum",
       "value": 100,
       "schema": "ConversationListData",
       "field": "limit"
     },
     {
-      "line": 5862,
+      "line": 5909,
       "keyword": "format",
       "value": "date-time",
       "schema": "KillSwitchState",
       "field": "updatedAt"
     },
     {
-      "line": 5863,
+      "line": 5910,
       "keyword": "nullable",
       "value": true,
       "schema": "KillSwitchState",
       "field": "updatedAt"
     },
     {
-      "line": 5868,
+      "line": 5915,
       "keyword": "format",
       "value": "uuid",
       "schema": "KillSwitchState",
       "field": "updatedBy"
     },
     {
-      "line": 5869,
+      "line": 5916,
       "keyword": "nullable",
       "value": true,
       "schema": "KillSwitchState",
       "field": "updatedBy"
     },
     {
-      "line": 5885,
+      "line": 5932,
       "keyword": "minimum",
       "value": 0,
       "schema": "ExperimentBudgetState",
       "field": "callsUsed"
     },
     {
-      "line": 5890,
+      "line": 5937,
       "keyword": "minimum",
       "value": 0,
       "schema": "ExperimentBudgetState",
       "field": "tokensUsed"
     },
     {
-      "line": 5895,
+      "line": 5942,
       "keyword": "minimum",
       "value": 0,
       "schema": "ExperimentBudgetState",
       "field": "callLimit"
     },
     {
-      "line": 5896,
+      "line": 5943,
       "keyword": "nullable",
       "value": true,
       "schema": "ExperimentBudgetState",
       "field": "callLimit"
     },
     {
-      "line": 5901,
+      "line": 5948,
       "keyword": "minimum",
       "value": 0,
       "schema": "ExperimentBudgetState",
       "field": "tokenLimit"
     },
     {
-      "line": 5902,
+      "line": 5949,
       "keyword": "nullable",
       "value": true,
       "schema": "ExperimentBudgetState",
       "field": "tokenLimit"
     },
     {
-      "line": 5912,
+      "line": 5959,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "UpdateAiControlsRequest",
       "field": ""
     },
     {
-      "line": 5938,
+      "line": 5985,
       "keyword": "format",
       "value": "uuid",
       "schema": "AiQuota",
       "field": "userId"
     },
     {
-      "line": 5942,
+      "line": 5989,
       "keyword": "maxLength",
       "value": 100,
       "schema": "AiQuota",
       "field": "username"
     },
     {
-      "line": 5943,
+      "line": 5990,
       "keyword": "nullable",
       "value": true,
       "schema": "AiQuota",
       "field": "username"
     },
     {
-      "line": 5948,
+      "line": 5995,
       "keyword": "minimum",
       "value": 1,
       "schema": "AiQuota",
       "field": "dailyQuestionLimit"
     },
     {
-      "line": 5949,
+      "line": 5996,
       "keyword": "maximum",
       "value": 4294967295,
       "schema": "AiQuota",
       "field": "dailyQuestionLimit"
     },
     {
-      "line": 5950,
+      "line": 5997,
       "keyword": "nullable",
       "value": true,
       "schema": "AiQuota",
       "field": "dailyQuestionLimit"
     },
     {
-      "line": 5955,
+      "line": 6002,
       "keyword": "minimum",
       "value": 1,
       "schema": "AiQuota",
       "field": "dailyTokenLimit"
     },
     {
-      "line": 5956,
+      "line": 6003,
       "keyword": "maximum",
       "value": 4294967295,
       "schema": "AiQuota",
       "field": "dailyTokenLimit"
     },
     {
-      "line": 5957,
+      "line": 6004,
       "keyword": "nullable",
       "value": true,
       "schema": "AiQuota",
       "field": "dailyTokenLimit"
     },
     {
-      "line": 5962,
+      "line": 6009,
       "keyword": "format",
       "value": "date-time",
       "schema": "AiQuota",
       "field": "updatedAt"
     },
     {
-      "line": 5966,
+      "line": 6013,
       "keyword": "format",
       "value": "uuid",
       "schema": "AiQuota",
       "field": "updatedBy"
     },
     {
-      "line": 5967,
+      "line": 6014,
       "keyword": "nullable",
       "value": true,
       "schema": "AiQuota",
       "field": "updatedBy"
     },
     {
-      "line": 5973,
+      "line": 6020,
       "keyword": "additionalProperties",
       "value": false,
       "schema": "UpdateAiQuotaRequest",
       "field": ""
     },
     {
-      "line": 5983,
+      "line": 6030,
       "keyword": "minimum",
       "value": 1,
       "schema": "UpdateAiQuotaRequest",
       "field": "dailyQuestionLimit"
     },
     {
-      "line": 5984,
+      "line": 6031,
       "keyword": "maximum",
       "value": 4294967295,
       "schema": "UpdateAiQuotaRequest",
       "field": "dailyQuestionLimit"
     },
     {
-      "line": 5985,
+      "line": 6032,
       "keyword": "nullable",
       "value": true,
       "schema": "UpdateAiQuotaRequest",
       "field": "dailyQuestionLimit"
     },
     {
-      "line": 5989,
+      "line": 6036,
       "keyword": "minimum",
       "value": 1,
       "schema": "UpdateAiQuotaRequest",
       "field": "dailyTokenLimit"
     },
     {
-      "line": 5990,
+      "line": 6037,
       "keyword": "maximum",
       "value": 4294967295,
       "schema": "UpdateAiQuotaRequest",
       "field": "dailyTokenLimit"
     },
     {
-      "line": 5991,
+      "line": 6038,
       "keyword": "nullable",
       "value": true,
       "schema": "UpdateAiQuotaRequest",
       "field": "dailyTokenLimit"
     },
     {
-      "line": 6011,
+      "line": 6058,
       "keyword": "format",
       "value": "uuid",
       "schema": "AuditEventItem",
       "field": "eventId"
     },
     {
-      "line": 6015,
+      "line": 6062,
       "keyword": "pattern",
       "value": "^[0-9a-f]{32}$",
       "schema": "AuditEventItem",
       "field": "traceId"
     },
     {
-      "line": 6019,
+      "line": 6066,
       "keyword": "format",
       "value": "uuid",
       "schema": "AuditEventItem",
       "field": "userId"
     },
     {
-      "line": 6024,
+      "line": 6071,
       "keyword": "pattern",
       "value": "^[A-Z][A-Z0-9_]{0,63}$",
       "schema": "AuditEventItem",
       "field": "eventType"
     },
     {
-      "line": 6028,
+      "line": 6075,
       "keyword": "maxLength",
       "value": 64,
       "schema": "AuditEventItem",
       "field": "agentName"
     },
     {
-      "line": 6029,
+      "line": 6076,
       "keyword": "nullable",
       "value": true,
       "schema": "AuditEventItem",
       "field": "agentName"
     },
     {
-      "line": 6033,
+      "line": 6080,
       "keyword": "enum",
       "value": "",
       "schema": "AuditEventItem",
       "field": "source"
     },
     {
-      "line": 6039,
+      "line": 6086,
       "keyword": "enum",
       "value": "",
       "schema": "AuditEventItem",
       "field": "severity"
     },
     {
-      "line": 6046,
+      "line": 6093,
       "keyword": "additionalProperties",
       "value": true,
       "schema": "AuditEventItem",
       "field": "payload"
     },
     {
-      "line": 6054,
+      "line": 6101,
       "keyword": "format",
       "value": "date-time",
       "schema": "AuditEventItem",
       "field": "occurredAt"
     },
     {
-      "line": 6072,
+      "line": 6119,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTotals",
       "field": "questions"
     },
     {
-      "line": 6077,
+      "line": 6124,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTotals",
       "field": "success"
     },
     {
-      "line": 6081,
+      "line": 6128,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTotals",
       "field": "budgetExhausted"
     },
     {
-      "line": 6086,
+      "line": 6133,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTotals",
       "field": "failed"
     },
     {
-      "line": 6091,
+      "line": 6138,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTotals",
       "field": "tokens"
     },
     {
-      "line": 6096,
+      "line": 6143,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTotals",
       "field": "toolCalls"
     },
     {
-      "line": 6101,
+      "line": 6148,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTotals",
       "field": "rounds"
     },
     {
-      "line": 6106,
+      "line": 6153,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTotals",
       "field": "cacheHits"
     },
     {
-      "line": 6110,
+      "line": 6157,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTotals",
       "field": "avgLatencyMs"
     },
     {
-      "line": 6111,
+      "line": 6158,
       "keyword": "nullable",
       "value": true,
       "schema": "UsageTotals",
       "field": "avgLatencyMs"
     },
     {
-      "line": 6125,
+      "line": 6172,
       "keyword": "pattern",
       "value": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
       "schema": "UsageDayPoint",
       "field": "date"
     },
     {
-      "line": 6130,
+      "line": 6177,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageDayPoint",
       "field": "questions"
     },
     {
-      "line": 6134,
+      "line": 6181,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageDayPoint",
       "field": "tokens"
     },
     {
-      "line": 6138,
+      "line": 6185,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageDayPoint",
       "field": "failed"
     },
     {
-      "line": 6149,
+      "line": 6196,
       "keyword": "enum",
       "value": "",
       "schema": "UsageStatusCount",
       "field": "status"
     },
     {
-      "line": 6157,
+      "line": 6204,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageStatusCount",
       "field": "count"
     },
     {
-      "line": 6169,
+      "line": 6216,
       "keyword": "format",
       "value": "uuid",
       "schema": "UsageTopUser",
       "field": "userId"
     },
     {
-      "line": 6173,
+      "line": 6220,
       "keyword": "maxLength",
       "value": 100,
       "schema": "UsageTopUser",
       "field": "username"
     },
     {
-      "line": 6174,
+      "line": 6221,
       "keyword": "nullable",
       "value": true,
       "schema": "UsageTopUser",
       "field": "username"
     },
     {
-      "line": 6178,
+      "line": 6225,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTopUser",
       "field": "questions"
     },
     {
-      "line": 6182,
+      "line": 6229,
       "keyword": "minimum",
       "value": 0,
       "schema": "UsageTopUser",
       "field": "tokens"
     },
     {
-      "line": 6199,
+      "line": 6246,
       "keyword": "format",
       "value": "date-time",
       "schema": "UsageSummary",
       "field": "from"
     },
     {
-      "line": 6203,
+      "line": 6250,
       "keyword": "format",
       "value": "date-time",
       "schema": "UsageSummary",
       "field": "to"
     },
     {
-      "line": 6207,
+      "line": 6254,
       "keyword": "enum",
       "value": "",
       "schema": "UsageSummary",
       "field": "bucket"
     },
     {
-      "line": 6214,
+      "line": 6261,
       "keyword": "maxItems",
       "value": 32,
       "schema": "UsageSummary",
       "field": "byDay"
     },
     {
-      "line": 6219,
+      "line": 6266,
       "keyword": "maxItems",
       "value": 4,
       "schema": "UsageSummary",
       "field": "byStatus"
     },
     {
-      "line": 6224,
+      "line": 6271,
       "keyword": "maxItems",
       "value": 50,
       "schema": "UsageSummary",
       "field": "topUsers"
     },
     {
-      "line": 6268,
-      "keyword": "maxItems",
-      "value": 200,
-      "schema": "AiQuotaListData",
-      "field": "items"
-    },
-    {
-      "line": 6273,
-      "keyword": "nullable",
-      "value": true,
-      "schema": "AiQuotaListData",
-      "field": "nextCursor"
-    },
-    {
-      "line": 6274,
-      "keyword": "maxLength",
-      "value": 200,
-      "schema": "AiQuotaListData",
-      "field": "nextCursor"
-    },
-    {
-      "line": 6279,
-      "keyword": "minimum",
-      "value": 1,
-      "schema": "AiQuotaListData",
-      "field": "limit"
-    },
-    {
-      "line": 6280,
-      "keyword": "maximum",
-      "value": 200,
-      "schema": "AiQuotaListData",
-      "field": "limit"
-    },
-    {
-      "line": 6303,
-      "keyword": "maxItems",
-      "value": 500,
-      "schema": "AuditEventListData",
-      "field": "items"
-    },
-    {
-      "line": 6308,
-      "keyword": "nullable",
-      "value": true,
-      "schema": "AuditEventListData",
-      "field": "nextCursor"
-    },
-    {
-      "line": 6309,
-      "keyword": "maxLength",
-      "value": 200,
-      "schema": "AuditEventListData",
-      "field": "nextCursor"
-    },
-    {
-      "line": 6314,
-      "keyword": "minimum",
-      "value": 1,
-      "schema": "AuditEventListData",
-      "field": "limit"
-    },
-    {
       "line": 6315,
+      "keyword": "maxItems",
+      "value": 200,
+      "schema": "AiQuotaListData",
+      "field": "items"
+    },
+    {
+      "line": 6320,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "AiQuotaListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 6321,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "AiQuotaListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 6326,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "AiQuotaListData",
+      "field": "limit"
+    },
+    {
+      "line": 6327,
+      "keyword": "maximum",
+      "value": 200,
+      "schema": "AiQuotaListData",
+      "field": "limit"
+    },
+    {
+      "line": 6350,
+      "keyword": "maxItems",
+      "value": 500,
+      "schema": "AuditEventListData",
+      "field": "items"
+    },
+    {
+      "line": 6355,
+      "keyword": "nullable",
+      "value": true,
+      "schema": "AuditEventListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 6356,
+      "keyword": "maxLength",
+      "value": 200,
+      "schema": "AuditEventListData",
+      "field": "nextCursor"
+    },
+    {
+      "line": 6361,
+      "keyword": "minimum",
+      "value": 1,
+      "schema": "AuditEventListData",
+      "field": "limit"
+    },
+    {
+      "line": 6362,
       "keyword": "maximum",
       "value": 500,
       "schema": "AuditEventListData",
       "field": "limit"
     },
     {
-      "line": 6353,
+      "line": 6384,
+      "keyword": "maxLength",
+      "value": 2048,
+      "schema": "ObservabilityData",
+      "field": "langfuseBaseUrl"
+    },
+    {
+      "line": 6422,
       "keyword": "format",
       "value": "uri",
       "schema": "ProblemDetail",
       "field": "type"
     },
     {
-      "line": 6358,
+      "line": 6427,
       "keyword": "minLength",
       "value": 1,
       "schema": "ProblemDetail",
       "field": "title"
     },
     {
-      "line": 6359,
+      "line": 6428,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ProblemDetail",
       "field": "title"
     },
     {
-      "line": 6363,
+      "line": 6432,
       "keyword": "minimum",
       "value": 400,
       "schema": "ProblemDetail",
       "field": "status"
     },
     {
-      "line": 6364,
+      "line": 6433,
       "keyword": "maximum",
       "value": 599,
       "schema": "ProblemDetail",
       "field": "status"
     },
     {
-      "line": 6369,
+      "line": 6438,
       "keyword": "minLength",
       "value": 1,
       "schema": "ProblemDetail",
       "field": "detail"
     },
     {
-      "line": 6370,
+      "line": 6439,
       "keyword": "maxLength",
       "value": 1000,
       "schema": "ProblemDetail",
       "field": "detail"
     },
     {
-      "line": 6379,
+      "line": 6448,
       "keyword": "pattern",
       "value": "^[A-Z]{2,4}-[A-Z_]+-[0-9]{3}$",
       "schema": "ProblemDetail",
       "field": "code"
     },
     {
-      "line": 6398,
+      "line": 6467,
       "keyword": "pattern",
       "value": "^[0-9a-f]{32}$",
       "schema": "ProblemDetail",
       "field": "traceId"
     },
     {
-      "line": 6402,
+      "line": 6471,
       "keyword": "maxItems",
       "value": 20,
       "schema": "ProblemDetail",
       "field": "errors"
     },
     {
-      "line": 6415,
+      "line": 6484,
       "keyword": "minLength",
       "value": 1,
       "schema": "FieldError",
       "field": "field"
     },
     {
-      "line": 6416,
+      "line": 6485,
       "keyword": "maxLength",
       "value": 200,
       "schema": "FieldError",
       "field": "field"
     },
     {
-      "line": 6420,
+      "line": 6489,
       "keyword": "minLength",
       "value": 1,
       "schema": "FieldError",
       "field": "message"
     },
     {
-      "line": 6421,
+      "line": 6490,
       "keyword": "maxLength",
       "value": 300,
       "schema": "FieldError",
       "field": "message"
     },
     {
-      "line": 6447,
+      "line": 6516,
       "keyword": "format",
       "value": "uuid",
       "schema": "ModelConnection",
       "field": "id"
     },
     {
-      "line": 6451,
+      "line": 6520,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ModelConnection",
       "field": "name"
     },
     {
-      "line": 6456,
+      "line": 6525,
       "keyword": "maxLength",
       "value": 32,
       "schema": "ModelConnection",
       "field": "presetId"
     },
     {
-      "line": 6457,
+      "line": 6526,
       "keyword": "nullable",
       "value": true,
       "schema": "ModelConnection",
       "field": "presetId"
     },
     {
-      "line": 6462,
+      "line": 6531,
       "keyword": "maxLength",
       "value": 512,
       "schema": "ModelConnection",
       "field": "baseUrl"
     },
     {
-      "line": 6467,
+      "line": 6536,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ModelConnection",
       "field": "model"
     },
     {
-      "line": 6481,
+      "line": 6550,
       "keyword": "enum",
       "value": "",
       "schema": "ModelConnection",
       "field": "probeStatus"
     },
     {
-      "line": 6488,
+      "line": 6557,
       "keyword": "format",
       "value": "date-time",
       "schema": "ModelConnection",
       "field": "lastProbedAt"
     },
     {
-      "line": 6489,
+      "line": 6558,
       "keyword": "nullable",
       "value": true,
       "schema": "ModelConnection",
       "field": "lastProbedAt"
     },
     {
-      "line": 6493,
+      "line": 6562,
       "keyword": "format",
       "value": "date-time",
       "schema": "ModelConnection",
       "field": "createdAt"
     },
     {
-      "line": 6497,
+      "line": 6566,
       "keyword": "format",
       "value": "date-time",
       "schema": "ModelConnection",
       "field": "updatedAt"
     },
     {
-      "line": 6501,
+      "line": 6570,
       "keyword": "format",
       "value": "uuid",
       "schema": "ModelConnection",
       "field": "updatedBy"
     },
     {
-      "line": 6502,
+      "line": 6571,
       "keyword": "nullable",
       "value": true,
       "schema": "ModelConnection",
       "field": "updatedBy"
     },
     {
-      "line": 6516,
+      "line": 6585,
       "keyword": "maxItems",
       "value": 20,
       "schema": "ModelConnectionListData",
       "field": "items"
     },
     {
-      "line": 6553,
+      "line": 6622,
       "keyword": "minLength",
       "value": 1,
       "schema": "CreateModelConnectionRequest",
       "field": "name"
     },
     {
-      "line": 6554,
+      "line": 6623,
       "keyword": "maxLength",
       "value": 64,
       "schema": "CreateModelConnectionRequest",
       "field": "name"
     },
     {
-      "line": 6558,
+      "line": 6627,
       "keyword": "maxLength",
       "value": 32,
       "schema": "CreateModelConnectionRequest",
       "field": "presetId"
     },
     {
-      "line": 6559,
+      "line": 6628,
       "keyword": "nullable",
       "value": true,
       "schema": "CreateModelConnectionRequest",
       "field": "presetId"
     },
     {
-      "line": 6560,
+      "line": 6629,
       "keyword": "pattern",
       "value": "^[a-z0-9][a-z0-9-]{0,31}$",
       "schema": "CreateModelConnectionRequest",
       "field": "presetId"
     },
     {
-      "line": 6564,
+      "line": 6633,
       "keyword": "minLength",
       "value": 1,
       "schema": "CreateModelConnectionRequest",
       "field": "baseUrl"
     },
     {
-      "line": 6565,
+      "line": 6634,
       "keyword": "maxLength",
       "value": 512,
       "schema": "CreateModelConnectionRequest",
       "field": "baseUrl"
     },
     {
-      "line": 6570,
+      "line": 6639,
       "keyword": "minLength",
       "value": 1,
       "schema": "CreateModelConnectionRequest",
       "field": "model"
     },
     {
-      "line": 6571,
+      "line": 6640,
       "keyword": "maxLength",
       "value": 64,
       "schema": "CreateModelConnectionRequest",
       "field": "model"
     },
     {
-      "line": 6575,
+      "line": 6644,
       "keyword": "nullable",
       "value": true,
       "schema": "CreateModelConnectionRequest",
       "field": "enabled"
     },
     {
-      "line": 6588,
+      "line": 6657,
       "keyword": "minLength",
       "value": 1,
       "schema": "AuthorizeModelConnectionRequest",
       "field": "secret"
     },
     {
-      "line": 6589,
+      "line": 6658,
       "keyword": "maxLength",
       "value": 512,
       "schema": "AuthorizeModelConnectionRequest",
       "field": "secret"
     },
     {
-      "line": 6609,
+      "line": 6678,
       "keyword": "enum",
       "value": "",
       "schema": "ModelProbeFailure",
       "field": ""
     },
     {
-      "line": 6634,
+      "line": 6703,
       "keyword": "maxItems",
       "value": 200,
       "schema": "ModelProbeData",
       "field": "models"
     },
     {
-      "line": 6637,
+      "line": 6706,
       "keyword": "maxLength",
       "value": 128,
       "schema": "ModelProbeData",
       "field": "models"
     },
     {
-      "line": 6640,
+      "line": 6709,
       "keyword": "nullable",
       "value": true,
       "schema": "ModelProbeData",
       "field": "failureReason"
     },
     {
-      "line": 6645,
+      "line": 6714,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ModelProbeData",
       "field": "detail"
     },
     {
-      "line": 6646,
+      "line": 6715,
       "keyword": "nullable",
       "value": true,
       "schema": "ModelProbeData",
       "field": "detail"
     },
     {
-      "line": 6663,
+      "line": 6732,
       "keyword": "enum",
       "value": "",
       "schema": "ModelPresetGroup",
       "field": ""
     },
     {
-      "line": 6692,
+      "line": 6761,
       "keyword": "maxLength",
       "value": 32,
       "schema": "ModelPreset",
       "field": "id"
     },
     {
-      "line": 6693,
+      "line": 6762,
       "keyword": "pattern",
       "value": "^[a-z0-9][a-z0-9-]{0,31}$",
       "schema": "ModelPreset",
       "field": "id"
     },
     {
-      "line": 6697,
+      "line": 6766,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ModelPreset",
       "field": "vendor"
     },
     {
-      "line": 6701,
+      "line": 6770,
       "keyword": "maxLength",
       "value": 2,
       "schema": "ModelPreset",
       "field": "mark"
     },
     {
-      "line": 6706,
+      "line": 6775,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ModelPreset",
       "field": "label"
     },
     {
-      "line": 6710,
+      "line": 6779,
       "keyword": "maxLength",
       "value": 64,
       "schema": "ModelPreset",
       "field": "model"
     },
     {
-      "line": 6715,
+      "line": 6784,
       "keyword": "maxItems",
       "value": 20,
       "schema": "ModelPreset",
       "field": "models"
     },
     {
-      "line": 6718,
+      "line": 6787,
       "keyword": "maxLength",
       "value": 128,
       "schema": "ModelPreset",
       "field": "models"
     },
     {
-      "line": 6722,
+      "line": 6791,
       "keyword": "maxLength",
       "value": 512,
       "schema": "ModelPreset",
       "field": "baseUrl"
     },
     {
-      "line": 6726,
+      "line": 6795,
       "keyword": "maxLength",
       "value": 512,
       "schema": "ModelPreset",
       "field": "keyUrl"
     },
     {
-      "line": 6731,
+      "line": 6800,
       "keyword": "maxLength",
       "value": 120,
       "schema": "ModelPreset",
       "field": "keyHint"
     },
     {
-      "line": 6737,
+      "line": 6806,
       "keyword": "maxLength",
       "value": 32,
       "schema": "ModelPreset",
       "field": "tag"
     },
     {
-      "line": 6738,
+      "line": 6807,
       "keyword": "nullable",
       "value": true,
       "schema": "ModelPreset",
       "field": "tag"
     },
     {
-      "line": 6742,
+      "line": 6811,
       "keyword": "maxLength",
       "value": 200,
       "schema": "ModelPreset",
       "field": "note"
     },
     {
-      "line": 6759,
+      "line": 6828,
       "keyword": "maxItems",
       "value": 50,
       "schema": "ModelPresetListData",
       "field": "items"
     },
     {
-      "line": 7363,
+      "line": 7432,
       "keyword": "minimum",
       "value": 1,
       "schema": "",
       "field": ""
     },
     {
-      "line": 7387,
+      "line": 7456,
       "keyword": "minimum",
       "value": 1,
       "schema": "",

@@ -124,6 +124,9 @@ docqa:
     # 管理动作只写这两个键的元数据 / 只读账本；主键 agent:kill-switch 仍由 KillSwitch 统一读写
     kill-switch-meta-key: agent:kill-switch:meta
     experiment-budget-key: agent:budget:session-tokens
+  observability:
+    # LangFuse UI 根地址，只下发给管理面拼追踪链接；留空 = 禁用（审计页 traceId 保持纯文本）。
+    langfuse-base-url: ${DOCQA_LANGFUSE_BASE_URL:}
   audit:
     enabled: ${DOCQA_AUDIT_ENABLED:true}
     namesrv: ${DOCQA_ROCKETMQ_NAMESRV:127.0.0.1:9876}

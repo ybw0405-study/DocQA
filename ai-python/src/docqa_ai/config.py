@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import re
 from typing import Annotated, Literal
 from urllib.parse import urlparse
@@ -260,6 +261,16 @@ class Settings(BaseSettings):
     otel_endpoint: str = ""
     otel_sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
 
+    # LangFuse v3 自托管追踪：默认关闭时不构造第二路导出，行为与改动前逐字节一致。
+    # 打开后在既有 OTLP processor 之后追加一个独立的 BatchSpanProcessor，同 spans 同 sampler。
+    langfuse_tracing_enabled: bool = False
+    langfuse_otlp_endpoint: str = "http://127.0.0.1:13000/api/public/otel/v1/traces"
+    # 与 compose 首启 bootstrap 的项目密钥对同一取值；SecretStr 保证不进日志与 redacted_summary。
+    langfuse_public_key: SecretStr = SecretStr("")
+    langfuse_secret_key: SecretStr = SecretStr("")
+    # 非回环 endpoint 需要显式放行（照 llm_allow_private 的口径）；生产保持 false。
+    langfuse_allow_private: bool = False
+
     # §4.2 的 9 项 Python 侧业务指标经独立端口的 /metrics 以 Prometheus 文本格式导出。
     # 默认关闭（生产默认 metrics_exposed=False 语义不变）：打开时 main() 才在
     # metrics_host:metrics_port（默认 loopback 9090）起一个只含 /metrics 的最小 app，
@@ -340,6 +351,22 @@ class Settings(BaseSettings):
         for host in self.web_fetch_allowed_hosts:
             if not _HOST_ENTRY.fullmatch(host):
                 raise ValueError("web_fetch_allowed_hosts entries must be bare hostnames")
+        # LangFuse 导出守卫：启用而无密钥会在运行期恒 401、追踪静默缺失，所以压回启动期。
+        if self.langfuse_tracing_enabled:
+            if not self.langfuse_public_key.get_secret_value() or not self.langfuse_secret_key.get_secret_value():
+                raise ValueError(
+                    "langfuse_public_key and langfuse_secret_key are required when langfuse_tracing_enabled=true"
+                )
+            parsed = urlparse(self.langfuse_otlp_endpoint)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                raise ValueError("langfuse_otlp_endpoint must be an absolute http/https URL")
+            host = parsed.hostname.lower()
+            try:
+                loopback = ipaddress.ip_address(host).is_loopback
+            except ValueError:
+                loopback = host == "localhost"
+            if not loopback and not self.langfuse_allow_private:
+                raise ValueError("non-loopback langfuse_otlp_endpoint requires langfuse_allow_private=true")
         return self
 
     @property
@@ -390,6 +417,9 @@ class Settings(BaseSettings):
             "fusion_rrf_k": self.fusion_rrf_k,
             "lexical_min_query_chars": self.lexical_min_query_chars,
             "otel_enabled": self.otel_enabled,
+            "langfuse_tracing_enabled": self.langfuse_tracing_enabled,
+            # 只暴露主机名：完整 endpoint 可能带路径/查询参数，密钥一律不进摘要。
+            "langfuse_otlp_host": urlparse(self.langfuse_otlp_endpoint).hostname or "",
             "pg_configured": bool(self.pg_dsn),
             "pg_table": self.pg_table,
             "checkpoint_enabled": self.checkpoint_enabled,
