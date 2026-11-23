@@ -61,7 +61,10 @@ def test_redacted_summary_still_holds_no_credentials_or_dsn() -> None:
     summary = settings.redacted_summary()
     assert summary["pg_configured"] is True
     assert "pg_dsn" not in summary
-    text = str(summary)
+    # langfuse_otlp_host 是 PR2 显式裁决暴露的部署面（只有主机名，无凭据无路径）；
+    # 其余键仍不得携带任何主机地址——DSN 主机泄漏的判据不因此放宽。
+    assert summary["langfuse_otlp_host"] == "127.0.0.1"
+    text = str({key: value for key, value in summary.items() if key != "langfuse_otlp_host"})
     assert "secret" not in text
     assert "127.0.0.1" not in text
 

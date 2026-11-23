@@ -210,3 +210,11 @@ export interface AuditEventListData {
   nextCursor: string | null;
   limit: number;
 }
+
+/**
+ * 可观测性入口（契约 2.8.0）。`langfuseBaseUrl` 为空串表示未部署 LangFuse：
+ * 审计页 traceId 保持纯文本；非空时运行时拼 `{base}/trace/{traceId}`，地址不烘焙进产物。
+ */
+export interface ObservabilityData {
+  langfuseBaseUrl: string;
+}

@@ -777,6 +777,7 @@ function clearStubState(): void {
   adminStubState.limitsKnown = true;
   adminStubState.quotaOverrides.clear();
   adminStubState.missingQuotaUsers.clear();
+  adminStubState.langfuseBaseUrl = '';
   usersStubState.roleOverrides.clear();
   usersStubState.statusOverrides.clear();
   modelConnectionsStubState.rows = [];
@@ -1248,6 +1249,8 @@ export const adminStubState = {
   limitsKnown: true,
   quotaOverrides: new Map<string, { dailyQuestionLimit: number | null; dailyTokenLimit: number | null; updatedAt: string }>(),
   missingQuotaUsers: new Set<string>(),
+  /** 可观测性入口：空串 = 未部署 LangFuse（默认形态），置值后审计页 traceId 渲染外链。 */
+  langfuseBaseUrl: '' as string,
 };
 
 export const KILL_SWITCH_WRITE_AT = '2026-11-03T10:04:11.508Z';
@@ -1619,6 +1622,10 @@ export const adminHandlers = [
         (eventType === null || item.eventType === eventType),
     );
     return pageRows(rows, params.get('cursor'), instance, 2, limit);
+  }),
+  mswHttp.get('/api/v1/admin/observability', ({ request }) => {
+    recordAdminOp('GET', request, null);
+    return HttpResponse.json(envelope({ langfuseBaseUrl: adminStubState.langfuseBaseUrl }));
   }),
   mswHttp.get('/api/v1/admin/ai/usage', ({ request }) => {
     recordAdminOp('GET', request, null);

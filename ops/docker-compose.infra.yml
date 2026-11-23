@@ -24,6 +24,36 @@
 
 name: docqa-infra
 
+# LangFuse web 与 worker 共用的存储/队列连接面；锚点避免两份 env 各自漂移。
+x-langfuse-shared-env: &langfuse-shared-env
+  DATABASE_URL: postgresql://docqa:${DOCQA_PG_PASSWORD}@postgres-vector:5432/langfuse
+  SALT: ${DOCQA_LANGFUSE_SALT}
+  ENCRYPTION_KEY: ${DOCQA_LANGFUSE_ENCRYPTION_KEY}
+  CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+  CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+  CLICKHOUSE_USER: default
+  CLICKHOUSE_PASSWORD: ${DOCQA_CLICKHOUSE_PASSWORD}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  REDIS_HOST: langfuse-redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${DOCQA_LANGFUSE_REDIS_PASSWORD}
+  REDIS_TLS_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${DOCQA_MINIO_ACCESS_KEY}
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${DOCQA_MINIO_SECRET_KEY}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:${DOCQA_MINIO_CONTAINER_PORT}
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${DOCQA_MINIO_ACCESS_KEY}
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${DOCQA_MINIO_SECRET_KEY}
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:${DOCQA_MINIO_CONTAINER_PORT}
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
+
 services:
   mysql:
     image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902  # 原 tag: mysql:8.4
@@ -127,9 +157,117 @@ services:
     volumes:
       - ./infra/broker.conf:/opt/rocketmq/conf/broker.conf:ro
 
+  # ---------------------------------------------------------------------------
+  # LangFuse v3 自托管追踪（可选面）：四个服务全部挂 profiles: ["langfuse"]，
+  # 默认 compose up 不启动（ClickHouse + worker 约 +2–3GB 内存），
+  # 只有 scripts/start-dev.ps1 -WithLangfuse 才加 --profile langfuse。
+  # 复用 postgres-vector（独立库 langfuse，start-dev 幂等建库）与 minio（bucket langfuse）。
+  # ---------------------------------------------------------------------------
+  langfuse-web:
+    image: langfuse/langfuse:3@sha256:314f4d79d6761299e4299dc646943f01bfabbc1daff286ab818245549aa5e9d6  # 原 tag: langfuse/langfuse:3
+    container_name: docqa-langfuse-web
+    profiles: ["langfuse"]
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      # minio 没有 healthcheck 定义；bucket 由 start-dev 的初始化步骤幂等补建。
+      minio:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${DOCQA_LANGFUSE_PORT}:3000"
+    environment:
+      <<: *langfuse-shared-env
+      NEXTAUTH_URL: http://127.0.0.1:${DOCQA_LANGFUSE_PORT}
+      NEXTAUTH_SECRET: ${DOCQA_LANGFUSE_NEXTAUTH_SECRET}
+      # 确定性 bootstrap：首启即建好组织/项目/用户与 API 密钥对，
+      # Python 数据面用同一对 pk/sk 导出，无需人工进界面抄密钥。
+      LANGFUSE_INIT_ORG_ID: docqa
+      LANGFUSE_INIT_ORG_NAME: DocQA
+      LANGFUSE_INIT_PROJECT_ID: docqa-ai
+      LANGFUSE_INIT_PROJECT_NAME: docqa-ai
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${DOCQA_LANGFUSE_INIT_PUBLIC_KEY}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${DOCQA_LANGFUSE_INIT_SECRET_KEY}
+      LANGFUSE_INIT_USER_EMAIL: admin@docqa.local
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: ${DOCQA_LANGFUSE_INIT_USER_PASSWORD}
+      TELEMETRY_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/public/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3@sha256:02c87eda9a9c6be5b3bf9a78041db86f06bad568d9dd434be3b3c1159f8d0579  # 原 tag: langfuse/langfuse-worker:3
+    container_name: docqa-langfuse-worker
+    profiles: ["langfuse"]
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      <<: *langfuse-shared-env
+      TELEMETRY_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3030/api/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:24.3@sha256:85b97f63dcfff47790d26bb5d5801637aaddb2b93e5e9aee27a686c2fb2b9916  # 原 tag: clickhouse/clickhouse-server:24.3
+    container_name: docqa-langfuse-clickhouse
+    profiles: ["langfuse"]
+    ports:
+      - "127.0.0.1:${DOCQA_CLICKHOUSE_HTTP_PORT}:8123"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${DOCQA_CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  langfuse-redis:
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499  # 原 tag: redis:7-alpine
+    container_name: docqa-langfuse-redis
+    profiles: ["langfuse"]
+    ports:
+      - "127.0.0.1:${DOCQA_LANGFUSE_REDIS_PORT}:6379"
+    # 队列专用实例：共享 redis 是 allkeys-lru，键被逐出会让 BullMQ 任务静默丢失，
+    # 因此这里必须 noeviction（写满时报错而不是丢任务），不复用共享实例。
+    command: redis-server --port 6379 --requirepass "${DOCQA_LANGFUSE_REDIS_PASSWORD}" --maxmemory 256mb --maxmemory-policy noeviction
+    volumes:
+      - langfuse-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -p 6379 -a \"${DOCQA_LANGFUSE_REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
 volumes:
   mysql-data:
   pg-data:
   redis-data:
   minio-data:
   rmq-namesrv-logs:
+  langfuse-clickhouse-data:
+  langfuse-redis-data:

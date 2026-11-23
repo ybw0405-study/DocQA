@@ -4,6 +4,7 @@ import type {
   AiQuotaListData,
   AuditEventListData,
   KillSwitchState,
+  ObservabilityData,
   UpdateAiControlsRequest,
   UpdateAiQuotaRequest,
   UsageBucket,
@@ -12,8 +13,9 @@ import type {
 import { get, put } from './http';
 
 /**
- * 管理面八个操作的唯一出口（契约 2.6.0 的 `Admin` tag）：S9 的六个平台级操作，
- * 加上 2.0.0 新增的两个租户级 Kill Switch 操作（`/admin/ai/controls/tenant`）。
+ * 管理面治理操作的唯一出口（契约 `Admin` tag）：S9 的六个平台级操作，
+ * 加上 2.0.0 新增的两个租户级 Kill Switch 操作（`/admin/ai/controls/tenant`），
+ * 以及 2.8.0 的可观测性入口只读（`/admin/observability`，部署配置而非治理动作）。
  *
  * **这里不构造任何请求头**：八个管理操作的参数集合里都没有名为 `IdempotencyKey` 的 parameter，
  * 三个 PUT 的请求体也都没有 `version` 字段（D-197）。共享拦截器仍会给非 GET 补一个随机幂等键头
@@ -119,4 +121,9 @@ export function getAiUsage(query: AiUsageQuery): Promise<UsageSummary> {
     bucket: query.bucket,
     topUsers: query.topUsers,
   });
+}
+
+/** 可观测性入口：`langfuseBaseUrl` 空串 = 未部署 LangFuse，调用方不得渲染追踪链接。 */
+export function getObservability(): Promise<ObservabilityData> {
+  return get<ObservabilityData>('/admin/observability');
 }

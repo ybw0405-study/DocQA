@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { listAuditEvents } from '../api/admin';
+import { getObservability, listAuditEvents } from '../api/admin';
 import type { AuditEventItem } from '../types/admin';
 import { AUDIT_EVENT_TYPE_PATTERN, AUDIT_TRACE_ID_PATTERN } from '../types/admin';
 import {
@@ -50,6 +50,9 @@ export interface AdminAuditState extends FailureFields {
   filterEventType: string | null;
   filterFrom: string | null;
   filterTo: string | null;
+
+  /** LangFuse 入口基地址；空串 = 未部署或读取失败，traceId 保持纯文本。 */
+  langfuseBaseUrl: string;
 }
 
 /** 空串与纯空格都归一成「不给这个条件」：契约的 pattern 对空串同样校验，发出去只会换来 400。 */
@@ -72,6 +75,8 @@ export const useAdminAuditStore = defineStore('adminAudit', {
     filterEventType: null,
     filterFrom: null,
     filterTo: null,
+
+    langfuseBaseUrl: '',
 
     detail: null,
     code: null,
@@ -100,6 +105,19 @@ export const useAdminAuditStore = defineStore('adminAudit', {
   actions: {
     clearFailure(): void {
       clearFailureFields(this);
+    },
+
+    /**
+     * 追踪链接是可选增强：读不到入口配置时 traceId 保持纯文本，不影响审计查询本身，
+     * 因此失败不走 failureFields（那会把「没有 LangFuse」呈现成审计页故障）。
+     */
+    async loadObservability(): Promise<void> {
+      try {
+        const data = await getObservability();
+        this.langfuseBaseUrl = data.langfuseBaseUrl;
+      } catch {
+        this.langfuseBaseUrl = '';
+      }
     },
 
     async loadFirst(): Promise<void> {

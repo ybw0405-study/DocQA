@@ -10,6 +10,7 @@ import {
   DEMO_TARGET_USER_ID,
   DEMO_TOKEN,
   DEMO_TRACE_ID,
+  adminStubState,
   auditEventItem,
   callLog,
   envelope,
@@ -47,7 +48,10 @@ function byLabel(view: ViewWrapper, label: string) {
 }
 
 function methods(): string[] {
-  return callLog.adminOps.map((entry) => entry.method);
+  // 挂载时还会读一次可观测性入口（部署配置）；这里只计审计查询本身的请求。
+  return callLog.adminOps
+    .filter((entry) => entry.path === '/api/v1/admin/audit/events')
+    .map((entry) => entry.method);
 }
 
 /** 展开行的载荷表：dt 是展示标签（未知键带原文键名与标注），dd 是转义后的值。 */
@@ -218,6 +222,30 @@ describe('AdminAuditView', () => {
     expect(sent[1]?.has('to')).toBe(false);
     // 「筛后为空」与「窗口内没有」是两种行动指引，不能合并成一句暂无数据。
     expect(view.text()).toContain(EMPTY_STATE_TEXT.auditFiltered);
+  });
+
+  it('renders the trace id as an external LangFuse link when a base url is configured', async () => {
+    adminStubState.langfuseBaseUrl = 'http://127.0.0.1:13000';
+    const view = await mountView();
+    await vi.waitFor(() => expect(useAdminAuditStore().langfuseBaseUrl).not.toBe(''));
+
+    const cell = view.findAll('tbody tr')[0]?.findAll('td')[4];
+    const link = cell?.find('a');
+    expect(link?.exists()).toBe(true);
+    // href 由服务端下发的基地址运行时拼接，产物里不烘焙任何绝对地址。
+    expect(link?.attributes('href')).toBe(`http://127.0.0.1:13000/trace/${DEMO_TRACE_ID}`);
+    expect(link?.attributes('target')).toBe('_blank');
+    expect(link?.attributes('rel')).toBe('noopener noreferrer');
+    expect(link?.text()).toBe(DEMO_TRACE_ID);
+  });
+
+  it('keeps the trace id plain text when LangFuse is not deployed', async () => {
+    const view = await mountView();
+    await vi.waitFor(() => expect(useAdminAuditStore().loaded).toBe(true));
+
+    const cell = view.findAll('tbody tr')[0]?.findAll('td')[4];
+    expect(cell?.find('a').exists()).toBe(false);
+    expect(cell?.text()).toBe(DEMO_TRACE_ID);
   });
 
   it('refuses a malformed trace id locally without spending a request', async () => {
