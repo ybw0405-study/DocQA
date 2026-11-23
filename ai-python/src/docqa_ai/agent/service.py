@@ -31,6 +31,7 @@ from docqa_ai.governance.budget import (
 )
 from docqa_ai.governance.experiment_budget import ExperimentBudgetStore
 from docqa_ai.governance.kill_switch import KillSwitch
+from docqa_ai.governance.memory import MemoryStore, close_memory_store, memory_command_fact
 from docqa_ai.governance.model_connection import PlannerResolver, ResolvedPlanner
 from docqa_ai.governance.tool_rate_limit import ToolRateLimiter
 from docqa_ai.logging_setup import log_event
@@ -72,6 +73,8 @@ LOGGER = logging.getLogger(__name__)
 
 _INSUFFICIENT_ANSWER = "未能根据已授权资料生成可靠回答，请补充资料或缩小问题范围。"
 _MAX_ANSWER = 8000
+_MEMORY_ACK = "已记住这条信息，后续问答会把它作为参考；它不会改变工具与引用规则。"
+_MEMORY_EMPTY = "记忆内容为空，未写入。请在「记住：」之后补充要记忆的事实。"
 
 
 @dataclass(frozen=True)
@@ -192,6 +195,7 @@ class AgentAskService:
         planner_resolver: PlannerResolver | None = None,
         checkpointer: BaseCheckpointSaver | None = None,
         redis: Redis | None = None,
+        memory: MemoryStore | None = None,
     ) -> None:
         self._settings = settings
         self._budget = budget
@@ -211,11 +215,17 @@ class AgentAskService:
         self._pg_provider = pg_provider
         self._checkpointer = checkpointer
         self._redis = redis
+        self._memory = memory
 
     @property
     def pg_provider(self) -> PgConnectionProvider | None:
         """供 readiness 探针复用同一个连接池，不另开连接。"""
         return self._pg_provider
+
+    @property
+    def memory(self) -> MemoryStore | None:
+        """供内部管理端点复用同一个 store；关闭时为 None，端点据此拒绝服务。"""
+        return self._memory
 
     async def publish_experiment_limits(self) -> None:
         """启动时把实验额度上限发布到账本，供管理面回显（S9-5e）。
@@ -255,6 +265,8 @@ class AgentAskService:
             await self._pg_provider.aclose()
         if self._checkpointer is not None:
             await close_checkpointer(self._checkpointer)
+        if self._memory is not None:
+            await close_memory_store(self._memory)
 
     async def ask(self, request: AgentAskRequest, *, deadline: Deadline | None = None) -> AgentAskResponse:
         started = time.monotonic()
@@ -316,6 +328,11 @@ class AgentAskService:
                 errorCode=AGT_UPSTREAM_003,
             )
             raise kill_switch_open(audit_events=collector.events(), trace_id=request.trace_id)
+        if self._memory is not None:
+            fact = memory_command_fact(question)
+            if fact is not None:
+                # 显式记忆指令：零外呼零检索，固定确认走同一 _build_response（既有审计键）。
+                return await self._remember(request, fact, collector, started)
         # 解析提前到预算之前：软降级路径也要报同一个模型身份，不能两条路径各说一套。
         resolved = await self._resolve_planner(request)
         try:
@@ -369,7 +386,25 @@ class AgentAskService:
                     model=resolved.model,
                 )
         retrieved = await self._retrieve(question, request, deadline, collector)
-        blocks = self._context_blocks(retrieved, request, history)
+        memory_notes: tuple[str, ...] = ()
+        if self._memory is not None:
+            try:
+                memory_notes = await self._memory.recall(
+                    request.tenant_id,
+                    request.user_id,
+                    limit=5,
+                    max_chars=self._settings.memory_max_chars,
+                )
+            except Exception as exc:
+                # 记忆读失败不静默降级：与检索失败同形，走既有 upstream_unavailable 映射。
+                collector.add(
+                    "AGENT_FAILED",
+                    "agent_service",
+                    severity="ERROR",
+                    errorCode=AGT_UPSTREAM_001,
+                )
+                raise upstream_unavailable(audit_events=collector.events(), trace_id=request.trace_id) from exc
+        blocks = self._context_blocks(retrieved, request, history, memory_notes)
         allowed_tools = tuple(request.deduplicated_tools())
         # D-124 三层交集的第三层：注册表里只放「启动允许表 ∩ 实际发现」，
         # 第二层（请求 allowedTools）由 graph 的同一处校验兜住。发现失败只让工具消失，不阻断问答。
@@ -391,6 +426,7 @@ class AgentAskService:
             max_output_tokens=self._max_output_tokens(budget_snapshot),
             model=resolved.model,
             tool_specs=tools.specs(allowed_tools),
+            memory_notes=memory_notes,
         )
         return _Prepared(
             history_truncated=history_truncated,
@@ -398,6 +434,66 @@ class AgentAskService:
             plan_context=plan_context,
             tools=tools,
             resolved=resolved,
+        )
+
+    async def _remember(
+        self,
+        request: AgentAskRequest,
+        fact: str,
+        collector: AuditCollector,
+        started: float,
+    ) -> AgentAskResponse:
+        """显式记忆指令的落库与固定确认：零外呼、零检索、零新审计键。
+
+        事实再按 v2 掩码复检：v1 客户端只承诺遮三类，银行卡这类残留在这里拒写（硬拦），
+        绝不把未脱敏文本写进长期存储。确认响应复用 _build_response，形态与软降级一致。
+        """
+
+        assert self._memory is not None
+        check = mask_text(fact)
+        if check.count:
+            self._audit_pii_block(collector, check.categories, check.count)
+            raise pii_blocked(audit_events=collector.events(), trace_id=request.trace_id)
+        text = check.masked.strip()
+        try:
+            budget_snapshot = await self._budget.snapshot(request.trace_id)
+        except BudgetError as exc:
+            # 与 _prepare 同一语义：预算 hash 读不到 ⇒ BUDGET_STATE_MISSING 503，不静默放行。
+            collector.add(
+                "BUDGET_STATE_MISSING",
+                "agent_service",
+                severity="ERROR",
+                errorCode=AGT_UPSTREAM_001,
+            )
+            raise upstream_unavailable(audit_events=collector.events(), trace_id=request.trace_id) from exc
+        if text:
+            try:
+                await self._memory.remember(request.tenant_id, request.user_id, text)
+            except Exception as exc:
+                collector.add(
+                    "AGENT_FAILED",
+                    "agent_service",
+                    severity="ERROR",
+                    errorCode=AGT_UPSTREAM_001,
+                )
+                raise upstream_unavailable(audit_events=collector.events(), trace_id=request.trace_id) from exc
+        return self._build_response(
+            request,
+            GraphResult(
+                answer=_MEMORY_ACK if text else _MEMORY_EMPTY,
+                citation_indexes=(),
+                token_in=0,
+                token_out=0,
+                budget_exhausted=False,
+                tool_executions=(),
+            ),
+            budget_snapshot,
+            (),
+            False,
+            collector,
+            started,
+            # 本路径没有解析界面连接也没有外呼：审计报启动期 planner 的身份，不虚构模型。
+            model=getattr(self._planner, "model", self._settings.llm_model),
         )
 
     async def _resolve_planner(self, request: AgentAskRequest) -> ResolvedPlanner:
@@ -744,6 +840,7 @@ class AgentAskService:
         retrieved: RetrievalResult,
         request: AgentAskRequest,
         history: tuple[tuple[str, str], ...],
+        memory_notes: tuple[str, ...] = (),
     ) -> tuple[ContextBlock, ...]:
         scopes = {scope.document_id for scope in request.document_scopes}
         blocks = [
@@ -759,8 +856,9 @@ class AgentAskService:
         ]
         question_size = len(mask_text(request.pii_masked_question).masked)
         history_size = sum(len(content) for _, content in history)
+        memory_size = sum(len(note) for note in memory_notes)
         while blocks:
-            size = question_size + history_size + sum(len(block.content) for block in blocks)
+            size = question_size + history_size + memory_size + sum(len(block.content) for block in blocks)
             if size <= self._settings.max_prompt_chars:
                 break
             blocks.pop()

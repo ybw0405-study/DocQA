@@ -211,6 +211,12 @@ class Settings(BaseSettings):
     checkpoint_enabled: bool = False
     checkpoint_dsn: str = ""
 
+    # 长期记忆（显式「记住：…」指令 + 管理页）。默认关闭：不构造 store、不写任何记忆表，
+    # 问答路径与改动前逐字节一致。memory_dsn 为空时回退 pg_dsn（同库 public schema）。
+    memory_enabled: bool = False
+    memory_dsn: str = ""
+    memory_max_chars: int = Field(default=800, ge=100, le=4000)
+
     mq_enabled: bool = False
     rocketmq_namesrv: str = Field(
         default="127.0.0.1:9876",
@@ -335,6 +341,8 @@ class Settings(BaseSettings):
             )
         if self.checkpoint_enabled and not (self.checkpoint_dsn or self.pg_dsn):
             raise ValueError("checkpoint_dsn or pg_dsn is required when checkpoint_enabled=true")
+        if self.memory_enabled and not (self.memory_dsn or self.pg_dsn):
+            raise ValueError("memory_dsn or pg_dsn is required when memory_enabled=true")
         if self.minio_secure is None:
             self.minio_secure = self.minio_endpoint.lower().startswith("https://")
         if self.mq_enabled and not self.rocketmq_namesrv:
@@ -424,5 +432,7 @@ class Settings(BaseSettings):
             "pg_table": self.pg_table,
             "checkpoint_enabled": self.checkpoint_enabled,
             "checkpoint_dsn_configured": bool(self.checkpoint_dsn),
+            "memory_enabled": self.memory_enabled,
+            "memory_dsn_configured": bool(self.memory_dsn),
             "internal_token_configured": bool(self.internal_token.get_secret_value()),
         }

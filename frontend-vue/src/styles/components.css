@@ -296,14 +296,15 @@ form > button[type='submit']:disabled {
   accent-color: var(--color-primary);
 }
 
-/* 表格：六个数据表共用一套骨架 ---------------------------------------- */
+/* 表格：七个数据表共用一套骨架 ---------------------------------------- */
 
 .document-table,
 .schedule-table,
 .quota-table,
 .audit-table,
 .usage-table,
-.users-table {
+.users-table,
+.memory-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: var(--space-5);
@@ -321,7 +322,9 @@ form > button[type='submit']:disabled {
 .usage-table th,
 .usage-table td,
 .users-table th,
-.users-table td {
+.users-table td,
+.memory-table th,
+.memory-table td {
   text-align: left;
   padding: var(--space-3);
   border-bottom: var(--border-width) solid var(--color-border);
@@ -334,7 +337,8 @@ form > button[type='submit']:disabled {
 .quota-table th,
 .audit-table th,
 .usage-table th,
-.users-table th {
+.users-table th,
+.memory-table th {
   padding-bottom: var(--space-2);
   border-bottom-color: var(--color-border-strong);
   color: var(--color-text-faint);
@@ -350,7 +354,8 @@ form > button[type='submit']:disabled {
 .quota-table tbody tr:hover td,
 .audit-table tbody tr:hover td,
 .usage-table tbody tr:hover td,
-.users-table tbody tr:hover td {
+.users-table tbody tr:hover td,
+.memory-table tbody tr:hover td {
   background: var(--color-surface-raised);
 }
 
@@ -360,7 +365,8 @@ form > button[type='submit']:disabled {
 .quota-table caption,
 .audit-table caption,
 .usage-table caption,
-.users-table caption {
+.users-table caption,
+.memory-table caption {
   text-align: left;
   color: var(--color-text-faint);
   font-size: var(--text-xs);
@@ -2331,5 +2337,10 @@ form > button[type='submit']:hover:not(:disabled),
   /* 用户表六列里有一个定长标识与两个时刻，压到 820 以下只剩断字符。 */
   .users-table {
     min-width: 820px;
+  }
+
+  /* 记忆表三列里事实文本不定长，压到 640 以下时间列会被挤成断字符。 */
+  .memory-table {
+    min-width: 640px;
   }
 }

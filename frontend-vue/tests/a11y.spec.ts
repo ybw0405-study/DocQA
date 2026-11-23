@@ -21,6 +21,7 @@ const STATUS_OWNERS = [
   'src/views/LoginView.vue',
   'src/views/RemindersView.vue',
   'src/views/admin/AdminControlsView.vue',
+  'src/views/admin/AdminMemoriesView.vue',
   'src/views/admin/AdminModelConnectionsView.vue',
   'src/views/admin/AdminQuotasView.vue',
   'src/views/admin/AdminTenantControlsView.vue',
@@ -126,7 +127,7 @@ describe('响应式三档断点（D-192）', () => {
     expect([...cssTexts.values()].join('')).not.toContain('--breakpoint');
   });
 
-  it('scrolls the seven wide tables instead of restacking their rows', () => {
+  it('scrolls the eight wide tables instead of restacking their rows', () => {
     // 窄屏把 td 竖排成卡片会丢掉 table/row/cell 角色，D-192 不能用 D-193 换。
     const text = read('src/styles/components.css');
 
@@ -135,6 +136,7 @@ describe('响应式三档断点（D-192）', () => {
       'src/components/ScheduleImportPanel.vue',
       'src/views/DocumentsView.vue',
       'src/views/admin/AdminAuditView.vue',
+      'src/views/admin/AdminMemoriesView.vue',
       'src/views/admin/AdminModelConnectionsView.vue',
       'src/views/admin/AdminQuotasView.vue',
       'src/views/admin/AdminUsageView.vue',
@@ -171,11 +173,12 @@ describe('可见焦点与键盘可达（D-193）', () => {
 describe('表格结构与标题（D-193）', () => {
   const tableFiles = [...productionTexts.entries()].filter(([, text]) => text.includes('<table'));
 
-  it('finds exactly the seven data tables', () => {
+  it('finds exactly the eight data tables', () => {
     expect(tableFiles.map(([file]) => file).sort()).toEqual([
       'src/components/ScheduleImportPanel.vue',
       'src/views/DocumentsView.vue',
       'src/views/admin/AdminAuditView.vue',
+      'src/views/admin/AdminMemoriesView.vue',
       'src/views/admin/AdminModelConnectionsView.vue',
       'src/views/admin/AdminQuotasView.vue',
       'src/views/admin/AdminUsageView.vue',
