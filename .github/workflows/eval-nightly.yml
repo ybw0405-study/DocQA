@@ -1,0 +1,84 @@
+name: eval-nightly
+
+#  nightly 真模型质量门禁：真实 embedding/rerank 检索 eval + 自建 LLM judge
+# 逐回答 faithfulness 评分（均值 >= 0.8 才通过），JSON 报告上传 artifact 供审计。
+# 离线确定性基线由 ci.yml python job 的 eval 步骤负责，本 workflow 只在有真实
+# 密钥时运行；workflow_dispatch 供首跑手动冒烟。刻意不引 RAGAS（见 ai-python/README.md）。
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nightly-eval:
+    name: 真模型检索 eval + faithfulness 门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ai-python
+    env:
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      DOCQA_EVAL_EMBEDDING: openai
+      # DOCQA_EMBEDDING_* secret 可选覆盖；缺省回退 DashScope 公共端点与同一把 key。
+      DOCQA_EMBEDDING_BASE_URL: ${{ secrets.DOCQA_EMBEDDING_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1' }}
+      DOCQA_EMBEDDING_API_KEY: ${{ secrets.DOCQA_EMBEDDING_API_KEY || secrets.DASHSCOPE_API_KEY }}
+      DOCQA_EMBEDDING_MODEL: ${{ secrets.DOCQA_EMBEDDING_MODEL || 'text-embedding-v3' }}
+      DOCQA_EVAL_RERANK: openai
+      DOCQA_RERANK_BASE_URL: https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank
+      DOCQA_RERANK_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      DOCQA_RERANK_MODEL: gte-rerank-v2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version  # 单一来源
+          cache: pip
+          cache-dependency-path: ai-python/requirements.lock.txt
+      - name: Install (locked + verified hashes)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r requirements.lock.txt
+          pip install --no-deps -e .
+      - name: 密钥预检（缺失即失败，不静默跳过）
+        run: |
+          if [ -z "$DASHSCOPE_API_KEY" ]; then
+            echo "eval-nightly 需要 DASHSCOPE_API_KEY secret" >&2
+            exit 1
+          fi
+      - name: 真模型检索 eval
+        run: python -m docqa_ai.eval --suite retrieval --json > retrieval-report.json
+      - name: 检索质量门禁（语义模型必须显著优于离线哈希）
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+
+          with open("retrieval-report.json", encoding="utf-8") as handle:
+              payload = json.load(handle)["retrieval"]
+          recall1 = payload["recall_at_k"]["1"]
+          mrr = payload["mrr"]
+          print(f"real-provider retrieval: R@1={recall1} MRR={mrr}")
+          if recall1 < 0.95 or mrr < 0.95:
+              print("检索质量门禁失败：真实语义模型 R@1/MRR 应 >= 0.95。", file=sys.stderr)
+              sys.exit(1)
+          PY
+      - name: LLM judge faithfulness 门禁（mean >= 0.8）
+        run: python -m docqa_ai.eval.judge --json > judge-report.json
+      - name: Upload eval reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eval-nightly-reports
+          path: |
+            ai-python/retrieval-report.json
+            ai-python/judge-report.json
+          retention-days: 30

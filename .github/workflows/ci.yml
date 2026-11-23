@@ -160,6 +160,9 @@ jobs:
               sys.exit(1)
           print("PG contract gate OK: 3/3 passed on real pgvector PostgreSQL.")
           PY
+      - name: Eval baseline gate (offline, no secrets)
+        # 检索指标下限 + agent 治理用例，全部离线确定性；基线在 eval/baselines/*.json。
+        run: python -m docqa_ai.eval --suite all --check-baseline
 
   frontend:
     name: Node / typecheck + lint + test + build

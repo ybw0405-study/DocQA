@@ -1,0 +1,14 @@
+{
+  "case_count": 8,
+  "pass_rate": 1.0,
+  "cases": [
+    "citations_scope_and_cap",
+    "happy_path_audit",
+    "budget_exhausted",
+    "pii_blocked",
+    "round_fallback",
+    "loop_fallback",
+    "tool_then_final_audit",
+    "kill_switch"
+  ]
+}

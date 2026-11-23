@@ -6,17 +6,25 @@
 真实 provider：设置 DOCQA_EVAL_EMBEDDING=openai 并注入
 DOCQA_EMBEDDING_BASE_URL / DOCQA_EMBEDDING_API_KEY / DOCQA_EMBEDDING_MODEL 后，
 用生产语义模型跑真实质量数字。rerank 同理（DOCQA_EVAL_RERANK）。
+
+套件与基线：
+    python -m docqa_ai.eval --suite retrieval|agent|all
+    python -m docqa_ai.eval --suite all --check-baseline   # 对照 baselines/*.json 门禁
+    python -m docqa_ai.eval --suite all --update-baseline  # 有意变更后重录基线
 """
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import logging
 import os
 import sys
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from docqa_ai.eval.corpus import CorpusDocument, load_corpus
@@ -88,8 +96,13 @@ async def _index_document(
     repository: InMemoryVectorRepository,
     *,
     version: str,
+    tenant_id: str = "",
 ) -> _IndexedDoc:
-    """把单个文档的块写入内存向量仓库，返回文档级定位信息。"""
+    """把单个文档的块写入内存向量仓库，返回文档级定位信息。
+
+    tenant_id 供 agent 套件使用：内存仓库与真实 SQL 一样执行租户谓词，
+    不带租户标注的行会被带 tenant_id 的检索拒绝。检索评测不传，保持原语义。
+    """
     document_id = uuid.uuid5(uuid.NAMESPACE_URL, f"docqa-eval:{doc.document_id}")
     texts = [content for _, content in doc.chunks]
     vectors = await embedder.embed(texts, timeout_s=30.0)
@@ -105,6 +118,7 @@ async def _index_document(
                 content=content,
                 embedding=tuple(vector),
                 metadata={"index_version": version},
+                tenant_id=tenant_id,
             )
         )
     return _IndexedDoc(
@@ -127,6 +141,23 @@ async def _run_query(
     return compute_metrics(query_id, question, returned, relevant_refs, ks=_KS)
 
 
+async def index_corpus(
+    embedder: Any,
+    repository: InMemoryVectorRepository,
+    corpus: Sequence[CorpusDocument],
+    *,
+    version: str = _DEFAULT_VERSION,
+    tenant_id: str = "",
+) -> dict[str, _IndexedDoc]:
+    """把整套语料写入内存向量仓库；检索与 agent 两个套件共用同一建索引路径。"""
+    indexed: dict[str, _IndexedDoc] = {}
+    for doc in corpus:
+        indexed[doc.document_id] = await _index_document(
+            doc, embedder, repository, version=version, tenant_id=tenant_id
+        )
+    return indexed
+
+
 async def run_eval() -> dict[str, Any]:
     """执行完整评测，返回可序列化的汇总 dict。"""
     embedder = _build_embedder()
@@ -135,10 +166,7 @@ async def run_eval() -> dict[str, Any]:
 
     # 所有文档写入同一个 InMemoryVectorRepository，靠 DocumentScope 隔离（与真实语义一致）
     repository = InMemoryVectorRepository()
-    indexed: dict[str, _IndexedDoc] = {}
-    for doc in corpus:
-        idx = await _index_document(doc, embedder, repository, version=_DEFAULT_VERSION)
-        indexed[doc.document_id] = idx
+    indexed = await index_corpus(embedder, repository, corpus)
 
     # lexical 通道在真实部署里依赖 PG；离线评测聚焦向量+rerank 链路质量，
     # 关闭词法通道以隔离评测目标（向量召回 + 重排排序）。
@@ -203,14 +231,130 @@ def _render_table(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def main() -> int:
-    as_json = "--json" in sys.argv
-    payload = asyncio.run(run_eval())
-    if as_json:
+_BASELINE_DIR = Path(__file__).resolve().parent / "baselines"
+# 基线数字与 run_eval 同口径 round(4)；比较留 1e-9 容差吸收浮点求和顺序差。
+_BASELINE_EPSILON = 1e-9
+
+
+def _retrieval_floors(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "query_count": payload["query_count"],
+        "recall_at_k": payload["recall_at_k"],
+        "mrr": payload["mrr"],
+        "ndcg_at_k": payload["ndcg_at_k"],
+    }
+
+
+def _agent_floors(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "case_count": payload["case_count"],
+        "pass_rate": payload["pass_rate"],
+        "cases": [case["case_id"] for case in payload["cases"]],
+    }
+
+
+def update_baseline(suite: str, payload: dict[str, Any], *, baseline_dir: Path | None = None) -> Path:
+    """把当前运行录为基线。只存门禁需要的字段，不存逐查询明细（基线要可人工审阅）。"""
+    floors = _retrieval_floors(payload) if suite == "retrieval" else _agent_floors(payload)
+    path = (baseline_dir or _BASELINE_DIR) / f"{suite}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(floors, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def baseline_violations(suite: str, payload: dict[str, Any], *, baseline_dir: Path | None = None) -> list[str]:
+    """对照提交基线找回归：检索指标只许升不许降；agent 用例集必须一致且全过。"""
+    path = (baseline_dir or _BASELINE_DIR) / f"{suite}.json"
+    baseline = json.loads(path.read_text(encoding="utf-8"))
+    violations: list[str] = []
+    if suite == "retrieval":
+        if payload["query_count"] != baseline["query_count"]:
+            violations.append(f"query_count 漂移: 基线 {baseline['query_count']}，当前 {payload['query_count']}")
+        for metric in ("recall_at_k", "ndcg_at_k"):
+            for k, floor in baseline[metric].items():
+                current = payload[metric].get(k, 0.0)
+                if current < floor - _BASELINE_EPSILON:
+                    violations.append(f"{metric}@{k} 回归: 基线 {floor}，当前 {current}")
+        if payload["mrr"] < baseline["mrr"] - _BASELINE_EPSILON:
+            violations.append(f"mrr 回归: 基线 {baseline['mrr']}，当前 {payload['mrr']}")
+        return violations
+    if [case["case_id"] for case in payload["cases"]] != baseline["cases"]:
+        violations.append("agent 用例集与基线不一致（增删用例必须同步重录基线）")
+    if payload["pass_rate"] < baseline["pass_rate"] - _BASELINE_EPSILON:
+        violations.append(f"agent pass_rate 回归: 基线 {baseline['pass_rate']}，当前 {payload['pass_rate']}")
+    violations.extend(
+        f"agent 用例失败: {case['case_id']} ({case.get('detail', '')})"
+        for case in payload["cases"]
+        if not case["passed"]
+    )
+    return violations
+
+
+def _render_agent(payload: dict[str, Any]) -> str:
+    lines: list[str] = []
+    lines.append("=" * 72)
+    lines.append("DocQA agent 级确定性回归报告")
+    lines.append("=" * 72)
+    lines.append(f"用例数: {payload['case_count']}   通过率: {payload['pass_rate']:.3f}")
+    lines.append("-" * 72)
+    for case in payload["cases"]:
+        mark = "✓" if case["passed"] else "✗"
+        detail = case.get("detail", "")
+        lines.append(f"  {mark}  {case['case_id']:<28} {detail}")
+    lines.append("=" * 72)
+    return "\n".join(lines)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    # Windows 默认 GBK 控制台编不了报告里的 ✓/✗：替换降级，不能让门禁崩在打印上。
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+    parser = argparse.ArgumentParser(prog="docqa_ai.eval", description="DocQA 离线评测与基线门禁")
+    parser.add_argument("--suite", choices=("retrieval", "agent", "all"), default="retrieval")
+    parser.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读 JSON")
+    parser.add_argument("--check-baseline", action="store_true", help="对照 baselines/*.json，回归即非零退出")
+    parser.add_argument("--update-baseline", action="store_true", help="把本次运行重录为基线（有意变更时使用）")
+    args = parser.parse_args(argv)
+    if args.check_baseline and args.update_baseline:
+        parser.error("--check-baseline 与 --update-baseline 互斥")
+
+    suites = ("retrieval", "agent") if args.suite == "all" else (args.suite,)
+    payload: dict[str, Any] = {}
+    for suite in suites:
+        if suite == "retrieval":
+            payload["retrieval"] = asyncio.run(run_eval())
+        else:
+            # agent 套件依赖 fakeredis（dev/CI 锁内）；延迟导入让纯检索评测不背这个依赖。
+            from docqa_ai.eval.agent import run_agent_eval
+
+            payload["agent"] = asyncio.run(run_agent_eval())
+
+    if args.update_baseline:
+        for suite in suites:
+            path = update_baseline(suite, payload[suite])
+            print(f"基线已更新: {path}")
+        return 0
+
+    if args.as_json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
-        print(_render_table(payload))
-    return 0
+        if "retrieval" in payload:
+            print(_render_table(payload["retrieval"]))
+        if "agent" in payload:
+            print(_render_agent(payload["agent"]))
+
+    exit_code = 0
+    if "agent" in payload and payload["agent"]["pass_rate"] < 1.0:
+        exit_code = 1
+    if args.check_baseline:
+        for suite in suites:
+            violations = baseline_violations(suite, payload[suite])
+            for item in violations:
+                print(f"基线门禁失败 [{suite}]: {item}", file=sys.stderr)
+            if violations:
+                exit_code = 1
+    return exit_code
 
 
 if __name__ == "__main__":
