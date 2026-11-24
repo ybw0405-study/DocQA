@@ -602,3 +602,49 @@ describe('conversations store', () => {
     expect(conversations.pendingKey).toBeNull();
   });
 });
+
+describe('approval resume (human-in-the-loop)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    useAuthStore().token = DEMO_TOKEN;
+    stubFetch(() => notAStreamResponse());
+  });
+
+  it('records pendingApproval and resumes the same checkpoint with resumeApproved', async () => {
+    const conversations = useConversationsStore();
+    await openSession(conversations);
+    await conversations.loadPickerFirst();
+    conversations.toggleDocument(INDEXED_ID);
+    conversations.updateQuestion('请解释梯度下降。');
+    server.use(
+      mswHttp.post('/api/v1/conversations/:conversationId/ask', async ({ request }) => {
+        const first = callLog.askedBodies.length === 0;
+        callLog.askedBodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(
+          envelope(
+            first
+              ? {
+                  ...askData(),
+                  budgetStatus: 'PENDING_APPROVAL',
+                  pendingApproval: { tool: 'mcp__srv__drop', input: '{"id":1}' },
+                }
+              : askData(),
+          ),
+          { status: 201 },
+        );
+      }),
+    );
+    await conversations.submitQuestion();
+    expect(callLog.askedBodies).toHaveLength(1);
+    expect(conversations.pendingApproval).not.toBeNull();
+    expect(conversations.pendingApproval?.approval.tool).toBe('mcp__srv__drop');
+
+    await conversations.resumeApproval(true);
+    expect(callLog.askedBodies[1]).toEqual({
+      question: '请解释梯度下降。',
+      documentIds: [INDEXED_ID],
+      resumeApproved: true,
+    });
+    expect(conversations.pendingApproval).toBeNull();
+  });
+});

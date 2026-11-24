@@ -4646,6 +4646,11 @@ components:
           maxLength: 4000
           description: 用户问题；服务端会先做 PII 第一层脱敏再进入 Python。
           example: 请解释第三章的梯度下降，并举一个例子。
+        resumeApproved:
+          type: boolean
+          description: |
+            人在回路审批续跑：非 null 时本请求是对挂起 checkpoint 的批准（true）/拒绝（false）。
+            必须命中同问题指纹的可续跑 checkpoint，否则 503；省略时行为与旧版逐字节一致。
         documentIds:
           type: array
           minItems: 1
@@ -4687,12 +4692,27 @@ components:
           maxLength: 255
           description: 可选展示文件名；不属于跨语言协议必带字段。
 
+    PendingApproval:
+      type: object
+      additionalProperties: false
+      required:
+        - tool
+        - input
+      properties:
+        tool:
+          type: string
+          minLength: 1
+          maxLength: 200
+        input:
+          type: string
+          maxLength: 2000
     BudgetStatus:
       type: string
       enum:
         - OK
         - BUDGET_EXHAUSTED
         - LOW_CONFIDENCE
+        - PENDING_APPROVAL
       description: |
         OK：正常回答；BUDGET_EXHAUSTED：硬预算被触发；
         LOW_CONFIDENCE：证据不足。预算耗尽优先于低置信度。
@@ -4757,6 +4777,11 @@ components:
         createdAt:
           type: string
           format: date-time
+        pendingApproval:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/PendingApproval'
+          description: 非 null 时图挂在 interrupt：answer 为挂起提示，budgetStatus 为 PENDING_APPROVAL。
 
     AskEnvelope:
       allOf:

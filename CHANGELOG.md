@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### 新增：人在回路审批（LangGraph interrupt）
+
+- 高风险工具（`DOCQA_AI_HIGH_RISK_TOOLS`，精确名或前缀通配）执行前 `interrupt` 挂起，checkpoint 保留恢复态；
+  ask 请求新增可选 `resumeApproved` 批准/拒绝续跑（拒绝则工具不执行、观测留痕后继续规划）。
+- 响应新增 `pendingApproval` 与 `PENDING_APPROVAL` 预算态；网关透传并校验配对关系；
+  `agent_execution.budget_status` 值域经 V14 迁移扩展；挂起执行记 RUNNING、不写结果缓存。
+- 前端问答页审批卡片（批准并继续 / 拒绝）；契约 yaml 与类型镜像同步；4 条 interrupt 单元回归。
+- 开启审批强制 checkpoint_enabled=true（启动期 fail-fast）；默认关闭，行为与旧版逐字节一致。
+
 ### 修复：深度体检第一轮（2026-11-24）
 
 - **启动链收敛**：删除旧 WSL 链全部 9 个文件（compose / 启动 / 自启 / worker 脚本 / broker 模板）；解析与向量 worker 改由容器承载；`start-dev.ps1 -Containers` 与新增 `ops/docker-compose.app.yml`（含 `mq-init` topic 预建与 `grants-finalize` 建表后补授权）一条命令起全栈；getting-started 改写为单启动路径。

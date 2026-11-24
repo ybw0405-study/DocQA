@@ -445,6 +445,7 @@ const TYPES = {
 
 /** 前端声明镜像的对象 schema：契约名 ↔ TS 接口名。 */
 const MIRRORED_OBJECTS: { schema: string; file: string; iface: string }[] = [
+  { schema: 'PendingApproval', file: TYPES.conversations, iface: 'PendingApproval' },
   { schema: 'ApiEnvelope', file: TYPES.api, iface: 'ApiEnvelope' },
   { schema: 'FieldError', file: TYPES.api, iface: 'FieldError' },
   { schema: 'ProblemDetail', file: TYPES.api, iface: 'ProblemDetail' },
@@ -973,8 +974,8 @@ describe('契约 ↔ 前端类型对账', () => {
 
     expect(unaccounted, `契约新增/改名的 schema 未经裁决：${unaccounted.join(', ')}`).toEqual([]);
     expect(stale, `前端镜像表里的 schema 在契约中已不存在：${stale.join(', ')}`).toEqual([]);
-    // 契约 2.9.0 的 schema 计数（2.7.0 的 113 个 + 可观测性入口 2 个 + 长期记忆管理面 3 个）。契约一旦增删，这一条先红，逼着来做一次裁决。
-    expect(SCHEMA_NAMES).toHaveLength(118);
+    // 契约 schema 计数（2.9.0 的 118 个 + 人在回路 PendingApproval 1 个）。契约一旦增删，这一条先红，逼着来做一次裁决。
+    expect(SCHEMA_NAMES).toHaveLength(119);
   });
 
   it('mirrors every object schema field-for-field', () => {

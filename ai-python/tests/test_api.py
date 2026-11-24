@@ -149,6 +149,7 @@ async def test_success_response_uses_camel_case_contract() -> None:
         "roundsUsed",
         "auditEvents",
         "finishedAt",
+        "pendingApproval",
     }
     assert body["citations"][0]["documentId"] == str(DOCUMENT_ID)
     assert body["auditEvents"][0]["eventType"] == "AGENT_COMPLETED"

@@ -218,7 +218,7 @@ class AskServiceStreamTest {
     void replayEmitsImmediateStreamWithoutCallingPython() throws Exception {
         AskData original = new com.docqa.agentgateway.dto.AskData(
                 CONVERSATION_ID, MESSAGE_ID, "答案", List.of(), 0.9, "OK",
-                120, 1, 2, false, false, NOW);
+                120, 1, 2, false, false, NOW, null);
         when(idempotencyStore.find(USER_ID, CONVERSATION_ID, KEY))
                 .thenReturn(Optional.of(new IdempotencyRecord(
                         IdempotencyStatus.COMPLETED,
@@ -363,7 +363,7 @@ class AskServiceStreamTest {
 
     private SseEmitter askStream() {
         return service.askStream(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
     }
 
     private void stubFreshStream() {
@@ -378,7 +378,7 @@ class AskServiceStreamTest {
 
     private PythonAskResponse response() {
         return new PythonAskResponse(
-                "1.1", TRACE_ID, "答案", List.of(), 0.9, "OK", 120, 1, 2, List.of(), NOW);
+                "1.1", TRACE_ID, "答案", List.of(), 0.9, "OK", 120, 1, 2, List.of(), NOW, null);
     }
 
     private BudgetSnapshot budget() {

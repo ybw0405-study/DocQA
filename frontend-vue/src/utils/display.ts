@@ -38,6 +38,7 @@ export const BUDGET_LABELS: Readonly<Record<BudgetStatus, string>> = {
   OK: '正常回答',
   BUDGET_EXHAUSTED: '预算耗尽',
   LOW_CONFIDENCE: '证据不足',
+  PENDING_APPROVAL: '等待审批',
 };
 
 /**

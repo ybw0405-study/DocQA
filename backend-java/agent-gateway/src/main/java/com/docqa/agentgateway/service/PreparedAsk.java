@@ -27,7 +27,8 @@ public record PreparedAsk(
         boolean lockHeld,
         boolean stream,
         Optional<AskData> replay,
-        Optional<CachedAnswer> cached) {
+        Optional<CachedAnswer> cached,
+        Boolean resumeApproved) {
 
     public boolean isFresh() {
         return replay.isEmpty() && cached.isEmpty();

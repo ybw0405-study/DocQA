@@ -4,6 +4,7 @@ import com.docqa.agentgateway.config.AgentProperties;
 import com.docqa.agentgateway.dto.AuthorizedDocument;
 import com.docqa.agentgateway.dto.Citation;
 import com.docqa.agentgateway.dto.PythonAskResponse;
+import com.docqa.agentgateway.dto.PythonPendingApproval;
 import com.docqa.agentgateway.dto.PythonCitation;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
@@ -19,7 +20,8 @@ public class PythonResponseValidator {
     private static final String PROTOCOL_VERSION = "1.0";
     private static final int MAX_ANSWER_LENGTH = 8000;
     private static final int MAX_SNIPPET_LENGTH = 200;
-    private static final Set<String> BUDGET_STATUSES = Set.of("OK", "LOW_CONFIDENCE", "BUDGET_EXHAUSTED");
+    private static final Set<String> BUDGET_STATUSES =
+            Set.of("OK", "LOW_CONFIDENCE", "BUDGET_EXHAUSTED", "PENDING_APPROVAL");
 
     private final AgentProperties properties;
     private final AuditEventValidator auditEventValidator;
@@ -59,6 +61,17 @@ public class PythonResponseValidator {
         }
         if (response.budgetStatus() == null || !BUDGET_STATUSES.contains(response.budgetStatus())) {
             throw violation("budgetStatus is invalid");
+        }
+        boolean pending = "PENDING_APPROVAL".equals(response.budgetStatus());
+        if (pending != (response.pendingApproval() != null)) {
+            throw violation("pendingApproval must accompany PENDING_APPROVAL exactly");
+        }
+        if (pending) {
+            PythonPendingApproval pa = response.pendingApproval();
+            if (pa.tool() == null || pa.tool().isBlank() || pa.tool().length() > 200
+                    || pa.input() == null || pa.input().length() > 2000) {
+                throw violation("pendingApproval payload is invalid");
+            }
         }
         if (response.tokenUsed() < 0) {
             throw violation("tokenUsed is negative");
@@ -128,6 +141,9 @@ public class PythonResponseValidator {
     }
 
     private String effectiveBudgetStatus(PythonAskResponse response, List<Citation> citations) {
+        if ("PENDING_APPROVAL".equals(response.budgetStatus())) {
+            return "PENDING_APPROVAL";
+        }
         if ("BUDGET_EXHAUSTED".equals(response.budgetStatus())) {
             return "BUDGET_EXHAUSTED";
         }

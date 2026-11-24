@@ -14,7 +14,7 @@ TOOL_NAME_PATTERN = (
     r"|mcp__[a-z0-9_]{1,32}__[a-z0-9_]{1,32})$"
 )
 ToolName = Annotated[str, Field(pattern=TOOL_NAME_PATTERN)]
-BudgetStatus = Literal["OK", "BUDGET_EXHAUSTED", "LOW_CONFIDENCE"]
+BudgetStatus = Literal["OK", "BUDGET_EXHAUSTED", "LOW_CONFIDENCE", "PENDING_APPROVAL"]
 HistoryRole = Literal["USER", "ASSISTANT"]
 
 PROTOCOL_VERSION = "1.0"
@@ -55,6 +55,9 @@ class AgentAskRequest(StrictModel):
     deadline_ms: int = Field(alias="deadlineMs", ge=100, le=15000)
     document_scopes: list[DocumentScope] = Field(alias="documentScopes", min_length=1, max_length=20)
     history: list[HistoryMessage] = Field(default_factory=list, max_length=6)
+    # 人在回路：非 None 时表示本请求是审批续跑（approved True/False），
+    # 必须命中可续跑 checkpoint，否则 503（CheckpointBusyError 映射）。
+    resume_approved: bool | None = Field(alias="resumeApproved", default=None)
 
     @field_validator("protocol_version")
     @classmethod
@@ -95,6 +98,11 @@ class Citation(StrictModel):
     snippet: str = Field(max_length=200)
 
 
+class PendingApproval(StrictModel):
+    tool: str = Field(min_length=1, max_length=200)
+    input: str = Field(default="", max_length=2000)
+
+
 class AgentAskResponse(StrictModel):
     protocol_version: str = Field(alias="protocolVersion", pattern=r"^[0-9]+\.[0-9]+$")
     trace_id: str = Field(alias="traceId", pattern=r"^[0-9a-f]{32}$")
@@ -107,6 +115,8 @@ class AgentAskResponse(StrictModel):
     rounds_used: int = Field(alias="roundsUsed", ge=0, le=3)
     audit_events: list[AuditEvent] = Field(alias="auditEvents", min_length=1, max_length=50)
     finished_at: datetime = Field(alias="finishedAt")
+    # 非 None 时图挂在 interrupt：回答为挂起提示，thread 保留待审批续跑。
+    pending_approval: PendingApproval | None = Field(alias="pendingApproval", default=None)
 
 
 class FieldError(BaseModel):

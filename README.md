@@ -92,7 +92,7 @@ docker compose -f ops/docker-compose.infra.yml -f ops/docker-compose.app.yml up 
 | 能力 | 说明 |
 |---|---|
 | 文档 RAG 问答 | PDF / Word / 文本异步解析 → 分块 → 向量索引 → 混合检索 → rerank → 带引用回答；同步 + SSE 流式 |
-| Agent 工具链 | LangGraph plan/tool 循环 + Postgres checkpoint 断点续跑；json / native tool_calls 双通道；MCP（HTTP/stdio）与内置工具统一治理 |
+| Agent 工具链 | LangGraph plan/tool 循环 + Postgres checkpoint 断点续跑；json / native tool_calls 双通道；高风险工具 interrupt 人在回路审批；MCP（HTTP/stdio）与内置工具统一治理 |
 | 治理 | 每用户配额与工具限流（fail-closed）、预算账本、Kill Switch、PII 掩码前置、提示注入围栏 |
 | 租户隔离 | JWT 租户声明 + 业务表强过滤 + pgvector 谓词纵深防御；跨租户 404 |
 | 认证与 RBAC | JWT + refresh 轮换、USER / ADMIN、注册白名单与限流 |

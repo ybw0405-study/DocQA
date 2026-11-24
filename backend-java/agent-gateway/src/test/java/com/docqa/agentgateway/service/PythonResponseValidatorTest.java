@@ -96,7 +96,7 @@ class PythonResponseValidatorTest {
     void rejectsUnsupportedProtocolVersion() {
         PythonAskResponse response = new PythonAskResponse(
                 "2.0", TRACE_ID, "答案", List.of(citation(DOCUMENT_ID, 0, 0.9, "片段")),
-                0.9, "OK", 10, 0, 1, auditEvents(), NOW);
+                0.9, "OK", 10, 0, 1, auditEvents(), NOW, null);
 
         assertViolation(response, budget(10, 0, 1));
     }
@@ -104,7 +104,7 @@ class PythonResponseValidatorTest {
     @Test
     void rejectsBlankAnswer() {
         PythonAskResponse response = new PythonAskResponse(
-                "1.0", TRACE_ID, " ", List.of(), 0.9, "OK", 10, 0, 1, auditEvents(), NOW);
+                "1.0", TRACE_ID, " ", List.of(), 0.9, "OK", 10, 0, 1, auditEvents(), NOW, null);
 
         assertViolation(response, budget(10, 0, 1));
     }
@@ -117,7 +117,7 @@ class PythonResponseValidatorTest {
     @Test
     void rejectsMissingFinishedAt() {
         PythonAskResponse response = new PythonAskResponse(
-                "1.0", TRACE_ID, "答案", List.of(), 0.9, "OK", 10, 0, 1, auditEvents(), null);
+                "1.0", TRACE_ID, "答案", List.of(), 0.9, "OK", 10, 0, 1, auditEvents(), null, null);
 
         assertViolation(response, budget(10, 0, 1));
     }
@@ -167,7 +167,7 @@ class PythonResponseValidatorTest {
     void rejectsMissingAuditEvents() {
         PythonAskResponse response = new PythonAskResponse(
                 "1.0", TRACE_ID, "答案", List.of(citation(DOCUMENT_ID, 0, 0.9, "片段")),
-                0.9, "OK", 10, 0, 1, List.of(), NOW);
+                0.9, "OK", 10, 0, 1, List.of(), NOW, null);
 
         assertViolation(response, budget(10, 0, 1));
     }
@@ -180,7 +180,7 @@ class PythonResponseValidatorTest {
                 List.of(new PythonAuditEvent(
                         UUID.randomUUID(), "RAG_RETRIEVED", "rag", "INFO", NOW,
                         Map.of("question", "完整问题"))),
-                NOW);
+                NOW, null);
 
         ValidatedAnswer answer = validator.validate(
                 response, TRACE_ID, USER_ID, CONVERSATION_ID,
@@ -222,7 +222,7 @@ class PythonResponseValidatorTest {
             String traceId) {
         return new PythonAskResponse(
                 "1.0", traceId, "答案", citations, confidence, budgetStatus,
-                tokenUsed, toolCalls, rounds, auditEvents(), NOW);
+                tokenUsed, toolCalls, rounds, auditEvents(), NOW, null);
     }
 
     private List<PythonAuditEvent> auditEvents() {

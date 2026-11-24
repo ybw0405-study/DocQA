@@ -175,7 +175,7 @@ class AskServiceTest {
         stubHappyPath();
 
         AskData result = service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         assertThat(result.answer()).isEqualTo("答案");
         assertThat(result.budgetStatus()).isEqualTo("OK");
@@ -193,7 +193,7 @@ class AskServiceTest {
     void autoCreatesConversationOnlyAfterDocumentScopeResolves() {
         stubHappyPath();
 
-        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         InOrder order = inOrder(documentScopeService, conversationService);
         order.verify(documentScopeService).resolve(USER_ID, List.of(DOCUMENT_ID));
@@ -205,7 +205,7 @@ class AskServiceTest {
     void buildsGovernedPythonRequest() {
         stubHappyPath();
 
-        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         ArgumentCaptor<PythonAskRequest> captor = ArgumentCaptor.forClass(PythonAskRequest.class);
         verify(pythonAgentClient).ask(captor.capture(), anyString());
@@ -238,7 +238,7 @@ class AskServiceTest {
                 .thenReturn(new PiiMaskingResult("[PHONE]", List.of("PHONE"), 1));
         stubHappyPath();
 
-        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         ArgumentCaptor<PythonAskRequest> captor = ArgumentCaptor.forClass(PythonAskRequest.class);
         verify(pythonAgentClient).ask(captor.capture(), anyString());
@@ -255,7 +255,7 @@ class AskServiceTest {
                 .thenReturn(new PiiMaskingResult("邮箱 [EMAIL]", List.of("EMAIL"), 1));
         stubHappyPath();
 
-        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         ArgumentCaptor<PythonAskRequest> captor = ArgumentCaptor.forClass(PythonAskRequest.class);
         verify(pythonAgentClient).ask(captor.capture(), anyString());
@@ -268,7 +268,7 @@ class AskServiceTest {
     void replaysCompletedIdempotentRequestWithoutLocking() {
         AskData original = new AskData(
                 CONVERSATION_ID, MESSAGE_ID, "答案", List.of(), 0.9, "OK",
-                120, 1, 2, false, false, NOW);
+                120, 1, 2, false, false, NOW, null);
         when(idempotencyStore.find(USER_ID, CONVERSATION_ID, KEY))
                 .thenReturn(Optional.of(new IdempotencyRecord(
                         IdempotencyStatus.COMPLETED,
@@ -278,7 +278,7 @@ class AskServiceTest {
                         NOW)));
 
         AskData result = service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         assertThat(result.idempotentReplay()).isTrue();
         assertThat(result.messageId()).isEqualTo(MESSAGE_ID);
@@ -290,13 +290,13 @@ class AskServiceTest {
     void rejectsSameKeyWithDifferentRequest() {
         AskData original = new AskData(
                 CONVERSATION_ID, MESSAGE_ID, "答案", List.of(), 0.9, "OK",
-                120, 1, 2, false, false, NOW);
+                120, 1, 2, false, false, NOW, null);
         when(idempotencyStore.find(USER_ID, CONVERSATION_ID, KEY))
                 .thenReturn(Optional.of(new IdempotencyRecord(
                         IdempotencyStatus.COMPLETED, "different-fingerprint", original, null, NOW)));
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_CONFLICT_001);
@@ -307,7 +307,7 @@ class AskServiceTest {
         when(conversationLock.tryLock(eq(CONVERSATION_ID), anyString())).thenReturn(false);
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_CONFLICT_001);
@@ -320,7 +320,7 @@ class AskServiceTest {
                 .when(conversationService).requireAccessible(CONVERSATION_ID, USER_ID);
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_NOT_FOUND_001);
@@ -330,7 +330,7 @@ class AskServiceTest {
     @Test
     void rejectsInvalidIdempotencyKeyBeforeRateLimit() {
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, "short",
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_VALIDATION_001);
@@ -346,7 +346,7 @@ class AskServiceTest {
                 .thenReturn(true);
 
         AskData result = service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         assertThat(result.answer()).isEqualTo("旧答案");
         assertThat(result.cacheHit()).isTrue();
@@ -364,7 +364,7 @@ class AskServiceTest {
         when(killSwitch.isActive()).thenReturn(true);
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_UPSTREAM_003);
@@ -383,7 +383,7 @@ class AskServiceTest {
                 .thenThrow(new PythonCallException(ErrorCode.AGT_UPSTREAM_002, "timeout", List.of(), false));
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_UPSTREAM_002);
@@ -404,7 +404,7 @@ class AskServiceTest {
                 .thenThrow(new BusinessException(ErrorCode.AGT_UPSTREAM_004, "bad protocol"));
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_UPSTREAM_004);
@@ -420,7 +420,7 @@ class AskServiceTest {
                 .thenReturn(new ValidatedAnswer(List.of(), List.of(), "LOW_CONFIDENCE"));
 
         AskData result = service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         assertThat(result.budgetStatus()).isEqualTo("LOW_CONFIDENCE");
         verify(qaCacheService, never()).put(any(), anyList(), anyList(), anyString(), any());
@@ -433,7 +433,7 @@ class AskServiceTest {
                 .when(agentExecutionRepository).insert(any(), any(AgentExecution.class));
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_INTERNAL_001);
@@ -452,7 +452,7 @@ class AskServiceTest {
                         any(), any(), any(), anyString(), anyString(), anyInt(), any(), any(), any(), any());
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_CONFLICT_001);
@@ -467,7 +467,7 @@ class AskServiceTest {
     void initializesBudgetBeforeCallingPython() {
         stubHappyPath();
 
-        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         InOrder order = inOrder(budgetStore, pythonAgentClient);
         order.verify(budgetStore).initialize(anyString(), eq(8000), eq(3), eq(3), any(Instant.class));
@@ -478,7 +478,7 @@ class AskServiceTest {
     void reservesQuotaAfterKillSwitchAndBeforeTheCacheLookup() {
         stubHappyPath();
 
-        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         InOrder order = inOrder(killSwitch, quotaGuard, qaCacheService);
         order.verify(killSwitch).isActive();
@@ -490,7 +490,7 @@ class AskServiceTest {
     void replaysIdempotentRequestsWithoutConsumingQuota() {
         AskData original = new AskData(
                 CONVERSATION_ID, MESSAGE_ID, "答案", List.of(), 0.9, "OK",
-                120, 1, 2, false, false, NOW);
+                120, 1, 2, false, false, NOW, null);
         when(idempotencyStore.find(USER_ID, CONVERSATION_ID, KEY))
                 .thenReturn(Optional.of(new IdempotencyRecord(
                         IdempotencyStatus.COMPLETED,
@@ -499,7 +499,7 @@ class AskServiceTest {
                         null,
                         NOW)));
 
-        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         verify(quotaGuard, never()).reserve(any());
     }
@@ -510,7 +510,7 @@ class AskServiceTest {
         when(killSwitch.isActive()).thenReturn(true);
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(BusinessException.class);
 
         verify(quotaGuard, never()).reserve(any());
@@ -524,7 +524,7 @@ class AskServiceTest {
         when(idempotencyStore.tryStart(eq(USER_ID), eq(CONVERSATION_ID), eq(KEY), anyString(), any()))
                 .thenReturn(true);
 
-        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         verify(quotaGuard).reserve(USER_ID);
         verify(quotaGuard, never()).recordTokens(any(), org.mockito.ArgumentMatchers.anyLong());
@@ -534,7 +534,7 @@ class AskServiceTest {
     void freshAnswersRecordTheActualTokenUsage() {
         stubHappyPath();
 
-        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID)));
+        service.ask(USER_ID, CONVERSATION_ID, KEY, new AskRequest(QUESTION, List.of(DOCUMENT_ID), null));
 
         verify(quotaGuard).recordTokens(USER_ID, 120L);
     }
@@ -545,7 +545,7 @@ class AskServiceTest {
         doThrow(new QuotaExceededException(3600)).when(quotaGuard).reserve(USER_ID);
 
         assertThatThrownBy(() -> service.ask(USER_ID, CONVERSATION_ID, KEY,
-                new AskRequest(QUESTION, List.of(DOCUMENT_ID))))
+                new AskRequest(QUESTION, List.of(DOCUMENT_ID), null)))
                 .isInstanceOf(QuotaExceededException.class)
                 .satisfies(ex -> assertThat(((QuotaExceededException) ex).getRetryAfterSeconds())
                         .isEqualTo(3600));
@@ -570,7 +570,7 @@ class AskServiceTest {
 
     private PythonAskResponse response() {
         return new PythonAskResponse(
-                "1.0", TRACE_ID, "答案", List.of(), 0.9, "OK", 120, 1, 2, List.of(), NOW);
+                "1.0", TRACE_ID, "答案", List.of(), 0.9, "OK", 120, 1, 2, List.of(), NOW, null);
     }
 
     private BudgetSnapshot budget() {

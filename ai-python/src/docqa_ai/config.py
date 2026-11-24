@@ -213,6 +213,10 @@ class Settings(BaseSettings):
     # 行为与改动前逐字节一致。checkpoint_dsn 为空时回退 pg_dsn（同库 public schema，不新建库）。
     checkpoint_enabled: bool = False
     checkpoint_dsn: str = ""
+    # 人在回路：高风险工具执行前 interrupt 挂起，等 ask:resume 审批续跑。
+    # 依赖 checkpoint 持久化挂起态，未开 checkpoint 时启动期拒绝。
+    tool_approval_enabled: bool = False
+    high_risk_tools: str = ""
 
     # 长期记忆（显式「记住：…」指令 + 管理页）。默认关闭：不构造 store、不写任何记忆表，
     # 问答路径与改动前逐字节一致。memory_dsn 为空时回退 pg_dsn（同库 public schema）。
@@ -344,6 +348,8 @@ class Settings(BaseSettings):
             )
         if self.checkpoint_enabled and not (self.checkpoint_dsn or self.pg_dsn):
             raise ValueError("checkpoint_dsn or pg_dsn is required when checkpoint_enabled=true")
+        if self.tool_approval_enabled and not self.checkpoint_enabled:
+            raise ValueError("checkpoint_enabled=true is required when tool_approval_enabled=true")
         if self.memory_enabled and not (self.memory_dsn or self.pg_dsn):
             raise ValueError("memory_dsn or pg_dsn is required when memory_enabled=true")
         if self.minio_secure is None:

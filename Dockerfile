@@ -15,6 +15,16 @@
 # ---------- 1. Java 构建 ----------
 FROM maven:3.9-eclipse-temurin-17@sha256:1a352420f7aba21f5ad08df31bab55f74c013fb491f1ae8ab1dd7ff9ed698584 AS java-build
 WORKDIR /src
+# 依赖层缓存：pom 不变时跳过 go-offline 重解析（多模块互依赖未安装，best-effort）
+COPY backend-java/pom.xml backend-java/
+COPY backend-java/common/pom.xml backend-java/common/
+COPY backend-java/mq-support/pom.xml backend-java/mq-support/
+COPY backend-java/user-service/pom.xml backend-java/user-service/
+COPY backend-java/document-service/pom.xml backend-java/document-service/
+COPY backend-java/reminder-service/pom.xml backend-java/reminder-service/
+COPY backend-java/audit-service/pom.xml backend-java/audit-service/
+COPY backend-java/agent-gateway/pom.xml backend-java/agent-gateway/
+RUN cd backend-java && mvn -B -ntp -q dependency:go-offline -Dcheckstyle.skip || true
 COPY . .
 WORKDIR /src/backend-java
 RUN mkdir -p /out \

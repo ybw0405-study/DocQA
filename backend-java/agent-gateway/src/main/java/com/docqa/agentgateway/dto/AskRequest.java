@@ -12,5 +12,6 @@ public record AskRequest(
         String question,
         @NotNull(message = "must not be null")
         @Size(min = 1, max = 20, message = "must contain 1 to 20 documents")
-        List<@NotNull(message = "must not contain null") UUID> documentIds) {
+        List<@NotNull(message = "must not contain null") UUID> documentIds,
+        Boolean resumeApproved) {
 }
