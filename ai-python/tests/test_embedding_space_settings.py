@@ -1,7 +1,7 @@
 """向量空间守卫的行为面：真实 embedding 不许写进 offline 空间。
 
 判据本身在 `config.py` 的 `validate_consistency` 里，是**启动期**的 fail-closed 检查；
-它与  的分表迁移（`migrations/003_*.sql`）是一对：迁移给出「另一个空间」，守卫保证
+它与分表迁移（`migrations/003_*.sql`）是一对：迁移给出「另一个空间」，守卫保证
 「切了 Provider 却忘了切表」不会变成静默的混空间。
 """
 

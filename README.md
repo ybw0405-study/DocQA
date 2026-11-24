@@ -83,6 +83,9 @@ Copy-Item ops/env/local.env.example ops/env/local.env
 docker compose -f ops/docker-compose.infra.yml -f ops/docker-compose.app.yml up -d parse-worker vector-worker
 ```
 
+> ⚠️ **Windows 开发机注意**：解析 / 向量 worker 依赖 librocketmq 的 Linux C 绑定，无法在 Windows 宿主机运行。
+> 请使用 `-Containers` 模式（worker 容器化）跑通「上传 → 解析 → 向量 → 检索」全链路；否则文档向量不写入，检索命中恒为 0。
+
 首次登录：全新库默认无账号（安全默认）。种子演示账号或自助注册二选一，
 开关与 BCrypt 摘要要求见 [getting-started](docs/00-infra/getting-started.md)。
 管理页「模型」可在界面换模型（凭据 AES-256-GCM 密文落库、不回显、无需重启）。
@@ -110,7 +113,9 @@ Docker 多阶段 + GHCR / GitHub Actions 三端门禁 + 真库契约测试。
 
 ## 已知限制与取舍
 
-默认离线占位、LangGraph 两节点循环的依赖取舍、RAG 正文纯文本渲染（零 XSS 面）等逐条说明见
+- **扫描件 / 图片型 PDF 暂不支持**：解析器覆盖文本型 PDF / Word / PPTX / TXT，无 OCR 引擎，扫描件需先经 OCR 转文本再导入。
+- **分片上传支持并发分片合并，暂不支持断点续传**（断网重连需重新开始）。
+- 默认离线占位、LangGraph 两节点循环的依赖取舍、RAG 正文纯文本渲染（零 XSS 面）等逐条说明见
 [产品指南](docs/product-guide.md)与 [docs/02-design/](docs/02-design/)。
 迁移注释中的历史阶段代号见 [索引](docs/02-design/migration-comment-codes.md)。
 

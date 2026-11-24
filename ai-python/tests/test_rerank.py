@@ -144,7 +144,7 @@ async def test_transport_error_maps_to_rerank_unavailable() -> None:
 
 
 async def test_timeout_maps_to_rerank_timeout() -> None:
-    """超时必须是独立异常类， 的降级与  的一次重试都靠它判别。"""
+    """超时必须是独立异常类，超时降级与超时后的一次重试都靠它判别。"""
 
     provider = provider_raising(httpx.ReadTimeout("slow"))
     with pytest.raises(RerankTimeout, match="rerank request timed out"):
