@@ -79,7 +79,7 @@ class AskControllerTest {
         when(askService.ask(eq(USER_ID), eq(CONVERSATION_ID), eq(KEY), any()))
                 .thenReturn(new AskData(
                         CONVERSATION_ID, MESSAGE_ID, "答案", List.of(), 0.9, "OK",
-                        120, 1, 2, false, false, NOW));
+                        120, 1, 2, false, false, NOW, null));
 
         mockMvc.perform(post("/api/v1/conversations/{conversationId}/ask", CONVERSATION_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, USER_ID)

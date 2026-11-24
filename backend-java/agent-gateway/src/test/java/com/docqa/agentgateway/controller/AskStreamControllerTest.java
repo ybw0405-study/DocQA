@@ -184,7 +184,7 @@ class AskStreamControllerTest {
 
     private String doneDataJson() {
         AskData data = new AskData(
-                CONVERSATION_ID, MESSAGE_ID, "答案", List.of(), 0.9, "OK", 120, 1, 2, false, false, NOW);
+                CONVERSATION_ID, MESSAGE_ID, "答案", List.of(), 0.9, "OK", 120, 1, 2, false, false, NOW, null);
         try {
             return objectMapper.writeValueAsString(data).replaceFirst("\\}$", ",\"traceId\":\"" + TRACE_ID + "\"}");
         } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {

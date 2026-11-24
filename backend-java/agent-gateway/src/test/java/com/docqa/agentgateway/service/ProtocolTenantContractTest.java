@@ -38,7 +38,8 @@ class ProtocolTenantContractTest {
             "allowedTools",
             "deadlineMs",
             "documentScopes",
-            "history");
+            "history",
+            "resumeApproved");
 
     @Test
     void javaAndPythonAgreeOnTheFieldSet() throws Exception {

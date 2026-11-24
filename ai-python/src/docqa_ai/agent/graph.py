@@ -9,6 +9,7 @@ from typing import TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command, interrupt
 from opentelemetry import trace
 from opentelemetry.trace import Tracer
 
@@ -59,6 +60,7 @@ class GraphResult:
     token_out: int
     budget_exhausted: bool
     tool_executions: tuple[ToolExecution, ...]
+    pending_approval: dict | None = None
 
 
 class AgentState(TypedDict, total=False):
@@ -104,6 +106,7 @@ class AgentGraph:
         answer_sink: Callable[[str], None] | None = None,
         tenant_id: object | None = None,
         checkpointer: BaseCheckpointSaver | None = None,
+        approval_check: Callable[[str], bool] | None = None,
     ) -> None:
         self._planner = planner
         self._tools = tools
@@ -124,6 +127,7 @@ class AgentGraph:
         self._answer_sink = answer_sink
         self._tenant_id = tenant_id
         self._checkpointer = checkpointer
+        self._approval_check = approval_check
         self._rounds_used = 0
         self._context: PlanContext | None = None
         self._graph = self._build()
@@ -134,6 +138,7 @@ class AgentGraph:
         *,
         thread_id: str | None = None,
         resume: bool = False,
+        resume_value: dict | None = None,
     ) -> GraphResult:
         self._context = context
         if resume and thread_id is None:
@@ -144,7 +149,9 @@ class AgentGraph:
             if resume:
                 # 续跑不喂初始 state：LangGraph 从最后完成的 super-step 重入，
                 # planner / answer_sink / deadline 等每请求闭包由本实例重新绑定，sink 永不持久化。
-                final = await self._graph.ainvoke(None, config)
+                # resume_value 非 None 时为审批续跑：Command(resume=...) 喂给 interrupt。
+                payload = Command(resume=resume_value) if resume_value is not None else None
+                final = await self._graph.ainvoke(payload, config)
             else:
                 state: AgentState = {
                     "round_number": 0,
@@ -172,6 +179,7 @@ class AgentGraph:
                     ToolExecution(**{**item, "pii_categories": tuple(item["pii_categories"])})
                     for item in final.get("tool_executions", ())
                 ),
+                pending_approval=await self._pending_interrupt(config),
             )
         finally:
             # 轮次是「每次问答」的量，只能在这里聚一次；放在 _plan 里会退化成每轮记 1，
@@ -187,6 +195,18 @@ class AgentGraph:
         builder.add_conditional_edges("plan", self._route, {"tool": "tool", "end": END})
         builder.add_edge("tool", "plan")
         return builder.compile(checkpointer=self._checkpointer)
+
+    async def _pending_interrupt(self, config: dict | None) -> dict | None:
+        if config is None or self._checkpointer is None:
+            return None
+        snap = await self._graph.aget_state(config)
+        if snap is None or not snap.next:
+            return None
+        for task in snap.tasks:
+            interrupts = getattr(task, "interrupts", ())
+            if interrupts:
+                return dict(interrupts[0].value)
+        return None
 
     @staticmethod
     def _route(state: AgentState) -> str:
@@ -361,6 +381,14 @@ class AgentGraph:
         if tool is None:
             raise PlannerProtocolError("tool is not registered")
         source = self._tools.source(tool_name) or "builtin"
+        if self._approval_check is not None and self._approval_check(tool_name):
+            decision = interrupt({"tool": tool_name, "input": argument})
+            if not isinstance(decision, dict) or not decision.get("approved"):
+                return {
+                    "observations": tuple(state.get("observations", ()))
+                    + (f"[tool {tool_name} 被审批人拒绝，未执行]",),
+                    "pending_tool": None,
+                }
         context = ToolContext(
             scopes=self._scopes,
             retrieval=self._retrieval,

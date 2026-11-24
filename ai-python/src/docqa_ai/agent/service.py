@@ -55,6 +55,7 @@ from docqa_ai.protocol.models import (
     AgentAskRequest,
     AgentAskResponse,
     Citation,
+    PendingApproval,
 )
 from docqa_ai.providers.planner import ContextBlock, PlanContext, Planner, PlannerTimeout, PlannerUnavailable
 from docqa_ai.providers.tokens import estimate_tokens
@@ -173,6 +174,18 @@ async def _aclose_if_present(resource: object) -> None:
         await result
 
 
+def _approval_predicate(settings: Settings):
+    """高风险工具谓词：精确名或前缀通配（如 mcp__*）；未开启审批时返回 None。"""
+    if not settings.tool_approval_enabled:
+        return None
+    entries = [e.strip() for e in settings.high_risk_tools.split(",") if e.strip()]
+
+    def check(name: str) -> bool:
+        return name in entries or any(e.endswith("*") and name.startswith(e[:-1]) for e in entries)
+
+    return check
+
+
 class AgentAskService:
     def __init__(
         self,
@@ -281,16 +294,27 @@ class AgentAskService:
                 if isinstance(decision, AgentAskResponse):
                     return decision
                 thread_id, resume = decision
+                if request.resume_approved is not None and not resume:
+                    raise CheckpointBusyError("approval resume requires a resumable checkpoint")
+                resume_value = (
+                    {"approved": request.resume_approved} if resume and request.resume_approved is not None else None
+                )
                 graph = self._build_graph(request, deadline, prepared)
                 with self._tracer.start_as_current_span("agent.graph") as span:
                     span.set_attribute("tenant.id", str(request.tenant_id))
                     span.set_attribute("agent.rounds_limit", request.max_rounds)
                     span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
                     span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)
-                    result = await graph.run(prepared.plan_context, thread_id=thread_id, resume=resume)
+                    result = await graph.run(
+                        prepared.plan_context,
+                        thread_id=thread_id,
+                        resume=resume,
+                        resume_value=resume_value,
+                    )
                     span.set_attribute("agent.budget_exhausted", result.budget_exhausted)
-                if thread_id is not None:
+                if thread_id is not None and not result.pending_approval:
                     # checkpoint 是崩溃恢复态而不是历史：终态完成即删，下一问永远从头开始。
+                    # 审批挂起态保留 thread，等 ask:resume 续跑。
                     await self._checkpointer.adelete_thread(thread_id)
             final_snapshot = await self._budget.snapshot(request.trace_id)
             return self._build_response(
@@ -537,6 +561,7 @@ class AgentAskService:
             answer_sink=answer_sink,
             tenant_id=request.tenant_id,
             checkpointer=self._checkpointer,
+            approval_check=_approval_predicate(self._settings),
         )
 
     @asynccontextmanager
@@ -682,6 +707,11 @@ class AgentAskService:
                     yield AskStreamEvent(kind="done", response=decision)
                     return
                 thread_id, resume = decision
+                if request.resume_approved is not None and not resume:
+                    raise CheckpointBusyError("approval resume requires a resumable checkpoint")
+                resume_value = (
+                    {"approved": request.resume_approved} if resume and request.resume_approved is not None else None
+                )
 
                 def sink(text: str) -> None:
                     queue.put_nowait(("delta", text))
@@ -695,7 +725,12 @@ class AgentAskService:
                             span.set_attribute("agent.rounds_limit", request.max_rounds)
                             span.set_attribute("agent.tools_allowed", len(prepared.plan_context.allowed_tools))
                             span.set_attribute("agent.mcp_tools", prepared.mcp_tool_count)
-                            result = await graph.run(prepared.plan_context, thread_id=thread_id, resume=resume)
+                            result = await graph.run(
+                                prepared.plan_context,
+                                thread_id=thread_id,
+                                resume=resume,
+                                resume_value=resume_value,
+                            )
                             span.set_attribute("agent.budget_exhausted", result.budget_exhausted)
                             return result
                     finally:
@@ -708,8 +743,8 @@ class AgentAskService:
                         break
                     yield AskStreamEvent(kind="delta", text=str(payload))
                 result = await graph_task
-                if thread_id is not None:
-                    # 与同步路径同一语义：终态完成即删恢复态，不留历史。
+                if thread_id is not None and not result.pending_approval:
+                    # 与同步路径同一语义：终态完成即删恢复态，不留历史；审批挂起保留。
                     await self._checkpointer.adelete_thread(thread_id)
             final_snapshot = await self._budget.snapshot(request.trace_id)
             response = self._build_response(
@@ -904,6 +939,8 @@ class AgentAskService:
                 )
                 cited_scores.append(block.score)
         answer = result.answer.strip() or _INSUFFICIENT_ANSWER
+        if result.pending_approval:
+            answer = "等待人工审批：工具调用已挂起，请在会话页批准或拒绝后继续。"
         output_check = mask_text(answer)
         if output_check.count:
             collector.add(
@@ -924,7 +961,9 @@ class AgentAskService:
         clamped_tokens = min(max(0, snapshot.tokens_used), request.token_budget, snapshot.token_budget)
         clamped_tools = min(max(0, snapshot.tool_calls_made), request.max_tool_calls)
         clamped_rounds = min(max(0, snapshot.rounds_used), request.max_rounds)
-        if result.budget_exhausted:
+        if result.pending_approval:
+            budget_status = "PENDING_APPROVAL"
+        elif result.budget_exhausted:
             budget_status = "BUDGET_EXHAUSTED"
         elif not citations or confidence < self._settings.low_confidence_threshold:
             budget_status = "LOW_CONFIDENCE"
@@ -970,6 +1009,7 @@ class AgentAskService:
             citations=citations[: self._settings.max_citations],
             confidence=confidence,
             budget_status=budget_status,
+            pending_approval=(PendingApproval(**result.pending_approval) if result.pending_approval else None),
             token_used=clamped_tokens,
             tool_calls_made=clamped_tools,
             rounds_used=clamped_rounds,

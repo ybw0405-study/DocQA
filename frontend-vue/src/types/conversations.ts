@@ -1,6 +1,6 @@
 /** 契约 `openapi-java.yaml` 2.5.0 中与问答相关的 schema 逐字段镜像，字段名不做本地化改名。 */
 
-export type BudgetStatus = 'OK' | 'BUDGET_EXHAUSTED' | 'LOW_CONFIDENCE';
+export type BudgetStatus = 'OK' | 'BUDGET_EXHAUSTED' | 'LOW_CONFIDENCE' | 'PENDING_APPROVAL';
 
 export type MessageRole = 'user' | 'assistant';
 
@@ -43,6 +43,12 @@ export interface ConversationData {
 export interface AskRequest {
   question: string;
   documentIds: string[];
+  resumeApproved?: boolean;
+}
+
+export interface PendingApproval {
+  tool: string;
+  input: string;
 }
 
 export interface Citation {
@@ -66,6 +72,7 @@ export interface AskData {
   cacheHit: boolean;
   idempotentReplay: boolean;
   createdAt: string;
+  pendingApproval?: PendingApproval | null;
 }
 
 /** 契约 `AskStreamMeta` 的 `data`：`messageId` 在流首即固定，本地行从第一刻起就能与服务端历史对账。 */

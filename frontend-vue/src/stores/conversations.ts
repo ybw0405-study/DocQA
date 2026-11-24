@@ -17,6 +17,7 @@ import type {
   ConversationListItemData,
   MessageHistoryItemData,
   MessageRole,
+  PendingApproval,
 } from '../types/conversations';
 import { DOCUMENT_IDS_MAX, QUESTION_MAX_LENGTH, TITLE_MAX_LENGTH } from '../types/conversations';
 import {
@@ -94,6 +95,8 @@ export interface ConversationsState extends FailureFields {
   streaming: boolean;
   /** 生成中的助手行键，视图据此只在最后一行挂光标；done 之后随分支结束一起清空。 */
   streamKey: string | null;
+  /** 人在回路挂起态：最近一次回答带 pendingApproval 时记录问题与文档集，供批准/拒绝续跑。 */
+  pendingApproval: { question: string; documentIds: string[]; approval: PendingApproval } | null;
 
   selected: string[];
   pickerItems: DocumentListItemData[];
@@ -143,6 +146,7 @@ export const useConversationsStore = defineStore('conversations', {
     pendingKey: null,
     streaming: false,
     streamKey: null,
+    pendingApproval: null,
 
     selected: [],
     pickerItems: [],
@@ -512,6 +516,9 @@ export const useConversationsStore = defineStore('conversations', {
             continue;
           }
           const done = event.payload;
+          this.pendingApproval = done.pendingApproval
+            ? { question, documentIds, approval: done.pendingApproval }
+            : null;
           const replaced = toDoneRow(done);
           this.messages = this.messages.map((row) => (row.key === assistantRowKey ? replaced : row));
           // done 才是字段真源：行键也按它重定，meta 与 done 不一致时同样收敛到服务端形态。
@@ -547,6 +554,7 @@ export const useConversationsStore = defineStore('conversations', {
       question: string,
       documentIds: string[],
       key: string,
+      resumeApproved?: boolean,
    ): Promise<boolean> {
       const controller = new AbortController();
       syncController = controller;
@@ -554,7 +562,7 @@ export const useConversationsStore = defineStore('conversations', {
       try {
         const result = await askConversation(
           conversationId,
-          { question, documentIds },
+          resumeApproved === undefined ? { question, documentIds } : { question, documentIds, resumeApproved },
           key,
           controller.signal,
        );
@@ -564,6 +572,9 @@ export const useConversationsStore = defineStore('conversations', {
           return false;
         }
         this.messages = [...this.messages, ...toLocalRows(question, key, result)];
+        this.pendingApproval = result.data.pendingApproval
+          ? { question, documentIds, approval: result.data.pendingApproval }
+          : null;
         return true;
       } catch (error) {
         // 主动断开（卸载/切会话导致的 abort）不是失败：不写 detail，回到空闲态。
@@ -582,6 +593,21 @@ export const useConversationsStore = defineStore('conversations', {
      * 失败后 `pendingKey` 保留，用户点「重试」复用同一个键：
      * 服务端对「同键同问题」会返回原结果或仍在执行，自动重试反而会把可恢复态变成持续 409。
      */
+    /** 批准/拒绝挂起的高风险工具调用：走同步 ask 续跑同一 checkpoint。 */
+    async resumeApproval(approved: boolean): Promise<void> {
+      const pending = this.pendingApproval;
+      if (pending === null || this.currentId === null || this.submitting) {
+        return;
+      }
+      this.submitting = true;
+      this.clearFailure();
+      try {
+        await this.runSync(this.currentId, pending.question, pending.documentIds, newIdempotencyKey(), approved);
+      } finally {
+        this.submitting = false;
+      }
+    },
+
     async submitQuestion(): Promise<void> {
       if (this.submitting) {
         return;

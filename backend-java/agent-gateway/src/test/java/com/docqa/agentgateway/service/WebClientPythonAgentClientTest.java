@@ -348,6 +348,7 @@ class WebClientPythonAgentClientTest {
                 List.of("document_search"),
                 15000,
                 List.of(),
-                List.of());
+                List.of(),
+                null);
     }
 }

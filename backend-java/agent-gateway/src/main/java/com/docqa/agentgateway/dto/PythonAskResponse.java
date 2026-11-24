@@ -14,5 +14,6 @@ public record PythonAskResponse(
         int toolCallsMade,
         int roundsUsed,
         List<PythonAuditEvent> auditEvents,
-        Instant finishedAt) {
+        Instant finishedAt,
+        PythonPendingApproval pendingApproval) {
 }

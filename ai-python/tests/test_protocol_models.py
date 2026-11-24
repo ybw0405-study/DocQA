@@ -22,7 +22,7 @@ def parse(payload: dict[str, object]) -> AgentAskRequest:
     return AgentAskRequest.model_validate_json(json.dumps(payload))
 
 
-def test_request_has_exactly_fifteen_contract_fields() -> None:
+def test_request_has_exactly_sixteen_contract_fields() -> None:
     request = parse(request_payload())
     dumped = request.model_dump(by_alias=True)
     assert set(dumped) == {
@@ -41,6 +41,7 @@ def test_request_has_exactly_fifteen_contract_fields() -> None:
         "deadlineMs",
         "documentScopes",
         "history",
+        "resumeApproved",
     }
     assert request.tenant_id == TENANT_ID
     assert request.user_id == USER_ID
@@ -158,6 +159,7 @@ def test_response_serializes_with_camel_case_and_audit_events() -> None:
         "roundsUsed",
         "auditEvents",
         "finishedAt",
+        "pendingApproval",
     }
     assert dumped["auditEvents"][0]["eventType"] == "AGENT_COMPLETED"
     assert dumped["citations"][0]["documentId"] == str(DOCUMENT_ID)

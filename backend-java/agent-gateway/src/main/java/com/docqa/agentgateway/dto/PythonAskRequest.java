@@ -18,5 +18,6 @@ public record PythonAskRequest(
         List<String> allowedTools,
         int deadlineMs,
         List<PythonDocumentScope> documentScopes,
-        List<PythonHistoryMessage> history) {
+        List<PythonHistoryMessage> history,
+        Boolean resumeApproved) {
 }

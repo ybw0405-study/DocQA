@@ -12,6 +12,7 @@ import com.docqa.agentgateway.dto.AskStreamDonePayload;
 import com.docqa.agentgateway.dto.AskStreamMetaPayload;
 import com.docqa.agentgateway.dto.AuditEvent;
 import com.docqa.agentgateway.dto.AuthorizedDocument;
+import com.docqa.agentgateway.dto.PendingApprovalData;
 import com.docqa.agentgateway.dto.PythonAskRequest;
 import com.docqa.agentgateway.dto.PythonAskResponse;
 import com.docqa.agentgateway.dto.PythonDocumentScope;
@@ -211,7 +212,7 @@ public class AskService {
             return completeImmediateStream(prepared, emitter, replayed);
         }
         FreshExecution execution = started.get();
-        PythonAskRequest pythonRequest = pythonRequest(prepared, execution.deadlineMs());
+        PythonAskRequest pythonRequest = pythonRequest(prepared, execution.deadlineMs(), prepared.resumeApproved());
         Flux<ServerSentEvent<String>> events;
         try {
             events = pythonAgentClient.openStream(pythonRequest, prepared.traceId());
@@ -247,7 +248,8 @@ public class AskService {
             return new PreparedAsk(
                     userId, tenantId, conversationId, key, fingerprint, question, documentIds,
                     List.of(), List.of(), null, traceId, startedAt, false, stream,
-                    Optional.of(replayOrConflict(existing.get(), fingerprint)), Optional.empty());
+                    Optional.of(replayOrConflict(existing.get(), fingerprint)), Optional.empty(),
+                    request.resumeApproved());
         }
 
         if (!conversationLock.tryLock(conversationId, traceId)) {
@@ -259,7 +261,8 @@ public class AskService {
                 return new PreparedAsk(
                         userId, tenantId, conversationId, key, fingerprint, question, documentIds,
                         List.of(), List.of(), null, traceId, startedAt, true, stream,
-                        Optional.of(replayOrConflict(existing.get(), fingerprint)), Optional.empty());
+                        Optional.of(replayOrConflict(existing.get(), fingerprint)), Optional.empty(),
+                        request.resumeApproved());
             }
             List<AuthorizedDocument> documents = documentScopeService.resolve(userId, documentIds);
             conversationService.ensureOwned(conversationId, userId, documentIds);
@@ -280,7 +283,7 @@ public class AskService {
             return new PreparedAsk(
                     userId, tenantId, conversationId, key, fingerprint, question, documentIds,
                     documents, history, masked, traceId, startedAt, true, stream,
-                    Optional.empty(), usable);
+                    Optional.empty(), usable, request.resumeApproved());
         } catch (RuntimeException ex) {
             conversationLock.unlock(conversationId, traceId);
             throw ex;
@@ -344,7 +347,7 @@ public class AskService {
         }
         FreshExecution execution = started.get();
         try {
-            PythonAskRequest pythonRequest = pythonRequest(prepared, execution.deadlineMs());
+            PythonAskRequest pythonRequest = pythonRequest(prepared, execution.deadlineMs(), prepared.resumeApproved());
             PythonAskResponse response = pythonAgentClient.ask(pythonRequest, prepared.traceId());
             quotaGuard.recordTokens(prepared.userId(), response.tokenUsed());
             BudgetSnapshot budget = budgetStore.snapshot(prepared.traceId()).orElse(null);
@@ -463,7 +466,8 @@ public class AskService {
                 0,
                 true,
                 false,
-                assistantMessageAt);
+                assistantMessageAt,
+                null);
         List<AuditEvent> events = List.of(
                 auditEventFactory.cacheHit(prepared.traceId(), prepared.userId(), prepared.conversationId()),
                 auditEventFactory.completed(
@@ -515,7 +519,8 @@ public class AskService {
                 ? UUID.randomUUID()
                 : assistantMessageIdOrNull;
         Instant assistantAt = clock.instant();
-        String status = "BUDGET_EXHAUSTED".equals(validated.budgetStatus()) ? "BUDGET_EXHAUSTED" : "SUCCESS";
+        String status = "BUDGET_EXHAUSTED".equals(validated.budgetStatus()) ? "BUDGET_EXHAUSTED"
+                : "PENDING_APPROVAL".equals(validated.budgetStatus()) ? "RUNNING" : "SUCCESS";
         List<AuditEvent> events = new ArrayList<>(validated.auditEvents());
         events.add(auditEventFactory.completed(
                 prepared.traceId(),
@@ -577,7 +582,9 @@ public class AskService {
                 response.roundsUsed(),
                 cacheHit,
                 false,
-                assistantAt);
+                assistantAt,
+                response.pendingApproval() == null ? null
+                        : new PendingApprovalData(response.pendingApproval().tool(), response.pendingApproval().input()));
     }
 
     private void cacheResult(PreparedAsk prepared, PythonAskResponse response, ValidatedAnswer validated) {
@@ -680,7 +687,7 @@ public class AskService {
         return events;
     }
 
-    private PythonAskRequest pythonRequest(PreparedAsk prepared, int deadlineMs) {
+    private PythonAskRequest pythonRequest(PreparedAsk prepared, int deadlineMs, Boolean resumeApproved) {
         List<PythonDocumentScope> scopes = prepared.documents().stream()
                 .map(document -> new PythonDocumentScope(document.documentId(), document.indexVersion()))
                 .toList();
@@ -702,7 +709,8 @@ public class AskService {
                 pythonProperties.getAllowedTools(),
                 deadlineMs,
                 scopes,
-                pythonHistory);
+                pythonHistory,
+                resumeApproved);
     }
 
     private List<QaCacheService.PythonHistoryMessageMask> loadHistory(UUID tenantId, UUID conversationId) {
@@ -792,7 +800,8 @@ public class AskService {
                     original.roundsUsed(),
                     original.cacheHit(),
                     true,
-                    original.createdAt());
+                    original.createdAt(),
+                    original.pendingApproval());
         }
         String detail = record.status() == IdempotencyStatus.IN_PROGRESS
                 ? "The same Idempotency-Key is still in progress"

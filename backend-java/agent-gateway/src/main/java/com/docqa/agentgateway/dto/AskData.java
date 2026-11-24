@@ -16,5 +16,6 @@ public record AskData(
         int roundsUsed,
         boolean cacheHit,
         boolean idempotentReplay,
-        Instant createdAt) {
+        Instant createdAt,
+        PendingApprovalData pendingApproval) {
 }

@@ -148,6 +148,33 @@ onBeforeUnmount(() => {
           />
         </li>
       </ol>
+      <div
+        v-if="conversations.pendingApproval"
+        class="ask__approval"
+        data-testid="approval-card"
+      >
+        <p>
+          高风险工具调用等待审批：
+          <span class="mono">{{ conversations.pendingApproval.approval.tool }}</span>
+        </p>
+        <p class="muted mono">{{ conversations.pendingApproval.approval.input }}</p>
+        <div class="ask__approval-actions">
+          <BaseButton
+            data-testid="approval-approve"
+            :disabled="conversations.submitting"
+            @click="conversations.resumeApproval(true)"
+          >
+            批准并继续
+          </BaseButton>
+          <BaseButton
+            data-testid="approval-deny"
+            :disabled="conversations.submitting"
+            @click="conversations.resumeApproval(false)"
+          >
+            拒绝
+          </BaseButton>
+        </div>
+      </div>
       <EmptyState
         v-if="conversations.currentId === null"
         :text="EMPTY_STATE_TEXT.askNoCurrent"
