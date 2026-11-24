@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-24
+
 ### 新增：人在回路审批（LangGraph interrupt）
 
 - 高风险工具（`DOCQA_AI_HIGH_RISK_TOOLS`，精确名或前缀通配）执行前 `interrupt` 挂起，checkpoint 保留恢复态；
