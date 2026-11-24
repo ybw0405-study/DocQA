@@ -37,7 +37,7 @@ public class NotificationController {
 
     /**
      * 有意不要求 {@code Idempotency-Key}，也不计入用户级限流桶：已读是「只由空变有」的收敛操作，
-     * 重复提交没有第二次副作用（契约 2.3.0 的显式例外，理由见 D-67）。
+     * 重复提交没有第二次副作用（契约 2.3.0 的显式例外，理由见）。
      */
     @PostMapping("/read")
     public ApiResponse<NotificationReadData> markRead(

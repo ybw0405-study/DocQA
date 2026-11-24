@@ -84,7 +84,7 @@ function openingTagOf(text: string, needle: string): string {
   return text.slice(text.lastIndexOf('<', at), end === -1 ? undefined : end + 1);
 }
 
-describe('响应式三档断点（D-192）', () => {
+describe('响应式三档断点', () => {
   it('keeps the prerequisite in index.html', () => {
     // 没有 device-width 视口声明，浏览器按假想宽度排版，三档断点在手机上一次都不会求值。
     const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
@@ -112,7 +112,7 @@ describe('响应式三档断点（D-192）', () => {
   });
 
   it('keeps breakpoint literals inside @media conditions', () => {
-    // 断点数值不能进 tokens.css：媒体查询的条件读不到自定义属性，写成令牌就是没有消费点的死令牌（S10-2 实测）。
+    // 断点数值不能进 tokens.css：媒体查询的条件读不到自定义属性，写成令牌就是没有消费点的死令牌（实测）。
     const offenders: string[] = [];
     for (const [file, text] of cssTexts) {
       for (const line of text.split(/\r?\n/)) {
@@ -128,7 +128,7 @@ describe('响应式三档断点（D-192）', () => {
   });
 
   it('scrolls the eight wide tables instead of restacking their rows', () => {
-    // 窄屏把 td 竖排成卡片会丢掉 table/row/cell 角色，D-192 不能用 D-193 换。
+    // 窄屏把 td 竖排成卡片会丢掉 table/row/cell 角色， 不能用  换。
     const text = read('src/styles/components.css');
 
     expect(text).toContain('.table-scroll');
@@ -145,7 +145,7 @@ describe('响应式三档断点（D-192）', () => {
   });
 });
 
-describe('可见焦点与键盘可达（D-193）', () => {
+describe('可见焦点与键盘可达', () => {
   it('defines the focus ring in exactly one place', () => {
     // 焦点环多处定义必然互相覆盖，最后总有一层会被某条 border/outline 规则吃掉。
     const ringFiles = [...cssTexts.entries()]
@@ -170,7 +170,7 @@ describe('可见焦点与键盘可达（D-193）', () => {
   });
 });
 
-describe('表格结构与标题（D-193）', () => {
+describe('表格结构与标题', () => {
   const tableFiles = [...productionTexts.entries()].filter(([, text]) => text.includes('<table'));
 
   it('finds exactly the eight data tables', () => {
@@ -198,27 +198,27 @@ describe('表格结构与标题（D-193）', () => {
   });
 });
 
-describe('live region 范围（D-193）', () => {
+describe('live region 范围', () => {
   it('keeps role="status" on one-shot results and the loading placeholder', () => {
     expect(ownersOf('role="status"')).toEqual(STATUS_OWNERS);
     expect(openingTagOf(read('src/components/ScheduleImportPanel.vue'), 'data-testid="ics-result"')).toContain('role="status"');
     expect(openingTagOf(read('src/components/NotificationPanel.vue'), 'data-testid="notifications-note"')).toContain(
       'role="status"',
-    );
+   );
     expect(openingTagOf(read('src/views/RemindersView.vue'), 'class="reminders__created"')).toContain('role="status"');
     expect(openingTagOf(read('src/views/LoginView.vue'), 'data-testid="login-notice"')).toContain('role="status"');
     expect(openingTagOf(read('src/views/admin/AdminControlsView.vue'), 'class="admin-controls__result"')).toContain(
       'role="status"',
-    );
+   );
     expect(openingTagOf(read('src/views/admin/AdminQuotasView.vue'), 'class="admin-quotas__result"')).toContain(
       'role="status"',
-    );
+   );
     expect(openingTagOf(read('src/views/admin/AdminTenantControlsView.vue'), 'class="admin-controls__result"')).toContain(
       'role="status"',
-    );
+   );
     expect(openingTagOf(read('src/views/admin/AdminUsersView.vue'), 'class="admin-users__result"')).toContain(
       'role="status"',
-    );
+   );
   });
 
   it('keeps the per-second rate-limit countdown out of any live region', () => {
@@ -243,7 +243,7 @@ describe('live region 范围（D-193）', () => {
   });
 });
 
-describe('skip link（D-193）', () => {
+describe('skip link', () => {
   it('points at an anchor that exists exactly once', () => {
     const app = read('src/App.vue');
     const href = /class="skip-link"[^>]*href="#([^"]+)"/.exec(app)?.[1] ?? '';

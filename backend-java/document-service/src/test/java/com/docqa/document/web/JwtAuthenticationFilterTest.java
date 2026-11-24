@@ -109,7 +109,7 @@ class JwtAuthenticationFilterTest {
     }
 
     /**
-     * {@code S10-H1} 的单元级回归：旧白名单只认 {@code /api/v1/documents}，其他业务前缀整体漏网、
+     * {@code } 的单元级回归：旧白名单只认 {@code /api/v1/documents}，其他业务前缀整体漏网、
      * 属性从不写入。默认拦截后，任何 {@code /api/v1/} 路径都要先过鉴权——包括本服务未注册的路径。
      */
     @Test
@@ -128,7 +128,7 @@ class JwtAuthenticationFilterTest {
 
     /**
      * 反方向：{@link com.docqa.common.web.PublicPaths} 登记的免 Bearer 端点必须放行。
-     * 缺了这条，「把门禁收紧成拦截一切」也能让上面几条全绿——守卫要双向承重（D-238）。
+     * 缺了这条，「把门禁收紧成拦截一切」也能让上面几条全绿——守卫要双向承重。
      */
     @Test
     void bearerExemptPathsArePassedThrough() throws Exception {

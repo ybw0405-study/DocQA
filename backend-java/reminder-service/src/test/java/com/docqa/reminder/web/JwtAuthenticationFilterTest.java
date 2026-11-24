@@ -109,7 +109,7 @@ class JwtAuthenticationFilterTest {
         assertThat(List.of(request.getRequestURI())).contains("/api/v1/reminders");
     }
 
-    /** {@code S10-H1} 的单元级回归：通知前缀曾在白名单之外，整体跳过鉴权后由绑定异常变成 500。 */
+    /** {@code } 的单元级回归：通知前缀曾在白名单之外，整体跳过鉴权后由绑定异常变成 500。 */
     @Test
     void notificationPathsAreFiltered() throws Exception {
         when(jwtAuthenticator.authenticateIdentity(null))

@@ -25,7 +25,7 @@ from docqa_ai.rag.service import RetrievalService, RetrievalUnavailable
 from tests.conftest import DOCUMENT_ID, make_settings
 from tests.test_agent_graph import ScriptedPlanner, block, context, graph
 
-# `observability.md` §4.2 中落在 Python 进程内的 9 项，逐字抄录，不得改写。
+# 9 项业务指标口径 中落在 Python 进程内的 9 项，逐字抄录，不得改写。
 DOCUMENTED_SERIES = (
     "docqa_llm_calls_total",
     "docqa_llm_latency_seconds",

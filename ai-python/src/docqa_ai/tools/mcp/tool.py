@@ -24,7 +24,7 @@ _SERVER_NAME = re.compile(r"^[a-z0-9_]{1,32}$")
 
 
 def _parse_arguments(argument: str) -> dict[str, object]:
-    """D-126：入参统一为 JSON 对象字符串；空串等价于 `{}`。"""
+    """入参统一为 JSON 对象字符串；空串等价于 `{}`。"""
 
     raw = argument.strip()
     if not raw:
@@ -78,7 +78,7 @@ class McpTool:
 
     async def run(self, argument: str, context: ToolContext) -> ToolResult:
         arguments = _parse_arguments(argument)
-        # D-131：出站前先掩码，与 document_search 同序；掩码后必须是合法 JSON 对象，否则不外呼。
+        # 出站前先掩码，与 document_search 同序；掩码后必须是合法 JSON 对象，否则不外呼。
         input_gate = mask_text(argument)
         if input_gate.count:
             LOGGER.warning(
@@ -120,7 +120,7 @@ class McpTool:
                 self.name,
                 result.dropped_blocks,
             )
-        # 先掩码后截断：截断可能把 PII 切成不可识别形态，顺序反了会漏（D-127）。
+        # 先掩码后截断：截断可能把 PII 切成不可识别形态，顺序反了会漏。
         masked = mask_text(result.text)
         return ToolResult(
             observation=fit_observation(

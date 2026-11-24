@@ -170,7 +170,7 @@ function resetMessages(): void {
 }
 
 /**
- * 只预检新口令（D-216）：当前口令在契约上的约束是「非空即合法」，
+ * 只预检新口令：当前口令在契约上的约束是「非空即合法」，
  * 本地再套一次强度策略就会把「旧口令打错了」误报成「格式不符」。
  */
 function checkNewPassword(): boolean {
@@ -211,7 +211,7 @@ async function submit(): Promise<void> {
   try {
     await changePassword({ currentPassword: currentPassword.value, newPassword: newPassword.value });
     // 契约在这里返回 204 且不含任何令牌：服务端已吊销该用户全部刷新凭据并推进吊销水位，
-    // 因此本地会话必须随即清空，静默续期只会拿到被拒绝的刷新请求（D-206）。
+    // 因此本地会话必须随即清空，静默续期只会拿到被拒绝的刷新请求。
     currentPassword.value = '';
     newPassword.value = '';
     await auth.signOut();
@@ -442,7 +442,7 @@ async function submit(): Promise<void> {
         label="当前口令"
         :error="currentError"
       >
-        <!-- 契约上 currentPassword 只有 minLength: 1 与 maxLength: 72，本页因此不做强度预检（D-216）。 -->
+        <!-- 契约上 currentPassword 只有 minLength: 1 与 maxLength: 72，本页因此不做强度预检。 -->
         <input
           v-model="currentPassword"
           name="currentPassword"

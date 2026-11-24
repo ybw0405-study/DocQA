@@ -50,7 +50,7 @@ class RecordingReranker:
 
 
 class ExplodingLedger:
-    """账本自身读写失败：装饰器必须把 BudgetUnavailable 原样交给调用点翻译（D-119 的竞态形态之一）。"""
+    """账本自身读写失败：装饰器必须把 BudgetUnavailable 原样交给调用点翻译（的竞态形态之一）。"""
 
     async def snapshot(self):  # pragma: no cover - must not be reached
         raise AssertionError("the decorators must not read a snapshot")
@@ -112,7 +112,7 @@ async def test_unarmed_quota_refuses_the_first_call(call_limit: int, token_limit
 
 
 async def test_failed_embedding_keeps_the_reservation() -> None:
-    """只预订不回补：端点报错时钱可能已经花了，宁可多记也不能少记（D-115 ②）。"""
+    """只预订不回补：端点报错时钱可能已经花了，宁可多记也不能少记（②）。"""
 
     inner = RecordingEmbedder(error=EmbeddingError("endpoint returned 500"))
     store = InMemoryExperimentBudgetStore(10, 100_000)
@@ -122,7 +122,7 @@ async def test_failed_embedding_keeps_the_reservation() -> None:
 
 
 async def test_decorated_embedder_passes_provider_identity_through() -> None:
-    """worker 的批量上限取 `min(配置, provider.max_batch_rows)`（D-114），属性不透传就会退回默认值。"""
+    """worker 的批量上限取 `min(配置, provider.max_batch_rows)`，属性不透传就会退回默认值。"""
 
     inner = RecordingEmbedder()
     embedder = BudgetedEmbeddingProvider(inner, InMemoryExperimentBudgetStore(10, 100_000))

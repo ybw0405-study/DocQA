@@ -54,7 +54,7 @@ def test_duplicate_tools_are_deduplicated_in_order() -> None:
 
 
 def test_mcp_tool_names_follow_the_protocol_pattern() -> None:
-    """D-123：允许值集合扩写，但仍是结构约束而不是任意字符串。"""
+    """允许值集合扩写，但仍是结构约束而不是任意字符串。"""
 
     request = parse(
         request_payload(

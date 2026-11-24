@@ -18,7 +18,7 @@
         <jjwt.version>0.12.7</jjwt.version>
         <!--
           resilience4j 版本一律由 spring-boot-dependencies BOM 管理（Boot 3.3.5 → 2.1.0），
-          此处**不得**覆盖。历史缺陷 S11-3-M3：曾把 resilience4j-spring-boot3 单独钉到 2.2.0，
+          此处**不得**覆盖。历史缺陷：曾把 resilience4j-spring-boot3 单独钉到 2.2.0，
           其余模块仍走 BOM 的 2.1.0，导致版本混装、CircuitBreakerMetricsAutoConfiguration
           静默不生效，/actuator/prometheus 上 resilience4j_* 序列长期为 0 条 —— 熔断功能
           正常但指标全空，属于「不报错但不干活」。
@@ -90,7 +90,7 @@
             <!-- 版本由 Boot BOM 决定，见 properties 里的说明 -->
         </dependency>
         <dependency>
-            <!-- 编译期需要 TaggedCircuitBreakerMetrics（S11-3-M3 显式绑定），
+            <!-- 编译期需要 TaggedCircuitBreakerMetrics（显式绑定），
                  它虽由 spring-boot3 传递引入但 scope 是 runtime，不加这一条编不过。 -->
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-micrometer</artifactId>

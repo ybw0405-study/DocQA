@@ -41,7 +41,7 @@ def _host_hint(url: str) -> str:
 
 
 class WebFetchTool:
-    """Fetches one public page through the bounded client (D-137 / D-141).
+    """Fetches one public page through the bounded client.
 
     The model supplies the URL, so this is the only built-in that reaches arbitrary
     hosts: SSRF validation, robots.txt, redirect revalidation, a byte ceiling and a

@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Bean;
  * 本身也是由 {@code MetricsAutoConfiguration} 提供的自动配置 bean。两者没有显式顺序约束时，
  * 本类可能先被求值、看不见 registry，于是整个 bean 被静默跳过——服务启动时表现为
  * 「required a bean of type BusinessMetrics that could not be found」，而单测直接
- * {@code new BusinessMetrics(registry)} 永远发现不了。S11-10 的真实启动复现了这一点
+ * {@code new BusinessMetrics(registry)} 永远发现不了。 的真实启动复现了这一点
  * （document-service / reminder-service / agent-gateway 三个模块启动即失败）。
  *
  * <p>{@link ObjectProvider#getIfAvailable()} 在**实例化**阶段才解析依赖，那时所有 bean

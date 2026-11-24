@@ -12,9 +12,9 @@ REQUEST_OVERHEAD_TOKENS = 4
 
 
 class ExperimentBudgetExhausted(Exception):
-    """额度门禁在**任何字节离开本机之前**拒绝了一次外呼（D-118 ②）。
+    """额度门禁在**任何字节离开本机之前**拒绝了一次外呼（②）。
 
-    它是进程内异常，不映射新错误码：各调用点把它翻译成自己已有的降级或失败形态（D-119 / D-120）。
+    它是进程内异常，不映射新错误码：各调用点把它翻译成自己已有的降级或失败形态。
     """
 
     def __init__(self, operation: str) -> None:
@@ -25,7 +25,7 @@ class ExperimentBudgetExhausted(Exception):
 class BudgetedEmbeddingProvider:
     """包在真实 embedding Provider 外层的额度门禁；离线 Provider 不经过这里。
 
-    只做预订、不做回补：运行时读不到真实 `usage` 是 D-115 ② 的裁决（探针 E56 证明响应带
+    只做预订、不做回补：运行时读不到真实 `usage` 是  ② 的裁决（探针 E56 证明响应带
     `usage.total_tokens`，但那是**一次性观测**，把它接进运行时就要改 Provider 的返回类型）。
     因此账本停留在估算上界，宁可少花不多花。
     """
@@ -51,9 +51,9 @@ class BudgetedEmbeddingProvider:
 
 
 class BudgetedRerankProvider:
-    """rerank 与 embedding 同形：名次是增量能力，花的是真实额度，所以必须进同一本账（D-106）。
+    """rerank 与 embedding 同形：名次是增量能力，花的是真实额度，所以必须进同一本账。
 
-    候选正文在这里已经是掩码文本（D-116 在 `rag/service.py` 的名次决定之前完成），
+    候选正文在这里已经是掩码文本（在 `rag/service.py` 的名次决定之前完成），
     估算因此与外发字节一一对应；`NoopRerank` 不经过这里。
     """
 

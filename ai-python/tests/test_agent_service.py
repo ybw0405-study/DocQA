@@ -80,7 +80,7 @@ async def retrieval_for(content: str, lexical_repository: object | None = None) 
 
 
 class FailingLexicalRepository:
-    """词法通道报错：整体检索仍必须成功，但退化要在审计与观测上可见（D-88）。"""
+    """词法通道报错：整体检索仍必须成功，但退化要在审计与观测上可见。"""
 
     async def search(self, lexical_query: str, scopes: object, limit: int) -> list[object]:
         raise LexicalStoreUnavailable("lexical index is down")
@@ -224,7 +224,7 @@ async def test_retrieval_pii_is_masked_and_audited() -> None:
 
 
 async def test_lexical_fallback_is_audited_as_warn_without_new_governance_surfaces() -> None:
-    """D-88：退化必须可见，但既不新增 audit_event 类型，也不新增两侧闭集白名单里的 payload 键。"""
+    """退化必须可见，但既不新增 audit_event 类型，也不新增两侧闭集白名单里的 payload 键。"""
 
     question = "Python 的 GIL 是什么？"
     result = await service(retrieval=await retrieval_for(question, FailingLexicalRepository())).ask(make_request())
@@ -418,7 +418,7 @@ async def test_without_mcp_lifecycle_calls_are_noops() -> None:
 
 
 class FixedVectorRepository:
-    """把向量侧分数写死：置信度的耦合关系必须可断言，不能靠 offline 哈希碰运气（D-94）。"""
+    """把向量侧分数写死：置信度的耦合关系必须可断言，不能靠 offline 哈希碰运气。"""
 
     def __init__(self, hits: list[VectorHit]) -> None:
         self._hits = hits
@@ -491,7 +491,7 @@ async def test_confidence_follows_which_chunk_is_cited_not_how_many_exist() -> N
 
 
 async def test_lexical_only_citation_stays_visible_with_zero_confidence() -> None:
-    """D-84 的对外后果：引用非空、score 恒 0.0、必然 LOW_CONFIDENCE，但回答不因此被阻断。"""
+    """的对外后果：引用非空、score 恒 0.0、必然 LOW_CONFIDENCE，但回答不因此被阻断。"""
 
     result = await scored_service(lexical_count=1, citation_indexes=(0,)).ask(make_request())
     assert len(result.citations) == 1
@@ -511,7 +511,7 @@ class ForbiddenRepository:
 
 
 async def test_experiment_exhaustion_soft_degrades_before_any_retrieval() -> None:
-    """D-119 ②：额度用尽呈现为既有的 200 软降级，而不是新错误码——响应面一个字段都没新增。"""
+    """②：额度用尽呈现为既有的 200 软降级，而不是新错误码——响应面一个字段都没新增。"""
 
     ledger = InMemoryExperimentBudgetStore(1, 200_000)
     assert await ledger.authorize_call(1) is True
@@ -569,7 +569,7 @@ class UnpublishableLedger(InMemoryExperimentBudgetStore):
 
 
 async def test_startup_publishes_the_experiment_limits_through_the_service() -> None:
-    """S9-5e：lifespan 调用的就是这个入口，管理面的 `limitsKnown` 靠它变成 true。"""
+    """lifespan 调用的就是这个入口，管理面的 `limitsKnown` 靠它变成 true。"""
 
     ledger = PublishingLedger()
     await service(experiment=ledger).publish_experiment_limits()
@@ -577,7 +577,7 @@ async def test_startup_publishes_the_experiment_limits_through_the_service() -> 
 
 
 async def test_startup_without_a_ledger_never_publishes() -> None:
-    """离线组合（experiment=None）必须在触碰 Redis 之前返回，否则 D-113 的零写键就破了。"""
+    """离线组合（experiment=None）必须在触碰 Redis 之前返回，否则  的零写键就破了。"""
 
     await service(experiment=None).publish_experiment_limits()
 

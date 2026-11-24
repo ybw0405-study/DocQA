@@ -99,7 +99,7 @@ def _inverted_abstract(index: object) -> str:
 
 
 class AcademicSearchTool:
-    """OpenAlex + arXiv metadata search; abstracts only, never full text (D-138)."""
+    """OpenAlex + arXiv metadata search; abstracts only, never full text."""
 
     name = "academic_search"
     source = "builtin"

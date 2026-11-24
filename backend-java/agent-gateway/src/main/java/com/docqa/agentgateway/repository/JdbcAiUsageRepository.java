@@ -16,7 +16,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 /**
- * `agent_execution` 只读聚合（D-159）。
+ * `agent_execution` 只读聚合。
  *
  * <p>时间窗用 `started_at`，配合 V9 的 `idx_agent_execution_started`。
  * 日桶按 UTC：连接时区由 Hikari `connection-init-sql` 固定为 `+00:00`，

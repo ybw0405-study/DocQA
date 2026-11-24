@@ -33,7 +33,7 @@ public class AuditPayloadSanitizer {
             "historyTruncated",
             "targetUserId");
 
-    // D-127：MCP 名不再被静默丢弃，但仍受结构约束；来源是闭集，避免治理字段变成自由文本。
+    // MCP 名不再被静默丢弃，但仍受结构约束；来源是闭集，避免治理字段变成自由文本。
     private static final Pattern TOOL_NAME = Pattern.compile(
             "^(document_search|calculator|current_time|web_fetch|web_search|academic_search|wikipedia_lookup"
                     + "|mcp__[a-z0-9_]{1,32}__[a-z0-9_]{1,32})$");

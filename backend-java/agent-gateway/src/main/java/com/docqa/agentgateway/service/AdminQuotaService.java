@@ -95,7 +95,7 @@ public class AdminQuotaService {
                     now,
                     now));
         });
-        // 配额数值只进结构化日志，不进审计 payload（D-160）。
+        // 配额数值只进结构化日志，不进审计 payload。
         LOGGER.info(
                 "Admin AI quota changed: targetUserId={}, dailyQuestionLimit={}, dailyTokenLimit={}, "
                         + "cleared={}, adminId={}, traceId={}",

@@ -16,7 +16,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
- * 管理面 AI 用量汇总（D-159）。
+ * 管理面 AI 用量汇总。
  *
  * <p>时间窗缺省最近 24 小时、最长 31 天；日桶按 UTC；只返回计数与均值，
  * 不返回分位数、不承诺延迟上界。本服务不投递 MQ、不调用 Python。</p>

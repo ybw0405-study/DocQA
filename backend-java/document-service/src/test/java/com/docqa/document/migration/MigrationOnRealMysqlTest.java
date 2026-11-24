@@ -263,7 +263,7 @@ class MigrationOnRealMysqlTest {
 
         assertThatThrownBy(() -> jdbc.update(insert,
                 "44444444-0000-0000-0000-0000000000a4", tenantId, "主连接", url, "model-d", true, false))
-                .as("租户内同名必须收敛到同一行，创建才能按值幂等（D-197）")
+                .as("租户内同名必须收敛到同一行，创建才能按值幂等")
                 .isInstanceOf(DuplicateKeyException.class)
                 .hasMessageContaining("uk_model_connection_tenant_name");
 

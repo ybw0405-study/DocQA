@@ -46,7 +46,7 @@ def results_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 async def test_noop_keeps_the_fusion_order_without_any_request() -> None:
-    """默认形态必须原样返回，否则「rerank 没参与」与「rerank 全失败」在离线跑里不可区分（D-103 的前提）。"""
+    """默认形态必须原样返回，否则「rerank 没参与」与「rerank 全失败」在离线跑里不可区分（的前提）。"""
 
     items = await NoopRerank().rerank(query="问题", documents=DOCUMENTS, timeout_s=1.0)
     assert [item.index for item in items] == [0, 1, 2]
@@ -144,7 +144,7 @@ async def test_transport_error_maps_to_rerank_unavailable() -> None:
 
 
 async def test_timeout_maps_to_rerank_timeout() -> None:
-    """超时必须是独立异常类，D-103 的降级与 D-112 的一次重试都靠它判别。"""
+    """超时必须是独立异常类， 的降级与  的一次重试都靠它判别。"""
 
     provider = provider_raising(httpx.ReadTimeout("slow"))
     with pytest.raises(RerankTimeout, match="rerank request timed out"):
@@ -230,7 +230,7 @@ def test_dashscope_rerank_without_api_key_is_rejected() -> None:
 
 
 def test_dashscope_rerank_consumes_the_experiment_budget_guard() -> None:
-    """rerank 是外呼，切真却不声明额度必须启动失败（D-106 把 rerank 也算进真实 Provider）。"""
+    """rerank 是外呼，切真却不声明额度必须启动失败（把 rerank 也算进真实 Provider）。"""
 
     with pytest.raises(ValidationError, match="experiment_budget"):
         make_settings(rerank_provider="dashscope", rerank_base_url=NATIVE_URL, rerank_api_key="k")

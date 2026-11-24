@@ -75,7 +75,7 @@ async function onLoadMore(): Promise<void> {
 }
 
 /**
- * 通知行没有 `leadMinutes`，契约要求用看板行的提前量做**显示层**换算（D-72）。
+ * 通知行没有 `leadMinutes`，契约要求用看板行的提前量做**显示层**换算。
  * 看板行不在已加载页时不猜提前量，退回只说触发时刻，措辞与换算过的口径明确不同。
  */
 function leadOf(item: NotificationData): number | null {
@@ -217,7 +217,7 @@ onMounted(() => {
     <!--
       空态只在「取数成功且确实为空」时出现：首屏请求失败时 `listLoaded` 也会被置真
       （`fetchFirstPage` 的 finally 保证加载骨架必须收起），若只判 `listLoaded && items.length === 0`，
-      失败页会同时出现「还没有通知」与错误条，等于告诉使用者「成功但没有数据」（S10-M3）。
+      失败页会同时出现「还没有通知」与错误条，等于告诉使用者「成功但没有数据」。
     -->
     <EmptyState
       v-if="notifications.listLoaded && notifications.items.length === 0 && notifications.detail === null"

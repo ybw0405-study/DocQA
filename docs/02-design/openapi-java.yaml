@@ -42,7 +42,7 @@ info:
     凭据**只进不出**：明文 Key 只出现在 `PUT …/credential` 的请求体，服务端以 AES-256-GCM
     封装落库（AAD 绑定 `connectionId|tenantId`），读侧只有 `hasCredential` 布尔。
     写操作全部按值幂等（创建按租户内 `name` upsert、凭据与生效状态覆盖式写入），
-    沿用 D-197「管理端不声明幂等头」。**不新增错误码**：连接不存在复用 `COM-NOT_FOUND-001`，
+    沿用 「管理端不声明幂等头」。**不新增错误码**：连接不存在复用 `COM-NOT_FOUND-001`，
     出网策略与连接数上限复用 `COM-VALIDATION-001`，主密钥未配置复用 `COM-INTERNAL-001`；
     探测失败不是 HTTP 错误，仍返回 200 并由 `ModelProbeFailure` 枚举表达结论。
     跨语言协议（`cross-language-protocol.md`）**零改动**：刻意不给 ask payload 增加模型字段，
@@ -58,7 +58,7 @@ info:
     事实再掩码复检、残留 PII 拒写，按 `(tenantId, userId)` 命名空间隔离，每用户上限 50 条
     （溢出淘汰最旧）、TTL 90 天；注入 prompt 时走 `<memory>` 不可信围栏，不影响工具与引用。
     管理面没有写入口。`tenantId` 取自已验签 JWT，`userId` 是被治理用户；删除按值幂等，
-    不声明 `Idempotency-Key`（D-197 同裁决）。**不新增错误码**：记忆不存在复用 `COM-NOT_FOUND-001`，
+    不声明 `Idempotency-Key`（同裁决）。**不新增错误码**：记忆不存在复用 `COM-NOT_FOUND-001`，
     数据面未启用记忆或不可达复用 `AGT-UPSTREAM-001`（503），不假装空清单。
 
     - 2.1.0 新增的五个写操作全部要求 `Idempotency-Key`，`operation` 取值分别为
@@ -2101,7 +2101,7 @@ paths:
         状态机只有六条合法迁移边——`ACTIVE → PAUSED | COMPLETED | CANCELLED` 与
         `PAUSED → ACTIVE | COMPLETED | CANCELLED`；`COMPLETED` 与 `CANCELLED` 是终态，
         没有指向其它状态的出边，因此六条之外的六种请求一律返回 409 `REM-CONFLICT-004`，
-        不先写库再报错，也不静默成功。撤销「已完成」需要重建一条提醒（代价登记在 `phase6-scope.md` D-58）。
+        不先写库再报错，也不静默成功。撤销「已完成」需要重建一条提醒（代价登记在 `phase6-scope.md`）。
 
         **同态提交是 no-op 而不是冲突**：`status` 等于当前状态时返回 200，不写库也不推进 `version`。
         响应里的 `version` 取**当前行的真实值**（未被推进），因此在「读到的版本还没过期」的正常情形下
@@ -2972,7 +2972,7 @@ paths:
         （LangFuse 的 trace 重定向入口），地址不烘焙进前端产物。
 
         本端点只读部署配置：不投递 MQ、不调用 Python、不触发 LLM；
-        不使用 `IdempotencyKey`，与其余管理面读操作同一裁决（D-197）。
+        不使用 `IdempotencyKey`，与其余管理面读操作同一裁决。
       responses:
         '200':
           description: 当前可观测性入口配置
@@ -3155,7 +3155,7 @@ paths:
 
         `name` 在租户内唯一，同名重复提交收敛到同一行并更新 `presetId` / `baseUrl` / `model` /
         `enabled`，**不改变生效状态**（`is_active` 不被 upsert 触碰）。因此本操作按值幂等，
-        沿用管理面 D-197 裁决：不声明 `Idempotency-Key`。
+        沿用管理面  裁决：不声明 `Idempotency-Key`。
 
         `baseUrl` 必须是 `http` / `https`，且出网前过主机白名单与私网判定：回环、私网、
         链路本地（含云元数据 169.254.169.254）、保留地址默认拒绝，本地自托管端点需要服务端

@@ -125,7 +125,7 @@ class RerankCall:
 class ScriptedRerankProvider:
     """按脚本给出名次的第三方替身。
 
-    `calls` 记录的是**实收文本**，它是 D-116（外发只有掩码后正文）与 D-104（名次由第三方决定、
+    `calls` 记录的是**实收文本**，它是 （外发只有掩码后正文）与 （名次由第三方决定、
     分数不由它决定）两条判据的载体；只断言返回次序的话，这两件事都可以悄悄破口。
     """
 
@@ -186,7 +186,7 @@ def service(
 
 
 async def test_lexical_only_chunk_enters_the_result_with_a_zero_score() -> None:
-    """只被词法命中、向量没给的块保留进上下文，但相似度未知就写 0，不伪造证据（D-84）。"""
+    """只被词法命中、向量没给的块保留进上下文，但相似度未知就写 0，不伪造证据。"""
 
     vector = RecordingVectorRepository([vector_hit(0, "学习方法甲", 0.9)])
     lexical = RecordingLexicalRepository([lexical_hit(3, "学习方法乙")])
@@ -197,7 +197,7 @@ async def test_lexical_only_chunk_enters_the_result_with_a_zero_score() -> None:
 
 
 async def test_fusion_ranks_by_rrf_then_coverage_rerank_can_move_a_lexical_only_chunk_first() -> None:
-    """融合只看名次（RRF），重排只看覆盖度；两者都不产生相似度（D-82/D-85/D-84）。"""
+    """融合只看名次（RRF），重排只看覆盖度；两者都不产生相似度。"""
 
     vector = RecordingVectorRepository(
         [
@@ -209,17 +209,17 @@ async def test_fusion_ranks_by_rrf_then_coverage_rerank_can_move_a_lexical_only_
     result = await service(vector, lexical).retrieve("学习方法", [scope()])
     assert [chunk.chunk_index for chunk in result.chunks] == [3, 1, 0]
     assert [chunk.score for chunk in result.chunks] == [0.0, 0.8, 0.95]
-    # 排在第一位的是纯词法命中，confidence 口径仍取向量侧最高相似度（D-83）
+    # 排在第一位的是纯词法命中，confidence 口径仍取向量侧最高相似度
     assert result.top_score == 0.95
     assert lexical.calls[0].query == "'学' <-> '习' | '习' <-> '方' | '方' <-> '法'"
     # 「练习方法乙」并不含词组「习方」，但跨词邻接让它字面命中，覆盖度升到 2/3 并压过 1/3 的 0 号块：
-    # 这就是 D-81 登记的结构性假阳性，重排只整理次序、修不掉它，根治归 S6 的真分词器
+    # 这就是已登记的结构性假阳性，重排只整理次序、修不掉它，根治归真分词器
     assert lexical_coverage("练习方法乙", ("学习", "习方", "方法")) == pytest.approx(2 / 3)
     assert lexical_coverage("学习很要紧", ("学习", "习方", "方法")) == pytest.approx(1 / 3)
 
 
 async def test_both_channels_receive_the_same_authorization_scope_and_limit() -> None:
-    """词法通道天然比向量通道宽，同一条授权谓词是必须而不是便利（D-87 红线、§7.2）。"""
+    """词法通道天然比向量通道宽，同一条授权谓词是必须而不是便利（红线、§7.2）。"""
 
     scopes = [scope(), scope(OTHER_DOCUMENT, "v2")]
     vector = RecordingVectorRepository([vector_hit(0, "学习方法甲", 0.9)])
@@ -232,7 +232,7 @@ async def test_both_channels_receive_the_same_authorization_scope_and_limit() ->
 
 
 async def test_candidate_limit_is_raised_by_the_three_fold_floor() -> None:
-    """候选集取 max(输出上限*3, 词法候选上限)，保证融合至少有 3 倍候选可排（D-91）。"""
+    """候选集取 max(输出上限*3, 词法候选上限)，保证融合至少有 3 倍候选可排。"""
 
     vector = RecordingVectorRepository([vector_hit(0, "学习方法甲", 0.9)])
     lexical = RecordingLexicalRepository([])
@@ -242,7 +242,7 @@ async def test_candidate_limit_is_raised_by_the_three_fold_floor() -> None:
 
 
 async def test_candidate_limit_is_the_per_channel_cap_while_top_k_is_the_output_cap() -> None:
-    """top_k 的语义已从「单通道取回上限」改为「最终输出上限」，这是最容易写错的一处（D-91）。"""
+    """top_k 的语义已从「单通道取回上限」改为「最终输出上限」，这是最容易写错的一处。"""
 
     vector = RecordingVectorRepository([vector_hit(index, f"学习方法{index}", 0.9 - index / 100) for index in range(8)])
     lexical = RecordingLexicalRepository([lexical_hit(index, f"学习方法{index}") for index in range(8)])
@@ -261,7 +261,7 @@ async def test_requested_top_k_is_still_clamped_by_the_service_ceiling() -> None
 
 
 async def test_min_score_drops_vector_rank_but_does_not_block_lexical_recall() -> None:
-    """min_score 是余弦语义的门槛，只作用于向量名次；词法通道补召回不受它约束（D-83/D-88）。"""
+    """min_score 是余弦语义的门槛，只作用于向量名次；词法通道补召回不受它约束。"""
 
     vector = RecordingVectorRepository([vector_hit(0, "学习方法甲", 0.2)])
     lexical = RecordingLexicalRepository([lexical_hit(0, "学习方法甲")])
@@ -272,7 +272,7 @@ async def test_min_score_drops_vector_rank_but_does_not_block_lexical_recall() -
 
 
 async def test_short_query_skips_the_lexical_channel_without_marking_a_fallback() -> None:
-    """单字查询走词法就是洪水形态，跳过是前置条件而不是优化项（D-97(b)、§7.4）。"""
+    """单字查询走词法就是洪水形态，跳过是前置条件而不是优化项（(b)、§7.4）。"""
 
     vector = RecordingVectorRepository([vector_hit(0, "学习方法甲", 0.9)])
     lexical = ExplodingLexicalRepository()
@@ -282,7 +282,7 @@ async def test_short_query_skips_the_lexical_channel_without_marking_a_fallback(
 
 
 async def test_lexical_failure_degrades_to_vector_only_and_marks_the_fallback() -> None:
-    """词法是增量能力，它挂掉时系统行为等于 S5 之前，但退化必须在观测上可见（D-88）。"""
+    """词法是增量能力，它挂掉时系统行为等于未引入词法通道之前，但退化必须在观测上可见。"""
 
     vector = RecordingVectorRepository([vector_hit(0, "学习方法甲", 0.9)])
     lexical = FailingLexicalRepository()
@@ -324,7 +324,7 @@ async def test_expired_deadline_before_the_lexical_query_skips_it_as_a_fallback(
 
 
 async def test_vector_failure_still_fails_closed_while_lexical_is_healthy() -> None:
-    """向量不可用仍是 fail-closed，词法通道不能把它救成「检索成功」（D-88 ①）。"""
+    """向量不可用仍是 fail-closed，词法通道不能把它救成「检索成功」（①）。"""
 
     class BrokenVectorRepository:
         async def search(self, embedding: object, scopes: Sequence[DocumentScope], top_k: int) -> list[VectorHit]:
@@ -457,7 +457,7 @@ async def test_degraded_lexical_run_logs_structured_fields_without_the_question(
 
 
 async def test_rerank_reorders_kept_chunks_without_touching_scores() -> None:
-    """D-104 ② 的可执行形态：名次由第三方决定，`score` 一个字节都不动。
+    """② 的可执行形态：名次由第三方决定，`score` 一个字节都不动。
 
     若实现把 `relevance_score` 写进 `score`，下面的分数断言会读成第三方给的数，
     而 Java 侧的 0..1 校验照样通过——所以这条只能在这里钉住，不能指望下游兜。
@@ -480,7 +480,7 @@ async def test_rerank_reorders_kept_chunks_without_touching_scores() -> None:
 
 
 async def test_noop_rerank_leaves_the_result_identical_to_a_run_without_rerank() -> None:
-    """D-113 的离线不变性：注入 `NoopRerank` 与完全不注入必须逐字段相等，否则「默认不联网」只是空话。"""
+    """的离线不变性：注入 `NoopRerank` 与完全不注入必须逐字段相等，否则「默认不联网」只是空话。"""
 
     def hits() -> list[VectorHit]:
         return [vector_hit(0, "学习方法甲", 0.9), vector_hit(1, "练习方法乙", 0.8)]
@@ -497,7 +497,7 @@ async def test_noop_rerank_leaves_the_result_identical_to_a_run_without_rerank()
 
 
 async def test_offline_assembly_only_adds_the_three_rerank_span_keys() -> None:
-    """S6-3 的观测对账口径：offline 注入的 `NoopRerank` 不改结果，只给 span 加三个**加性**键。
+    """的观测对账口径：offline 注入的 `NoopRerank` 不改结果，只给 span 加三个**加性**键。
 
     任何按「属性集合完全相等」写的观测断言都会在这条通道上红；对账必须承认这三个键存在，
     同时不得把 `offline-noop` 读成「rerank 已生效」——它恰恰是「通道未外呼」的证据。
@@ -529,7 +529,7 @@ async def test_offline_assembly_only_adds_the_three_rerank_span_keys() -> None:
 
 
 async def test_rerank_sends_masked_candidates_and_a_masked_query() -> None:
-    """D-116：rerank 的入参就是召回正文本身，掩码必须发生在它之前而不是之后。
+    """rerank 的入参就是召回正文本身，掩码必须发生在它之前而不是之后。
 
     查询侧也重掩一次——生产上传进来的已是掩码文本，但外发红线不能依赖调用方自觉。
     """
@@ -555,7 +555,7 @@ async def test_rerank_sends_masked_candidates_and_a_masked_query() -> None:
     [RerankUnavailable("down"), RerankOutputInvalid("shape"), TimeoutError("slow")],
 )
 async def test_rerank_failure_degrades_to_local_order_and_marks_the_fallback(error: Exception) -> None:
-    """D-103：rerank 挂掉等于退回融合次序，块一个不少，对外响应体一个字段都不变。"""
+    """rerank 挂掉等于退回融合次序，块一个不少，对外响应体一个字段都不变。"""
 
     def hits() -> list[VectorHit]:
         return [vector_hit(0, "学习方法甲", 0.9), vector_hit(1, "学习方法乙", 0.8)]
@@ -634,7 +634,7 @@ async def test_unusable_rerank_indexes_fall_back_to_local_order(items: list[Rera
 
 
 async def test_rerank_writes_its_own_span_attributes_and_degrades_on_both_spans() -> None:
-    """「rerank 全失败」与「rerank 没参与」必须可区分（D-103 的观测代价）。"""
+    """「rerank 全失败」与「rerank 没参与」必须可区分（的观测代价）。"""
 
     exporter = InMemorySpanExporter()
     tracer, _provider = build_tracing(make_settings(), exporter=exporter)
@@ -703,7 +703,7 @@ class UnreachableLedger:
     ids=["quota-refused", "ledger-unreachable"],
 )
 async def test_embedding_gate_failure_keeps_the_existing_retrieval_unavailable(store, expected_reason: str) -> None:
-    """D-119 的检索侧残余：请求级预检放行后并发把额度花完，这里退回既有 503，不新增错误码。"""
+    """的检索侧残余：请求级预检放行后并发把额度花完，这里退回既有 503，不新增错误码。"""
 
     embedder = BudgetedEmbeddingProvider(OfflineEmbeddingProvider(), store)
     retrieval = RetrievalService(RecordingVectorRepository([vector_hit(0, "学习方法甲", 0.9)]), embedder)

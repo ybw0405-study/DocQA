@@ -82,7 +82,7 @@ def _connected_peer(response: httpx.Response) -> str | None:
 
 
 class BoundedHttpClient:
-    """Bounded outbound HTTP for built-in tools (D-141 / D-147).
+    """Bounded outbound HTTP for built-in tools.
 
     Every request goes through URL validation (public address, allowlist, no
     embedded credentials), robots.txt for model-supplied pages, a byte ceiling,

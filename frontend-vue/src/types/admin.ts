@@ -85,7 +85,7 @@ export interface AdminAiControls {
 
 /**
  * 契约 `UpdateAiControlsRequest`（`additionalProperties: false`）：全量只有一个字段。
- * 契约上**没有** `version` 乐观锁、**没有** `IdempotencyKey` 参数（D-197 的本轮解析结论），
+ * 契约上**没有** `version` 乐观锁、**没有** `IdempotencyKey` 参数（的本轮解析结论），
  * 因此这是「按值幂等」——重复设置同一状态无副作用；并发覆盖在服务端是 last-write-wins，界面检测不到。
  */
 export interface UpdateAiControlsRequest {
@@ -142,7 +142,7 @@ export interface AuditEventItem {
 
 /**
  * 时间窗内的计数与均值。只提供计数与均值，**不提供分位数**；
- * `avgLatencyMs` 是服务端记录的历史均值，展示时必须带「非压测结论」标注（D-200）。
+ * `avgLatencyMs` 是服务端记录的历史均值，展示时必须带「非压测结论」标注。
  */
 export interface UsageTotals {
   /** 问答次数，含缓存命中。 */

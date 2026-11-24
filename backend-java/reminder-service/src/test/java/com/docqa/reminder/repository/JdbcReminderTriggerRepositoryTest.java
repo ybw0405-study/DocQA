@@ -65,7 +65,7 @@ class JdbcReminderTriggerRepositoryTest {
                 eq(TENANT_ID.toString()), eq(USER_ID.toString()), eq(21));
         String statement = sql.getValue();
         assertThat(statement).contains("FROM reminder_trigger WHERE tenant_id = ? AND user_id = ?");
-        // D-64：排序键是业务时刻而不是落库时刻，投递堆积时用户看到的仍是事件顺序。
+        // 排序键是业务时刻而不是落库时刻，投递堆积时用户看到的仍是事件顺序。
         assertThat(statement).contains("ORDER BY planned_trigger_at DESC, id DESC LIMIT ?");
         assertThat(statement).doesNotContain("read_at IS NULL");
         assertThat(statement).doesNotContain("planned_trigger_at < ?");

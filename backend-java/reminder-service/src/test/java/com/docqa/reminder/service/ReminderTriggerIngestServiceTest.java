@@ -35,7 +35,7 @@ import org.springframework.dao.DuplicateKeyException;
 
 /**
  * 落库侧只认 {@code (reminderId, plannedTriggerAt)} 这个业务事实判重：{@code eventId} 与 MQ {@code msgId}
- * 在同一次 occurrence 重发时都是新值，按它们判重会让用户为同一节课收到两条通知（D-62）。
+ * 在同一次 occurrence 重发时都是新值，按它们判重会让用户为同一节课收到两条通知。
  */
 @ExtendWith(MockitoExtension.class)
 class ReminderTriggerIngestServiceTest {

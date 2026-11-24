@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * 站内通知的读侧与已读收敛。列表排序键与游标编码严格同序
- * （{@code planned_trigger_at DESC, id DESC}），已读是「只由空变有」的收敛操作，因此不要求幂等键、也不计限流（D-67）。
+ * （{@code planned_trigger_at DESC, id DESC}），已读是「只由空变有」的收敛操作，因此不要求幂等键、也不计限流。
  */
 @Service
 public class NotificationService {

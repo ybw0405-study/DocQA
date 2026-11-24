@@ -18,7 +18,7 @@ const ADDRESS_LEAKS = ['http://', 'https://', ':8000', '/agent/'];
 const NEVER_LOG = ['console.'];
 
 /**
- * 浏览器存储三重白名单（D-185）：原判据扫的是 `localStorage` 这个**词**，而它要守的是「访问令牌不落浏览器存储」。
+ * 浏览器存储三重白名单：原判据扫的是 `localStorage` 这个**词**，而它要守的是「访问令牌不落浏览器存储」。
  * 判据严于命名会把主题偏好这类非敏感状态一并禁掉，因此这里把它拆成三层可机判的约束：
  * 谁能用（owner 文件）、用什么 key（固定集合 + 只允许三个读写 API）、文件内不得出现什么（凭据类字面量）。
  * 这不是放宽红线：任何一项越界都仍然红，且多出来的两层是原来扫字面量抓不到的。
@@ -50,7 +50,7 @@ const CONTRACT_TARGET_IDENTITY = [
     shapes: [/userId\??: string/, /userId: query\.userId/, /\$\{encodeURIComponent\(userId\)\}/],
   },
   /**
-   * S10-7 的用户管理面（`PUT /users/{…}/roles`、`PATCH /users/{…}/status`）携带的也是**被管理对象**：
+   *  的用户管理面（`PUT /users/{…}/roles`、`PATCH /users/{…}/status`）携带的也是**被管理对象**：
    * 契约把标识放在路径上，Java 侧仍以 JWT `sub` 判调用者，因此放行形态与配额页同构，只是没有查询键那条。
    */
   {
@@ -94,7 +94,7 @@ const HTTP_VERBS = ['get', 'post', 'postWithTrace', 'postFormWithTrace', 'postNo
 function verbsUsedFrom(file: string): string[] {
   const verbs = importSpecifiers(readFileSync(join(ROOT, file), 'utf8'), HTTP_SPEC).filter((name) =>
     HTTP_VERBS.includes(name),
-  );
+ );
   return [...verbs].sort();
 }
 
@@ -120,7 +120,7 @@ function hits(files: string[], needles: string[]): string[] {
 }
 
 /**
- * D-218 的判据来源：dev 服务器只按 `BACKENDS` 的 context 前缀匹配请求，少一条不报错、
+ *  的判据来源：dev 服务器只按 `BACKENDS` 的 context 前缀匹配请求，少一条不报错、
  * 而是走 SPA fallback 返回 `index.html`，页面于是拿到 HTML 却只表现为「请求失败」。
  * 所以这里要的不是「代理里有哪些前缀」，而是「前端调用过哪些前缀」——后者只能从调用点导出。
  */
@@ -200,7 +200,7 @@ describe('红线扫描', () => {
   });
 
   it('keeps index.html free of inline scripts and pins the theme bootstrap first', () => {
-    // CSP 是 script-src 'self'：首帧主题只能靠独立模块，不能靠内联脚本（D-184）。
+    // CSP 是 script-src 'self'：首帧主题只能靠独立模块，不能靠内联脚本。
     const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
     const inline = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
       .map((match) => (match[1] ?? '').trim())
@@ -274,7 +274,7 @@ describe('红线扫描', () => {
     expect(config).toContain('127.0.0.1:9000');
   });
 
-  it('keeps one dev proxy prefix for exactly every API prefix the client calls (D-218)', () => {
+  it('keeps one dev proxy prefix for exactly every API prefix the client calls', () => {
     const contexts = [...readFileSync(join(ROOT, 'vite.config.ts'), 'utf8')
       .matchAll(/context: '([^']+)'/g)]
       .map((match) => match[1] ?? '')
@@ -330,7 +330,7 @@ describe('红线扫描', () => {
         lines
           .filter((line) => !entry.shapes.some((shape) => shape.test(line)))
           .map((line) => line.trim()),
-      ).toEqual([]);
+     ).toEqual([]);
     }
   });
 
@@ -345,7 +345,7 @@ describe('红线扫描', () => {
     for (const [file, expected] of Object.entries(apiVerbs)) {
       expect(verbsUsedFrom(file), `${file} 使用的传输动词与契约给出的操作面不符`).toEqual(
         [...expected].sort(),
-      );
+     );
     }
 
     // 视图、组件与 store 一律经 api 层发请求：绕过它就会绕过「幂等键绑定 reminderId|status|version」这一处实现。

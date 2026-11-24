@@ -8,7 +8,7 @@ from tests.conftest import make_settings
 
 
 def test_s5_retrieval_defaults_are_the_delivered_shape() -> None:
-    """配置面默认值必须等于交付形态，不能「测试跑开、线上跑关」（D-90 ②）。"""
+    """配置面默认值必须等于交付形态，不能「测试跑开、线上跑关」（②）。"""
 
     settings = make_settings()
     assert settings.lexical_recall_enabled is True
@@ -18,7 +18,7 @@ def test_s5_retrieval_defaults_are_the_delivered_shape() -> None:
 
 
 def test_lexical_candidate_limit_below_top_k_is_rejected() -> None:
-    """否则词法通道每轮都被自己的上限截没（D-90 的跨键校验）。"""
+    """否则词法通道每轮都被自己的上限截没（的跨键校验）。"""
 
     with pytest.raises(ValidationError, match="retrieval_lexical_candidate_limit"):
         make_settings(retrieval_top_k=20, retrieval_lexical_candidate_limit=10)
@@ -41,7 +41,7 @@ def test_s5_keys_are_bounded(overrides: dict[str, int]) -> None:
 
 
 def test_redacted_summary_reports_the_effective_retrieval_shape() -> None:
-    """启动日志必须读得出实际生效形态，否则退化与关通道在事后不可区分（D-90 的代价条目）。"""
+    """启动日志必须读得出实际生效形态，否则退化与关通道在事后不可区分（的代价条目）。"""
 
     settings = make_settings(
         lexical_recall_enabled=False,

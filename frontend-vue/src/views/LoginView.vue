@@ -41,7 +41,7 @@ const usernameMaxLength = computed(() =>
 const passwordMinLength = computed(() => (isRegister.value ? PASSWORD_MIN_LENGTH : 1));
 
 /**
- * 跨页提示只认这一个固定键（D-206）：URL 里的其它值一律不渲染，
+ * 跨页提示只认这一个固定键：URL 里的其它值一律不渲染，
  * 提示语本体由 display.ts 单点持有，查询串只携带键名。
  */
 const noticeText = computed(() =>

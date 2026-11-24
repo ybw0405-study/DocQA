@@ -262,7 +262,7 @@ async def test_tool_failure_is_recorded_without_leaking_input() -> None:
 
 
 async def test_experiment_ledger_refusal_stops_before_the_planner() -> None:
-    """全局额度拒绝 ⇒ 与每轮预算拒绝同一个软降级形态，且一次都没外呼（D-119 ②）。"""
+    """全局额度拒绝 ⇒ 与每轮预算拒绝同一个软降级形态，且一次都没外呼（②）。"""
 
     planner = ScriptedPlanner(PlannerOutput(kind="final", answer="must not run"))
     experiment = InMemoryExperimentBudgetStore(0, 100_000)
@@ -277,7 +277,7 @@ async def test_experiment_ledger_refusal_stops_before_the_planner() -> None:
 
 
 async def test_experiment_ledger_is_settled_with_the_real_usage() -> None:
-    """生成侧是账本里唯一能拿到真实 `usage` 的入口：预订是上界，结算把差额退回（D-115）。"""
+    """生成侧是账本里唯一能拿到真实 `usage` 的入口：预订是上界，结算把差额退回。"""
 
     planner = ScriptedPlanner(PlannerOutput(kind="final", answer="answer", token_in=120, token_out=30))
     experiment = InMemoryExperimentBudgetStore(10, 100_000)
@@ -302,7 +302,7 @@ async def test_round_budget_refusal_releases_the_experiment_reservation() -> Non
 
 
 async def test_planner_failure_keeps_the_experiment_reservation() -> None:
-    """失败的外呼可能已经花钱：每轮预算回补到 0，全局账本却保留预订（D-115 ② 的「只预订不回补」）。"""
+    """失败的外呼可能已经花钱：每轮预算回补到 0，全局账本却保留预订（② 的「只预订不回补」）。"""
 
     planner = ScriptedPlanner(PlannerOutputInvalid("bad"))
     experiment = InMemoryExperimentBudgetStore(10, 100_000)

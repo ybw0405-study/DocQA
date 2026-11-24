@@ -195,7 +195,7 @@ class NotificationServiceTest {
     @Test
     void theIdsPathReturnsTheAffectedRowCountAndZeroIsLegallyASuccess() {
         NotificationService service = service(NOW);
-        // 已读过的 id 撞上 read_at IS NULL 就是 0 行：不报错、不逐项说明，红点照常消失（D-66 的代价）。
+        // 已读过的 id 撞上 read_at IS NULL 就是 0 行：不报错、不逐项说明，红点照常消失（的代价）。
         when(reminderTriggerRepository.markRead(TENANT_ID, USER_ID, List.of(FIRST_ID, SECOND_ID), NOW)).thenReturn(0);
 
         NotificationReadData data = service.markRead(

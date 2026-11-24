@@ -8,7 +8,7 @@ from typing import Protocol
 
 import httpx
 
-# D-122：只实现 Streamable HTTP 的最小 JSON-RPC 2.0 客户端，不引入官方 mcp SDK，
+# 只实现 Streamable HTTP 的最小 JSON-RPC 2.0 客户端，不引入官方 mcp SDK，
 # 也不支持 stdio（那等于把「配置即执行子进程」写进配置文件）。
 MCP_PROTOCOL_VERSION = "2025-06-18"
 CLIENT_INFO = {"name": "docqa-ai", "version": "1.0"}
@@ -60,7 +60,7 @@ def _is_loopback(host: str) -> bool:
 
 
 def _validate_url(url: str) -> str:
-    """D-126：仅 http/https、禁止内嵌凭据、非 loopback 禁止明文。"""
+    """仅 http/https、禁止内嵌凭据、非 loopback 禁止明文。"""
 
     try:
         parsed = httpx.URL(url)
@@ -78,7 +78,7 @@ def _validate_url(url: str) -> str:
 
 
 def _extract_sse_payload(text: str) -> str:
-    """只取第一条事件的 data 行：D-122 明确不实现服务端推送流。"""
+    """只取第一条事件的 data 行： 明确不实现服务端推送流。"""
 
     data: list[str] = []
     for line in text.splitlines():

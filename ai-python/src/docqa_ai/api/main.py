@@ -153,7 +153,7 @@ def build_repositories(
     settings: Settings,
     pg_provider: PgConnectionProvider | None = None,
 ) -> tuple[VectorRepository, LexicalRepository]:
-    """两路仓库共用同一个 DSN 与同一个表名：同一条授权谓词的前提是同一份数据面（D-87）。
+    """两路仓库共用同一个 DSN 与同一个表名：同一条授权谓词的前提是同一份数据面。
 
     连接池由组装根注入，两路仓库共享同一个 provider；未注入时才各自直连（仅测试/离线路径）。
     """
@@ -181,8 +181,8 @@ def build_repositories(
 def build_experiment_ledger(settings: Settings, redis_client: Redis) -> ExperimentBudgetStore | None:
     """全局额度账本只在「真会往外发字节」的组合下构造。
 
-    谓词与配置里的启动守卫同源（D-106 ②）：三个 Provider 全离线**且未打开界面模型连接**
-    ⇒ None ⇒ 一个 Redis 键都不写，默认配置与 S5 逐字节一致（D-113）；只要有一个切真
+    谓词与配置里的启动守卫同源（②）：三个 Provider 全离线**且未打开界面模型连接**
+    ⇒ None ⇒ 一个 Redis 键都不写，默认配置与纯离线形态逐字节一致；只要有一个切真
     （或打开了界面连接）⇒ 守卫已保证额度为正，不会出现「额度 0 把每个请求都软降级」的假死。
     """
 
@@ -219,7 +219,7 @@ def build_embedder(settings: Settings, experiment: ExperimentBudgetStore | None)
 
 
 def build_reranker(settings: Settings, experiment: ExperimentBudgetStore | None) -> RerankProvider:
-    """offline 也注入 `NoopRerank`：名次通道存在但不外呼，结果与不注入逐字段相等（D-113 的用例保证）。
+    """offline 也注入 `NoopRerank`：名次通道存在但不外呼，结果与不注入逐字段相等（的用例保证）。
 
     这里用 `NoopRerank` 自己的模型名而不是配置里的 `rerank_model`——通道没有外呼，
     把真实模型名写到 span 上就是一条假的出网证据。
@@ -238,7 +238,7 @@ def build_reranker(settings: Settings, experiment: ExperimentBudgetStore | None)
 
 
 def build_mcp_servers(settings: Settings) -> tuple[McpServer, ...]:
-    """D-125 / D-133：关闭时不构造任何客户端，零外呼由结构保证，而不是靠调用点自觉。
+    """关闭时不构造任何客户端，零外呼由结构保证，而不是靠调用点自觉。
 
     stdio 条目走官方 SDK 适配层（独立 Proactor 线程 + 熔断）；HTTP 条目沿用自研客户端。
     令牌只从配置指向的环境变量读取，既不进 Settings 字段，也不进日志。
@@ -338,6 +338,7 @@ def build_default_service(
             settings.llm_base_url,
             settings.llm_api_key.get_secret_value(),
             settings.llm_model,
+            tool_protocol=settings.tool_protocol,
         )
     # 单一组装根：进程内只建一次连接池，读侧两路仓库与 AgentAskService 的关闭钩子共用它。
     pg_provider = pg_provider or (
@@ -396,6 +397,7 @@ def build_default_service(
             ResolvedPlanner(planner=planner, model=planner.model, provider=settings.llm_provider),
             allowed_hosts=settings.llm_allowed_host_entries,
             allow_private=settings.llm_allow_private,
+            tool_protocol=settings.tool_protocol,
         )
     service = AgentAskService(
         settings,
@@ -530,10 +532,10 @@ def create_app(
             )
             app.state.agent_service = service
             app.state.redis_client = redis_client
-            # 账本上限先发布，管理面启动后立刻能读到 `limitsKnown=true`（S9-5e）；
+            # 账本上限先发布，管理面启动后立刻能读到 `limitsKnown=true`；
             # 失败只降级回显，不阻断启动（见 `publish_experiment_limits`）。
             await service.publish_experiment_limits()
-            # 预热失败会被 provider 逐 Server 吞掉并保留空快照，不会阻断启动（D-125）。
+            # 预热失败会被 provider 逐 Server 吞掉并保留空快照，不会阻断启动。
             await service.prewarm_tools()
         yield
         if app.state.owns_service:
@@ -677,7 +679,7 @@ def create_app(
         )
 
     async def _read_ask_request(request: Request, instance: str) -> tuple[AgentAskRequest, str | None]:
-        """两个问答端点共享的请求体现状（S8-3 抽出，行为与抽出前逐字节一致）。
+        """两个问答端点共享的请求体现状（抽出，行为与抽出前逐字节一致）。
 
         返回解析后的请求与 trace 线索；一切形状错误在返回前抛出 JSON ProblemDetail——
         这类拒绝发生在任何 SSE 字节之前，因此两个端点都保持「首字节前拒绝 = 普通 JSON」。
@@ -754,7 +756,7 @@ def create_app(
 
     @app.post("/agent/ask/stream")
     async def agent_ask_stream(request: Request) -> Response:
-        """流式问答（S8-3 / D-177）：响应恒为 text/event-stream，事件为 delta/done/error。
+        """流式问答：响应恒为 text/event-stream，事件为 delta/done/error。
 
         请求体形狀错误与协议协商（protocolVersion 必须是 1.1）在升流前拒绝，返回普通
         JSON ProblemDetail（明确 4xx）；进入流之后的失败由 ask_stream 抛出的 AgentError

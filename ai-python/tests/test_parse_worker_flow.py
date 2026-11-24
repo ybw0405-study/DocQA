@@ -361,7 +361,7 @@ async def test_embedding_shape_failure_is_retryable() -> None:
 class RecordingEmbedder:
     """记录每批行数**与收到的原文**的 Provider 替身。
 
-    `max_batch_rows` 模拟端点自报上限（D-114）；`texts` 是 D-110 的判据载体——「Provider 没见过未掩码文本」
+    `max_batch_rows` 模拟端点自报上限；`texts` 是  的判据载体——「Provider 没见过未掩码文本」
     只有把实收文本记下来才可断言，否则只能靠读代码相信它。
     """
 
@@ -424,7 +424,7 @@ async def test_traceparent_continues_the_document_parse_span() -> None:
 
 
 async def test_embedding_input_is_masked_before_the_provider() -> None:
-    """D-110 ②：写侧的掩码在 `_embed` 这个唯一出口上，与 Provider 是 offline 还是真实无关。"""
+    """②：写侧的掩码在 `_embed` 这个唯一出口上，与 Provider 是 offline 还是真实无关。"""
 
     embedder = RecordingEmbedder(1024)
     worker = make_worker(embedder=embedder)
@@ -481,7 +481,7 @@ async def test_without_traceparent_the_event_trace_id_is_annotated() -> None:
 
 
 async def test_experiment_budget_refusal_stays_a_retryable_embedding_failure(caplog) -> None:
-    """D-120 ②：超限沿用既有 retryable 形态，错误码零新增；日志要能把「额度拦下」与「端点失败」分开。
+    """②：超限沿用既有 retryable 形态，错误码零新增；日志要能把「额度拦下」与「端点失败」分开。
 
     注意既有语义：`ParseJobError` 一律走「发布 retryable 的 `parse-failed` 并 ack」
     （`HandleOutcome.PROCESSED`），重投由 Java 依据 `retryable` 决定；返回 `RETRY` 会

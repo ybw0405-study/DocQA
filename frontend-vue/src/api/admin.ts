@@ -18,7 +18,7 @@ import { get, put } from './http';
  * 以及 2.8.0 的可观测性入口只读（`/admin/observability`，部署配置而非治理动作）。
  *
  * **这里不构造任何请求头**：八个管理操作的参数集合里都没有名为 `IdempotencyKey` 的 parameter，
- * 三个 PUT 的请求体也都没有 `version` 字段（D-197）。共享拦截器仍会给非 GET 补一个随机幂等键头
+ * 三个 PUT 的请求体也都没有 `version` 字段。共享拦截器仍会给非 GET 补一个随机幂等键头
  * （那个字面量只存在于 `http.ts`），服务端不消费它——与 `api/notifications.ts` 的已读接口是同一处
  * 既有裁决，因此不为管理端单开一条通道。按值幂等与 last-write-wins 的边界在 store 与界面文案里如实表述。
  */

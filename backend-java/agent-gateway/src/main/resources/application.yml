@@ -46,7 +46,7 @@ spring:
           - id: reminder-service
             uri: ${DOCQA_REMINDER_SERVICE_URI:http://127.0.0.1:8083}
             predicates:
-              # 通知与提醒同服务：Path 必须与契约的 /api/v1/notifications 面一起改，配错表现为 404 而非启动失败（D-71）。
+              # 通知与提醒同服务：Path 必须与契约的 /api/v1/notifications 面一起改，配错表现为 404 而非启动失败。
               - Path=/api/v1/reminders/**,/api/v1/notifications/**
 
 management:
@@ -58,7 +58,7 @@ management:
     health:
       probes:
         enabled: true
-      # 与三个业务服务对齐：liveness 只看进程自身；readiness 纳入 db/redis（D-163）
+      # 与三个业务服务对齐：liveness 只看进程自身；readiness 纳入 db/redis
       group:
         liveness:
           include: livenessState,ping

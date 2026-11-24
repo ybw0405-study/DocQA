@@ -45,13 +45,14 @@ powershell -File scripts/verify-all.ps1 -Offline  # Windows PowerShell 5.1
 `typecheck + lint + test + build`，任一失败即非零退出。
 
 > 本地服务正在运行时，`mvn clean verify` 会因 `target/*.jar` 被占用而失败。
-> 先执行 `docs/00-infra/run-local.ps1 -Action stop`，验证后再重新启动。
+> 先执行 `.\scripts\stop-dev.ps1`，验证后再用 `.\scripts\start-dev.ps1` 重新启动。
 
 ## 3. 分支与提交
 
 完整流程见 [docs/00-infra/git-workflow.md](docs/00-infra/git-workflow.md)。
 
-- 从最新 `main` 创建分支：`feature/{issue-id}-{描述}`、`hotfix/{issue-id}-{描述}`、`release/{major.minor.patch}`；编号用 GitHub issue / PR 号，不使用内部任务书编号。
+- 从最新 `main` 创建分支：`feature/{issue-id}-{描述}`、`hotfix/{issue-id}-{描述}`、`release/{major.minor.patch}`；编号用 GitHub issue / PR 号。
+- 评审机制：个人项目由备用账号 `Y-super000` 履行第二人 review 与批准（模拟双人流程）；分支保护另强制 required status checks、线性历史与禁 force push。
 - 分支名使用小写英文与连字符，长度尽量不超过 30 个字符。
 - 每日至少 rebase 一次 `origin/main`，合并前确保历史线性。
 - 提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)：

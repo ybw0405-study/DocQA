@@ -166,7 +166,7 @@ agent_execution=FAILED，不能伪装成 BUDGET_EXHAUSTED。
 
 - 阈值 `0.55` 是按余弦语义定的，且 Java 侧在 `PythonResponseValidator.java:54-55` 校验取值 0..1 且有限、`:135` 用 `AgentProperties.java:48` 的同值阈值独立判读一次。**两端的阈值不是同一个判定**，Python 决定 `budgetStatus`，Java 决定它自己是否采信——这层重复是既有的治理设计，S5 不合并、不改动。
 - 融合用的是名次而非分数（RRF，`k=60`），因为 `ts_rank` 与 `1 - 余弦距离` 实测不在同一尺度（30000 行语料上 `ts_rank` 落在 `0.0203..0.0746`，`ts_rank_cd` 只有 5–6 个不同值；余弦相似度在 S2 实链上约 `0.6..0.99`）。融合分**不会**被写进 `confidence`，也不会被写进 `score`。
-- 只被词法通道命中、向量通道没给的块，对外 `score = 0.0`，且**不参与 `confidence` 取最大值**（D-84）。因此「引用来自词法」在协议里是**不可见**的：`Citation` 不带来源通道字段，`StrictModel` 禁止 extra 字段，本期也不新增（改协议属跨语言变更，不在 S5）。这条局限由 S5 如实登记，判据留给 D-94。
+- 只被词法通道命中、向量通道没给的块，对外 `score = 0.0`，且**不参与 `confidence` 取最大值**。因此「引用来自词法」在协议里是**不可见**的：`Citation` 不带来源通道字段，`StrictModel` 禁止 extra 字段，本期也不新增（改协议属跨语言变更，不在 S5）。这条局限由 S5 如实登记，判据留给 。
 - 由此有一个必须预防的误读：**只有词法块被引用时 `confidence` 恒为 0.0**，因而必然落到 `LOW_CONFIDENCE`。这是有意的保守（不假装知道相似度），不是缺陷；界面对这种情形的解释口径归 S10。
 
 ### 2.3 成功响应示例
@@ -246,7 +246,7 @@ agent_execution=FAILED，不能伪装成 BUDGET_EXHAUSTED。
 
 `eventId` 由 Python 生成 UUID，Java 以此做 MQ 重复投递和同步/异步双通道去重。`traceId`、`userId` 由 Java 在入库时注入并覆盖任何上游值，防止 Python 伪造归属。
 
-**白名单当前为 17 键**（S7 加入 `toolSource` 后为 16，S9 加入 `targetUserId` 后为 17；网关在 S7 漏同步 `toolSource`，S9 一并补回，即 `S9-M1`）。三处实现逐字对齐：Python `governance/audit.py` 的 `ALLOWED_PAYLOAD_KEYS`、`agent-gateway` 的 `AuditEventValidator.ALLOWED_KEYS`、`audit-service` 的 `AuditPayloadSanitizer.ALLOWED_KEYS`。`agent-gateway` 的 `AuditPayloadKeySetContractTest` 在每次 `mvn verify` 时解析另两侧源码并与运行期集合比对，任何一侧少键都会直接变红。网关与 audit-service 对未知键的处理不同：网关丢弃并追加 `AUDIT_PAYLOAD_REJECTED`，audit-service 丢弃并记录 `droppedFields`；两者都不回显被丢弃的键值。`targetUserId` 在 Python 与 audit-service 两侧都校验 UUID 形态，网关只做长度与类型预过滤。
+**白名单当前为 17 键**（S7 加入 `toolSource` 后为 16，S9 加入 `targetUserId` 后为 17；网关在 S7 漏同步 `toolSource`，S9 一并补回，即 ``）。三处实现逐字对齐：Python `governance/audit.py` 的 `ALLOWED_PAYLOAD_KEYS`、`agent-gateway` 的 `AuditEventValidator.ALLOWED_KEYS`、`audit-service` 的 `AuditPayloadSanitizer.ALLOWED_KEYS`。`agent-gateway` 的 `AuditPayloadKeySetContractTest` 在每次 `mvn verify` 时解析另两侧源码并与运行期集合比对，任何一侧少键都会直接变红。网关与 audit-service 对未知键的处理不同：网关丢弃并追加 `AUDIT_PAYLOAD_REJECTED`，audit-service 丢弃并记录 `droppedFields`；两者都不回显被丢弃的键值。`targetUserId` 在 Python 与 audit-service 两侧都校验 UUID 形态，网关只做长度与类型预过滤。
 
 ## 3. 第三部分：审计回传通道与降级决策树
 
@@ -396,7 +396,7 @@ Java 的 `PiiMasker` 始终按 v2 规则掩码（更严格，不会漏遮），`
 
 ### 5.1 为什么必须是 MQ，而不是 Java 直接调 Python
 
-架构约定禁止除 `agent-gateway` 外的 Java 模块引入 HTTP 客户端，ArchUnit 同时封掉 `RestClient` 与 `java.net.http.HttpClient` 绕路，所以 `document-service` 无法同步调用 Python。反过来给 Python 加一个入站删除端点，就要从零补入站鉴权、限权与 PII 边界，并把一次可失败的删除塞进只服务问答的同步面。**选择新增 topic**（决策 D-32）。
+架构约定禁止除 `agent-gateway` 外的 Java 模块引入 HTTP 客户端，ArchUnit 同时封掉 `RestClient` 与 `java.net.http.HttpClient` 绕路，所以 `document-service` 无法同步调用 Python。反过来给 Python 加一个入站删除端点，就要从零补入站鉴权、限权与 PII 边界，并把一次可失败的删除塞进只服务问答的同步面。**选择新增 topic**（决策）。
 
 副作用必须认下来：删除不再是即时的。API 的对外语义是「MySQL 侧已删除、向量侧异步收敛」，一致性由 §5.4 的确认回投与 §5.6 的补投扫描兜住，不由调用返回码兜住。
 
@@ -504,7 +504,7 @@ S4 新增的不是**跨语言**边界，而是第一条**服务内**异步边界
 | `reminder.due` | `reminder-due` | `reminder-service` 调度器（`RocketMqReminderDuePublisher`） | `reminder-service` 通知落库（S4 新增） | `reminder-service-reminder-due` |
 
 - 消费者组名沿用 `audit-service-audit-event` 的 `{service}-{topic}` 形状；**与生产者组 `reminder-service-producer` 分开**，同一进程内两个不同的 group 身份不共享位点。
-- 消费侧配置镜像 audit-service：`max-reconsume-times: 8`、`consume-thread-min: 2`、`consume-thread-max: 4`，并保留同一条 `consumeThreadMin <= consumeThreadMax` 断言。`reminder-service` 的 `RocketMqProperties` 当前只有生产侧字段（`enabled`/`namesrv`/`producerGroup`/`dueTopic`/`sendTimeoutMs`），S4-2 需要补 `consumerGroup` 与上面三项。
+- 消费侧配置镜像 audit-service：`max-reconsume-times: 8`、`consume-thread-min: 2`、`consume-thread-max: 4`，并保留同一条 `consumeThreadMin <= consumeThreadMax` 断言。`reminder-service` 的 `RocketMqProperties` 当前只有生产侧字段（`enabled`/`namesrv`/`producerGroup`/`dueTopic`/`sendTimeoutMs`）， 需要补 `consumerGroup` 与上面三项。
 - 订阅表达式 `*`：该 topic 没有 tag 分流，引入 tag 属于新切片。
 
 ### 6.3 载荷字段（与 `ReminderDueEvent` 逐字一致）
@@ -569,15 +569,15 @@ rag.retrieve                      # 既有总 span
 └── rag.rerank                    # 既有 span，本期填入真实逻辑：lexical-coverage-v1
 ```
 
-- 属性口径沿用既有命名风格（`retrieval.kept` / `retrieval.dropped` 已存在）。新增：`vector.candidate_count`、`lexical.candidate_count`、`lexical.enabled`（取值 `true` / `false` / `skipped_short_query`）、`lexical.phrase_count`（本次查询切出的短语数，D-97(c) 要求——它是「短查询被跳过」与「切分器什么都没切出来」这两种退化的唯一区分依据）、`lexical_fallback`（仅在退化时出现）、`fusion_rrf_k`、`reranker`（恒为 `lexical-coverage-v1`，**不能**留空，否则会被误读成模型重排）。
+- 属性口径沿用既有命名风格（`retrieval.kept` / `retrieval.dropped` 已存在）。新增：`vector.candidate_count`、`lexical.candidate_count`、`lexical.enabled`（取值 `true` / `false` / `skipped_short_query`）、`lexical.phrase_count`（本次查询切出的短语数，(c) 要求——它是「短查询被跳过」与「切分器什么都没切出来」这两种退化的唯一区分依据）、`lexical_fallback`（仅在退化时出现）、`fusion_rrf_k`、`reranker`（恒为 `lexical-coverage-v1`，**不能**留空，否则会被误读成模型重排）。
 - `rag.rerank` 此前包的是「按向量分数排序 + 截断」，而 `retrieval_min_score` 默认 `0.0` 使那个过滤恒真——span 存在、名字存在、逻辑不存在。本期把它换成真东西，同时用属性写清**是哪个重排器**在做决定。
-- **覆盖度重排在 vector-only 形态下也会改变引用次序。** 这是实现期才发现、设计时只写了「两路融合」的情形：退化时输入 RRF 的只有向量一路，但重排仍按覆盖度次键调序，于是同一批块的先后可能与 S4（纯相似度直排）不同。属 D-85 批准的行为，不是缺陷；但它是用户可感的（引用卡片顺序变了），解释文案归 S10。
-- 相应地 `top_score` 必须是**显式取最大值**，不能写 `chunks[0].score`：重排后第一位不再保证是相似度最高的块，而 `confidence` 的语义（§2.2）钉在向量侧最高相似度上（D-84/D-83）。
+- **覆盖度重排在 vector-only 形态下也会改变引用次序。** 这是实现期才发现、设计时只写了「两路融合」的情形：退化时输入 RRF 的只有向量一路，但重排仍按覆盖度次键调序，于是同一批块的先后可能与 S4（纯相似度直排）不同。属  批准的行为，不是缺陷；但它是用户可感的（引用卡片顺序变了），解释文案归 S10。
+- 相应地 `top_score` 必须是**显式取最大值**，不能写 `chunks[0].score`：重排后第一位不再保证是相似度最高的块，而 `confidence` 的语义（§2.2）钉在向量侧最高相似度上。
 - 融合发生在 PII 掩码**之前**：掩码循环（`rag/service.py:113-127`）仍是对最终候选集执行一次，两路各自不掩码，避免同一个块被掩两次或被绕开。
 
 ### 7.2 授权入参：一个集合喂两路
 
-Java 授权与状态检查产出的 `(documentId, indexVersion)` 对，原样作为两路的共同过滤条件；Python **不为词法通道单独构造范围**，也不接受前端传入的文档 ID。词法通道天然比向量通道宽（GIN 在索引层按 `学 & 习` 取候选，靠 heap 重检收敛出邻接与词序），所以「同一条谓词」不是实现便利而是**必须**：一旦词法通道少带一个 `index_version`，用户就会在引用里看到旧版本或已删除版本的原文片段，而同一条请求里向量通道的同一谓词本来是挡得住的（对应 D-87，红线）。
+Java 授权与状态检查产出的 `(documentId, indexVersion)` 对，原样作为两路的共同过滤条件；Python **不为词法通道单独构造范围**，也不接受前端传入的文档 ID。词法通道天然比向量通道宽（GIN 在索引层按 `学 & 习` 取候选，靠 heap 重检收敛出邻接与词序），所以「同一条谓词」不是实现便利而是**必须**：一旦词法通道少带一个 `index_version`，用户就会在引用里看到旧版本或已删除版本的原文片段，而同一条请求里向量通道的同一谓词本来是挡得住的（对应 ，红线）。
 
 实现侧的验收形式：一条对账测试断言「词法候选的 `document_id` 集合 ⊆ 向量授权集合」与「两路使用同一入参数组」，而不是断言条数相等——后者在真实语料上不成立。
 
@@ -609,21 +609,21 @@ Java 授权与状态检查产出的 `(documentId, indexVersion)` 对，原样作
 
 ### 7.5 本期不构成结论的部分
 
-- **检索质量数字不存在。** Provider 全程 `offline`（特征哈希，不外呼），真实调用预算 200 问 / 20 万 token 分文未动。命中率、精度、`LOW_CONFIDENCE` 误判率都必须等 S6 接入真实 embedding 之后才有意义，阈值校准的判据在 D-94 里定义、执行归 S6/S11。
-- **索引能否命中、计划形态、真实延迟不进 CI。** 门禁是纯离线单测；这三类事实由一次性库/一次性 schema 内的脚本重放取证（D-93），已登记为 S5 的验证缺口。
+- **检索质量数字不存在。** Provider 全程 `offline`（特征哈希，不外呼），真实调用预算 200 问 / 20 万 token 分文未动。命中率、精度、`LOW_CONFIDENCE` 误判率都必须等 S6 接入真实 embedding 之后才有意义，阈值校准的判据在  里定义、执行归 S6/S11。
+- **索引能否命中、计划形态、真实延迟不进 CI。** 门禁是纯离线单测；这三类事实由一次性库/一次性 schema 内的脚本重放取证，已登记为 S5 的验证缺口。
 - **性能一律未压测。** 唯一与耗时相关的记录是一次 30000 行合成语料上的计划观测（索引侧先给 1500 行再重检截断），仅供量级参考，不构成吞吐或延迟结论。
 
 ## 8. 第八部分：名次通道与实验额度账本的跨语言面
 
-S6 在 Python 侧接上两件跨语言敏感的事：**第三方决定引用次序**（rerank，D-104）与**全局真实调用额度**（D-106 / D-107 / D-115 / D-118 / D-119 / D-120）。两者对协议面的字段变更都是**零**，因此本节登记的是**语义边界、对外形态与观测口径**——它们是排查「次序为什么变了」「这次为什么没花钱也没答」的唯一抓手。
+S6 在 Python 侧接上两件跨语言敏感的事：**第三方决定引用次序**（rerank，）与**全局真实调用额度**。两者对协议面的字段变更都是**零**，因此本节登记的是**语义边界、对外形态与观测口径**——它们是排查「次序为什么变了」「这次为什么没花钱也没答」的唯一抓手。
 
-### 8.1 `Citation.score` 与引用次序解耦（D-104 的语义注记）
+### 8.1 `Citation.score` 与引用次序解耦（的语义注记）
 
 - **名次由 rerank 决定，分数由向量相似度决定。** 注入第三方重排器后，`citations[]` 的**先后**可能不再与 `score` 单调一致：`score` 仍然是该块的向量余弦相似度，rerank 只改次序、**不改也不融合分数**。读到「第二条比第一条 `score` 高」不是数据错乱，而是名次由覆盖度 + 精排共同决定的正常结果。
 - `confidence` 的口径**一个字节都不改**（§2.2 的注记继续生效）：它仍是 `max(被引用块的向量相似度)`，且实现上必须**显式取最大值**而非读首元素——首元素现在是名次第一位，不再保证相似度最高。
-- `rerank_fallback` **不进协议**（D-103 ②）：`Citation` 与 `AgentAskResponse` 都不带这个字段，`StrictModel` 也不放 extra。因此「这次的名次是第三方给的还是本地的」只能从 trace 判读，不能从响应体判读——这是 15 键审计闭集与契约不动的既定代价，写在这里以免下一个人把它「顺手」补成字段。
+- `rerank_fallback` **不进协议**（②）：`Citation` 与 `AgentAskResponse` 都不带这个字段，`StrictModel` 也不放 extra。因此「这次的名次是第三方给的还是本地的」只能从 trace 判读，不能从响应体判读——这是 15 键审计闭集与契约不动的既定代价，写在这里以免下一个人把它「顺手」补成字段。
 
-### 8.2 额度超限的对外形态（D-106 ② / D-119 ②）
+### 8.2 额度超限的对外形态（② /  ②）
 
 | 触发位置 | 行为 | 对外表现 | 证据 |
 |---|---|---|---|
@@ -637,7 +637,7 @@ S6 在 Python 侧接上两件跨语言敏感的事：**第三方决定引用次�
 
 ### 8.3 装配面：离线形态为什么可以逐字节不变
 
-`build_experiment_ledger` 的谓词与启动守卫同源（`embedding_provider` / `llm_provider` / `rerank_provider` 任一非 `offline`）：三者全离线时返回 `None`，下游**不构造账本、不包装 Provider**，因此默认配置下 Redis 键 `agent:budget:session-tokens` 一次都不被读写——离线不变性（D-113）在这里是**结构事实**而不是断言。反向也成立：真实 Provider 一旦启用，额度为 0 就启动即失败，不存在「额度 0 ⇒ 每个请求都软降级」的假死组合。
+`build_experiment_ledger` 的谓词与启动守卫同源（`embedding_provider` / `llm_provider` / `rerank_provider` 任一非 `offline`）：三者全离线时返回 `None`，下游**不构造账本、不包装 Provider**，因此默认配置下 Redis 键 `agent:budget:session-tokens` 一次都不被读写——离线不变性在这里是**结构事实**而不是断言。反向也成立：真实 Provider 一旦启用，额度为 0 就启动即失败，不存在「额度 0 ⇒ 每个请求都软降级」的假死组合。
 
 `rerank_provider=offline` 时注入的是 `NoopRerank` 而不是 `None`。可观测面因此是**加性**的：`rag.rerank` 上会多出 `rerank.model`（离线为 `offline-noop`，刻意不写配置里的第三方模型名——通道没有外呼，写了就是假的出网证据）、`rerank.document_count`、`rerank.returned`。检索**结果**与不注入时逐字段相等（`test_noop_rerank_leaves_the_result_identical_to_a_run_without_rerank`），变的只有 span 属性集。
 
@@ -649,15 +649,15 @@ S6 在 Python 侧接上两件跨语言敏感的事：**第三方决定引用次�
 | `openapi-java.yaml` | **不动**，保持 2.3.0（27 paths / 30 operations / 75 schemas / 34 responses / 16 parameters） |
 | `ErrorCode`（Java） | 保持 **37**。`ExperimentBudgetExhausted` 是**进程内异常**，不映射新 HTTP 语义 |
 | `audit_event` 类型 | **零新增**，Java `AuditEventValidator` 白名单不改；载荷仍是同一份 15 键闭集 |
-| Redis | **键名零新增**，但 `agent:budget:session-tokens` 自本期起**真正被读写**（打破 S6-2c 那句「今天只有启动守卫可执行」）。账本只有四个整数字段，正文 / `userId` / traceId 一律不落 |
+| Redis | **键名零新增**，但 `agent:budget:session-tokens` 自本期起**真正被读写**（打破  那句「今天只有启动守卫可执行」）。账本只有四个整数字段，正文 / `userId` / traceId 一律不落 |
 | MQ | 不新增 topic，总数保持 7；写侧超限复用 `parse-failed` |
 | 前端 | 零改动 |
 
 ### 8.5 本期不构成结论的部分
 
-- **`S5-M5` 本期不闭合。** D-94 的阈值校准判据（真实语料上的命中率 / `LOW_CONFIDENCE` 误判率）需要真实 embedding + 标注集两件事，本轮只到位前者的一半：代码路径接通、真实外呼为零，标注集仍未产出。因此 `retrieval_min_score` 与 `low_confidence_threshold` 的取值**仍属未校准默认值**，不得据本轮结果调整。
+- **`` 本期不闭合。**  的阈值校准判据（真实语料上的命中率 / `LOW_CONFIDENCE` 误判率）需要真实 embedding + 标注集两件事，本轮只到位前者的一半：代码路径接通、真实外呼为零，标注集仍未产出。因此 `retrieval_min_score` 与 `low_confidence_threshold` 的取值**仍属未校准默认值**，不得据本轮结果调整。
 - **rerank 名次质量无数字。** 真实 Provider 尚未发出过一次请求，`relevance_score` 从未被观测；§8.1 描述的是语义边界，不是效果结论。
-- **账本的并发正确性只在单进程假设内成立。** `authorize_call` 用 Lua 原子递增，但「多进程共享同一本账」未在真实 Redis 上压过；worker 侧按批预订，前面批次已花费后某一批被拒时整任务仍是 retryable，重投会**重复花费**已成功的批次（D-114 的既有边界，非本期新增）。
+- **账本的并发正确性只在单进程假设内成立。** `authorize_call` 用 Lua 原子递增，但「多进程共享同一本账」未在真实 Redis 上压过；worker 侧按批预订，前面批次已花费后某一批被拒时整任务仍是 retryable，重投会**重复花费**已成功的批次（的既有边界，非本期新增）。
 - **性能未压测。** `rerank_timeout_s`（默认 3000 ms）与掩码逐篇调用的 CPU 开销都在离线单测里跑过，不构成真实端点上的耗时结论。
 
 ---
@@ -670,4 +670,4 @@ S6 在 Python 侧接上两件跨语言敏感的事：**第三方决定引用次�
 
 拦截 hybrid 检索的是什么问题：拦截“span 叫 `rag.rerank` 就当作已经有重排序”的名义主义（默认 `retrieval_min_score=0.0` 让那个过滤恒真，四期无人发现），以及“多一条召回通道应该顺手把分数也融合进来”的尺度混淆——`ts_rank` 与余弦相似度实测不在一个量纲上，线性加权等于给一个未定标的分数凭空定权重。§7 因此把两路的**授权谓词写成同一条**（词法通道天然更宽，放宽一次就是引用泄露）、把 `confidence` 的含义**钉死为向量侧相似度**（词法独有块记 `score=0.0` 且不参与取最大值）、把退化路径**要求留下可见证据**（`lexical_fallback` 属性加 `WARN` 审计），并明确写下 offline Provider 下「检索质量」在本期不构成任何结论。
 
-拦截名次通道与额度账本的是什么问题：拦截“让第三方决定次序却顺手把分数也交给它”的责任转移（§8.1 把名次与 `score` 拆成两句话，谁决定什么写成可判读边界），以及“配置里写了 200 次额度就等于运行时只有 200 次”的自我安慰——额度只有在**每个外呼出口都被读一次、写一次**时才成立，否则它是一份没人执行的注释。§8 因此把「超限长什么样」写成五种触发位置的表格（并明令不得简化成「超限恒为 200」，因为预检与逐外呼之间有竞态）、把「离线不花钱」写成**结构事实**（不构造账本对象就不可能有 Redis 写入），并把「真实 Provider 的名次质量」与 `S5-M5` 一起留在未闭合清单上。
+拦截名次通道与额度账本的是什么问题：拦截“让第三方决定次序却顺手把分数也交给它”的责任转移（§8.1 把名次与 `score` 拆成两句话，谁决定什么写成可判读边界），以及“配置里写了 200 次额度就等于运行时只有 200 次”的自我安慰——额度只有在**每个外呼出口都被读一次、写一次**时才成立，否则它是一份没人执行的注释。§8 因此把「超限长什么样」写成五种触发位置的表格（并明令不得简化成「超限恒为 200」，因为预检与逐外呼之间有竞态）、把「离线不花钱」写成**结构事实**（不构造账本对象就不可能有 Redis 写入），并把「真实 Provider 的名次质量」与 `` 一起留在未闭合清单上。

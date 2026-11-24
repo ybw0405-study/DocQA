@@ -3,7 +3,7 @@
  * 镜像与契约是否仍然一致由 `tests/contract-drift.spec.ts` 当场对账，不靠本注释。
  *
  * `UserRole` / `UserStatus` 两个枚举与 `PASSWORD_PATTERN`、`REGISTER_USERNAME_*` 已经活在
- * `src/types/api.ts`（S1-4 交付 `auth/me` 时建立），这里**只引用不重复定义**——
+ * `src/types/api.ts`（交付 `auth/me` 时建立），这里**只引用不重复定义**——
  * 同一个枚举在两处各写一遍就会失去对账意义。
  *
  * 两条贯穿本片的口径：
@@ -19,7 +19,7 @@ export const USER_LIST_LIMIT_MAX = 100;
 
 /**
  * 契约 `ChangePasswordRequest.currentPassword`：`minLength: 1`、`maxLength: 72`、**没有 pattern**。
- * 缺或错都统一返回 401 `USR-AUTH-001` 并计入登录失败限流，所以客户端不做强度预检（D-216）。
+ * 缺或错都统一返回 401 `USR-AUTH-001` 并计入登录失败限流，所以客户端不做强度预检。
  */
 export const CURRENT_PASSWORD_MIN_LENGTH = 1;
 

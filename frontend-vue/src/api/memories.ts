@@ -4,7 +4,7 @@ import { deleteNoContent, get } from './http';
 /**
  * 长期记忆管理面两个操作的唯一出口（契约 2.9.0 的 `Admin` tag）。
  *
- * **这里不构造任何请求头**：两个操作都没有 `IdempotencyKey` parameter（D-197 同裁决），
+ * **这里不构造任何请求头**：两个操作都没有 `IdempotencyKey` parameter（同裁决），
  * 删除按值幂等。租户由服务端取自已验签 JWT；查询里携带的是**被治理用户**的标识，
  * 不是调用方自己的——与配额页、审计查询同一契约例外。
  *

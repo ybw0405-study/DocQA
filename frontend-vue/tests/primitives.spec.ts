@@ -8,7 +8,7 @@ const SRC = join(ROOT, 'src');
 const UI_DIR = join(SRC, 'components', 'ui');
 
 /**
- * D-187 的单点判据：每个原语独占它负责的那个标签/属性，视图只允许引用组件名。
+ *  的单点判据：每个原语独占它负责的那个标签/属性，视图只允许引用组件名。
  * 扫描范围刻意包含测试文件之外的一切生产源码，出现第二处就说明有人绕开原语手写了同构标记。
  */
 const SINGLE_OWNER = [
@@ -41,7 +41,7 @@ function ownersOf(token: string): string[] {
   return [...texts.entries()].filter(([, text]) => text.includes(token)).map(([file]) => file).sort();
 }
 
-describe('组件原语单点（D-187）', () => {
+describe('组件原语单点', () => {
   it('covers a non-trivial set of sources', () => {
     expect(productionFiles.length).toBeGreaterThanOrEqual(20);
     expect(readdirSync(UI_DIR).filter((entry) => entry.endsWith('.vue'))).toHaveLength(6);
@@ -63,7 +63,7 @@ describe('组件原语单点（D-187）', () => {
   });
 
   it('binds every skeleton to a loading flag and to first-load semantics', () => {
-    // D-189：骨架只能出现在「首次加载中」。宿主只要另有同名 `*loaded` 标志，就说明它已有过内容，
+    // 骨架只能出现在「首次加载中」。宿主只要另有同名 `*loaded` 标志，就说明它已有过内容，
     // 此时骨架条件必须把那个标志取反，否则每次刷新都会闪一块空壳、把已有数据顶掉。
     const offenders: string[] = [];
     for (const [file, text] of texts) {

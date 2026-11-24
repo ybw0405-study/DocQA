@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>被回归的缺陷：{@code @ConditionalOnBean(MeterRegistry.class)} 的求值时机取决于自动配置的
  * 处理顺序。当本配置先于提供 {@code MeterRegistry} 的配置被处理时，条件不成立、整个 bean 被
- * 静默跳过，服务启动直接失败（S11-10 实测：document-service / reminder-service /
+ * 静默跳过，服务启动直接失败（实测：document-service / reminder-service /
  * agent-gateway 三个模块 required a bean of type BusinessMetrics）。普通单测
  * {@code new BusinessMetrics(registry)} 永远发现不了这类问题，因为缺陷只在容器里成立。
  *

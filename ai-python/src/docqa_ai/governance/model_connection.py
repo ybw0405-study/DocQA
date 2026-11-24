@@ -186,6 +186,7 @@ class PlannerResolver:
         *,
         allowed_hosts: Sequence[str] = (),
         allow_private: bool = False,
+        tool_protocol: str = "json",
         close_grace_seconds: float = _CLOSE_GRACE_SECONDS,
     ) -> None:
         self._store = store
@@ -193,6 +194,7 @@ class PlannerResolver:
         self._fallback = fallback
         self._allowed_hosts = tuple(allowed_hosts)
         self._allow_private = allow_private
+        self._tool_protocol = tool_protocol
         self._close_grace = close_grace_seconds
         self._cache: dict[tuple[str, int], ResolvedPlanner] = {}
         self._retired: list[tuple[Planner, float]] = []
@@ -240,7 +242,7 @@ class PlannerResolver:
                 connection.credential, connection_aad(connection.id, tenant_id), connection.key_id
             ).decode("utf-8")
         return ResolvedPlanner(
-            planner=OpenAIPlanner(connection.base_url, api_key, connection.model),
+            planner=OpenAIPlanner(connection.base_url, api_key, connection.model, tool_protocol=self._tool_protocol),
             model=connection.model,
             provider="openai",
         )

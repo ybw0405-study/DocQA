@@ -75,7 +75,7 @@ function onThemeChange(event: Event) {
 
 /**
  * 退出必须显式导航：`signOut()` 只清本地会话，不会改变当前路由。
- * 停在原页面会让界面「看似在线」，而此后每个请求都带不上令牌、逐个 401（S10-M4）。
+ * 停在原页面会让界面「看似在线」，而此后每个请求都带不上令牌、逐个 401。
  * 用 `replace` 而非 `push`，是为了让浏览器的后退键不把一个已被清空的会话页翻回来。
  */
 async function onSignOut(): Promise<void> {

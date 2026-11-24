@@ -12,7 +12,7 @@ _ServerStates = Callable[[], Mapping[str, bool]]
 
 
 class ToolMetrics:
-    """D-143 工具指标面：调用量、耗时、MCP Server 可达性与缓存命中。
+    """工具指标面：调用量、耗时、MCP Server 可达性与缓存命中。
 
     指标属性只放工具名、来源与结果，不放查询原文、URL query、用户标识或入参。
     """

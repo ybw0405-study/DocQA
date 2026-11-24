@@ -376,7 +376,7 @@ public class ParseResultHandler {
 
     /** 发布失败只记日志、不影响 index 已提交的业务状态；残留的旧版本由对账任务与 DLQ 告警兜底。
      *
-     * <p>修复前这里声称「等 S9 sweep」，但仓库里从来没有 S9，属于注释与实现脱节。
+     * <p>修复前这里声称「等后台 sweep」，但实现里从来没有该 sweep，属于注释与实现脱节。
      * 当前真实边界：DELETE_DOCUMENT 由 {@code republishUnconfirmedDeletions} 按未确认删除重投；
      * DELETE_VERSION 依赖 vector-change-completed 的 FAILED 重投链（见 VectorChangeResultHandler）。
      * 持久化「待清理版本」列仍是待办项，不能在这里假装已有自动清理。

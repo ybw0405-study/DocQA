@@ -8,11 +8,13 @@
 #
 # 配置只在进程作用域，不写 Windows 全局；
 # 中间件全在 Docker Desktop bridge，端点固定 127.0.0.1，因此不需要开机自启、不需要刷 IP。
-# 旧路径 docs/00-infra/{start-local,run-local,prepare-local-stack}.ps1 保留作 legacy 回滚。
+# 旧 WSL 链（docs/00-infra/{start-local,run-local,prepare-local-stack} 等）已于 2026-11-24 删除；
+# 解析/向量 Worker 由 ops/docker-compose.app.yml 的 parse-worker / vector-worker 容器承载。
 [CmdletBinding()]
 param(
     [switch]$NoBuild,     # 跳过 mvn package（jar 已是最新时使用）
     [switch]$InfraOnly,   # 只起中间件，不构建、不起任何应用层进程
+    [switch]$Containers,  # 中间件就绪后用全栈 compose 起应用层（含 parse/vector worker 容器）
     [switch]$SkipGrants,  # 跳过授权重放（账号已建好时使用）
     [switch]$WithLangfuse # 追加 LangFuse v3 追踪面（compose langfuse profile，约 +2–3GB 内存）
 )
@@ -402,6 +404,18 @@ if ($WithLangfuse) {
     docker compose -f $compose --profile langfuse up -d *> $null
     if ($LASTEXITCODE -ne 0) { throw 'LangFuse 容器收敛失败；查看上面的输出。' }
     Write-Host '   minio bucket langfuse 就绪；组织/项目/密钥对由容器首启 bootstrap 完成'
+}
+
+if ($Containers) {
+    Write-Host '==> [5/8] -Containers：全栈 compose 起应用层（含 parse/vector worker 容器）'
+    docker compose -f (Join-Path $root 'ops/docker-compose.infra.yml') `
+                   -f (Join-Path $root 'ops/docker-compose.app.yml') up -d
+    if ($LASTEXITCODE -ne 0) { throw 'compose 应用层启动失败；查看上面的输出。' }
+    $gwPort = Get-Conf 'DOCQA_GATEWAY_PORT'; if (-not $gwPort) { $gwPort = '18080' }
+    $webPort = Get-Conf 'DOCQA_WEB_PORT'; if (-not $webPort) { $webPort = '18090' }
+    Write-Host ("  网关 http://127.0.0.1:{0} / 前端 http://127.0.0.1:{1}" -f $gwPort, $webPort)
+    Write-Host '  推迟授权由 compose 的 grants-finalize 在 document-service 就绪后补齐。'
+    return
 }
 
 if ($InfraOnly) {

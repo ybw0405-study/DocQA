@@ -198,7 +198,7 @@ async def test_openai_planner_astream_tool_action_emits_no_delta() -> None:
 
 
 async def test_openai_planner_astream_emits_incremental_deltas_as_answer_streams() -> None:
-    """D-177 的逐 token 形态：答案要边收边发，不能等全文收齐再吐一次。"""
+    """的逐 token 形态：答案要边收边发，不能等全文收齐再吐一次。"""
 
     pieces = ['{"action":"final",', '"answer":"', "流式", "答案", '",', '"citations":[]}']
     body = _sse_body(*[json.dumps({"choices": [{"delta": {"content": piece}}]}) for piece in pieces], "[DONE]")

@@ -167,7 +167,7 @@ export const useConversationsStore = defineStore('conversations', {
     indexedSelection: (state): string[] => {
       const indexed = new Set(
         state.pickerItems.filter((doc) => doc.status === 'INDEXED').map((doc) => doc.documentId),
-      );
+     );
       return [...new Set(state.selected)].filter((id) => indexed.has(id));
     },
 
@@ -259,7 +259,7 @@ export const useConversationsStore = defineStore('conversations', {
       this.createKey = null;
     },
 
-    /** 显式新建会话（D-5 方案 A）：会话 ID 由服务端签发，前端不铸造任何 UUID。 */
+    /** 显式新建会话（方案 A）：会话 ID 由服务端签发，前端不铸造任何 UUID。 */
     async provisionConversation(): Promise<void> {
       if (this.creating) {
         return;
@@ -462,7 +462,7 @@ export const useConversationsStore = defineStore('conversations', {
       question: string,
       documentIds: string[],
       key: string,
-    ): Promise<boolean> {
+   ): Promise<boolean> {
       try {
         return await this.runStream(conversationId, question, documentIds, key);
       } catch (error) {
@@ -475,7 +475,7 @@ export const useConversationsStore = defineStore('conversations', {
 
     /**
      * 帧序即状态机：`meta` 落两行（助手行先空），`delta` 只拼接文本，
-     * `done` 用服务端字段整体替换——到达即渲染，不做本地补间的假动画（D-176）。
+     * `done` 用服务端字段整体替换——到达即渲染，不做本地补间的假动画。
      * `error` 帧与首字节前的 JSON 拒绝在 api 层已是同一个 `ApiError`，这里只有一个失败分支。
      */
     async runStream(
@@ -483,7 +483,7 @@ export const useConversationsStore = defineStore('conversations', {
       question: string,
       documentIds: string[],
       key: string,
-    ): Promise<boolean> {
+   ): Promise<boolean> {
       const controller = new AbortController();
       streamController = controller;
       this.streaming = true;
@@ -496,7 +496,7 @@ export const useConversationsStore = defineStore('conversations', {
           { question, documentIds },
           key,
           controller.signal,
-        );
+       );
         for await (const event of events) {
           if (event.kind === 'meta') {
             assistantRowKey = event.payload.messageId;
@@ -508,7 +508,7 @@ export const useConversationsStore = defineStore('conversations', {
             const text = event.payload.text;
             this.messages = this.messages.map((row) =>
               row.key === assistantRowKey ? { ...row, content: row.content + text } : row,
-            );
+           );
             continue;
           }
           const done = event.payload;
@@ -530,7 +530,7 @@ export const useConversationsStore = defineStore('conversations', {
         if (!finished) {
           this.messages = this.messages.filter(
             (row) => row.key !== userRowKey && row.key !== assistantRowKey,
-          );
+         );
         }
         this.streaming = false;
         this.streamKey = null;
@@ -547,7 +547,7 @@ export const useConversationsStore = defineStore('conversations', {
       question: string,
       documentIds: string[],
       key: string,
-    ): Promise<boolean> {
+   ): Promise<boolean> {
       const controller = new AbortController();
       syncController = controller;
       const seq = requestSeq;
@@ -557,7 +557,7 @@ export const useConversationsStore = defineStore('conversations', {
           { question, documentIds },
           key,
           controller.signal,
-        );
+       );
         // 归属校验：停止生成 / 离开问答页 / 切换会话都会改变代号或 currentId，
         // 此时答案属于上一会话，整条丢弃而不是写进当前 messages。
         if (seq !== requestSeq || controller.signal.aborted || this.currentId !== conversationId) {

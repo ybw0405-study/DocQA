@@ -128,9 +128,9 @@ describe('LoginView', () => {
         HttpResponse.json(
           problem({ status: 401, code: 'USR-AUTH-001', detail: '<img src=x onerror=alert(1)>', instance: '/api/v1/auth/login' }),
           { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
-        ),
-      ),
-    );
+       ),
+     ),
+   );
 
     const { wrapper } = await mountLogin();
     await submit(wrapper, 'whatever');
@@ -152,9 +152,9 @@ describe('LoginView', () => {
             errors: [{ field: 'password', message: '不能超过 72 个 UTF-8 字节' }],
           }),
           { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
-        ),
-      ),
-    );
+       ),
+     ),
+   );
 
     const { wrapper } = await mountLogin();
     await submit(wrapper, 'whatever');
@@ -178,7 +178,7 @@ describe('LoginView', () => {
   });
 
   it('hands the account page’s fixed notice key over as a status line and still lets the user sign in', async () => {
-    // D-206 的完整链路：改密 204 之后服务端已吊销该用户全部刷新家族，本地会话清空，
+    //  的完整链路：改密 204 之后服务端已吊销该用户全部刷新家族，本地会话清空，
     // 落到登录页时 URL 里只有键名，句子本体由 display.ts 单点持有。
     await useAuthStore().signIn('demo', 'right-password');
     await changePassword({ currentPassword: 'right-password', newPassword: 'brandnewpass1' });
@@ -204,9 +204,9 @@ describe('LoginView', () => {
         captured = body.username ?? '';
         return HttpResponse.json(
           envelope({ accessToken: DEMO_TOKEN, tokenType: 'Bearer', expiresIn: 900 }),
-        );
+       );
       }),
-    );
+   );
     const { wrapper } = await mountLogin();
 
     await submit(wrapper, 'right-password', '  demo  ');

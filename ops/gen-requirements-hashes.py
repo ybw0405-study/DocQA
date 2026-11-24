@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成 ai-python/requirements.lock.txt（G15，精确版本 + 真实 --hash，可复现脚本）。
+"""生成 ai-python/requirements.lock.txt（精确版本 + 真实 --hash，可复现脚本）。
 
 用法（仓库根目录）：
     python ops/gen-requirements-hashes.py            # 重新生成锁文件
@@ -31,7 +31,7 @@ VENV = ROOT / "ai-python" / ".venv" / "Lib" / "site-packages"
 LOCK = ROOT / "ai-python" / "requirements.lock.txt"
 EXCLUDE = {"pip", "setuptools", "wheel", "distribute", "docqa-ai"}
 
-HEADER = """# DocQA ai-python 依赖锁文件（G15：精确版本 + 真实 --hash）
+HEADER = """# DocQA ai-python 依赖锁文件（精确版本 + 真实 --hash）
 # 由 ops/gen-requirements-hashes.py 生成：版本取自本机 ai-python/.venv 的
 # dist-info（即通过测试的那套依赖），hash 取自 PyPI JSON API，覆盖全部发行文件。
 # 请勿手工编辑；重新生成：python ops/gen-requirements-hashes.py

@@ -118,7 +118,7 @@ describe('api/sse', () => {
         ': keep-alive\r\n',
         '\r\n',
       ]),
-    );
+   );
 
     const frames = await collect(postSseStream(streamRequest()));
 
@@ -165,7 +165,7 @@ describe('api/sse', () => {
   it('keeps the governance code, trace and server-suggested wait on a pre-first-byte rejection', async () => {
     stubFetch(() =>
       problemStreamResponse(429, 'COM-RATE_LIMIT-001', '请求过于频繁，请稍后重试。', { 'Retry-After': '30' }),
-    );
+   );
 
     const error = (await expectThrown(collect(postSseStream(streamRequest())))) as ApiError;
 
@@ -179,12 +179,12 @@ describe('api/sse', () => {
   it('does not invent a wait when Retry-After is not whole seconds on a 429', async () => {
     stubFetch(() =>
       problemStreamResponse(429, 'COM-RATE_LIMIT-001', '请求过于频繁，请稍后重试。', { 'Retry-After': '0.5' }),
-    );
+   );
     const vague = (await expectThrown(collect(postSseStream(streamRequest())))) as ApiError;
 
     stubFetch(() =>
       problemStreamResponse(503, 'AGT-UPSTREAM-003', 'AI 功能已暂停。', { 'Retry-After': '30' }),
-    );
+   );
     const offContract = (await expectThrown(collect(postSseStream(streamRequest())))) as ApiError;
 
     expect(vague.retryAfterSeconds).toBeNull();
@@ -234,7 +234,7 @@ describe('api/sse', () => {
     server.use(refreshHandler('stream-refreshed-token'));
     const calls = stubFetch((_call, attempt) =>
       attempt === 1 ? problemStreamResponse(401, 'USR-AUTH-001', '令牌无效。') : sseResponse(askStreamFrames(['第一段'])),
-    );
+   );
 
     const frames = await collect(postSseStream(streamRequest()));
 
@@ -345,7 +345,7 @@ describe('api/sse', () => {
       break;
     }
 
-    // D-174「客户端断开即取消上游」的客户端一侧：提前 break 也必须把这条连接放掉。
+    // 「客户端断开即取消上游」的客户端一侧：提前 break 也必须把这条连接放掉。
     expect(seen).toEqual(['meta']);
     expect(cancelled).toBe(true);
   });

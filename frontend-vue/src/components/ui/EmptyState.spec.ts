@@ -48,7 +48,7 @@ describe('EmptyState', () => {
   });
 });
 
-describe('空态文案单点（D-191）', () => {
+describe('空态文案单点', () => {
   const blocks = emptyStateBlocks();
 
   it('finds every empty state in the sources', () => {
@@ -67,7 +67,7 @@ describe('空态文案单点（D-191）', () => {
   it('binds exactly the declared set of keys, with no dead copy and no unregistered one', () => {
     const used = new Set(
       blocks.flatMap((block) => [...block.binding.matchAll(/EMPTY_STATE_TEXT\.([A-Za-z0-9_]+)/g)].map((m) => m[1])),
-    );
+   );
     const declared = new Set(Object.keys(EMPTY_STATE_TEXT));
 
     for (const block of blocks) {

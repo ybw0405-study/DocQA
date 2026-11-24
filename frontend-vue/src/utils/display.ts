@@ -41,15 +41,15 @@ export const BUDGET_LABELS: Readonly<Record<BudgetStatus, string>> = {
 };
 
 /**
- * `LOW_CONFIDENCE` 徽章的补充说明（D-202）。只有徽章一个词时「证据不足」会被读成「什么都没查到」，
+ * `LOW_CONFIDENCE` 徽章的补充说明。只有徽章一个词时「证据不足」会被读成「什么都没查到」，
  * 而实际形态是检索有结果、匹配度不够——这句话只能由界面补，协议里没有这个字段。
  */
 export const LOW_CONFIDENCE_NOTE = '检索到了内容，但证据与问题的匹配不足。';
 
 /**
- * 引用 `score` 的界面口径（D-202，承接 `S5-M5` / D-84）。协议里 `score` 一物两义：
+ * 引用 `score` 的界面口径（，承接 `` /）。协议里 `score` 一物两义：
  * 混合检索下只被词法通道命中的块恒为 0.0，说成「相关度 0.0%」是把「向量没匹配上」冒充成「完全不相关」。
- * 这里只改**说法**，`score` 的取值与排序一律不动，因此不构成 S5-M5 的闭合。
+ * 这里只改**说法**，`score` 的取值与排序一律不动，因此不构成  的闭合。
  */
 export const CITATION_LEXICAL_ONLY_LABEL = '词法召回（向量未命中）';
 
@@ -77,7 +77,7 @@ export const USER_STATUS_LABELS: Readonly<Record<UserStatus, string>> = {
 };
 
 /**
- * 身份三块各一条口径注脚（D-212）：契约对这三个字段的陈旧性承诺**并不相同**，
+ * 身份三块各一条口径注脚：契约对这三个字段的陈旧性承诺**并不相同**，
  * `/auth/me` 明确「账号状态必须实时、角色允许短时陈旧（上限是访问令牌有效期）」，
  * 所以三句话必须分开说，合并成一句「以服务端为准」就是把差异抹掉了。
  */
@@ -86,7 +86,7 @@ export const IDENTITY_ROLES_NOTE = '角色是签发本次访问令牌时写入�
 export const IDENTITY_TOKEN_TTL_NOTE = '剩余有效期是本次读取时的快照，界面不逐秒倒数；它也正是上面那份角色快照可能陈旧的时间窗。';
 
 /**
- * 改密成功后落到登录页时的提示（D-206）：契约在服务端吊销了该用户全部刷新令牌家族，
+ * 改密成功后落到登录页时的提示：契约在服务端吊销了该用户全部刷新令牌家族，
  * 因此这句话描述的是**已发生的后果**，不是「建议重新登录」。
  */
 export const PASSWORD_CHANGED_NOTICE = '口令已修改，此前的登录凭据已全部失效，请用新口令重新登录。';
@@ -108,7 +108,7 @@ export const REMINDER_STATUS_LABELS: Readonly<Record<ReminderStatus, string>> = 
 
 /**
  * 状态机按钮的动词，取自目标状态：`ACTIVE` 在界面上读作「恢复」而不是「设为进行中」。
- * `COMPLETED` 与 `CANCELLED` 是终态（D-58，无回退边），这两个动词必须与确认框里的
+ * `COMPLETED` 与 `CANCELLED` 是终态（，无回退边），这两个动词必须与确认框里的
  * 「不可回退」同屏出现，否则一次误点就要重建提醒才能挽回。
  */
 export const REMINDER_ACTION_LABELS: Readonly<Record<ReminderStatus, string>> = {
@@ -130,9 +130,9 @@ export const SCHEDULE_IMPORT_ACTION_LABELS: Readonly<Record<ScheduleImportAction
 };
 
 /**
- * 审计 `payload` 的「展示」标签表（D-201）。键集镜像两处服务端写入白名单——
+ * 审计 `payload` 的「展示」标签表。键集镜像两处服务端写入白名单——
  * `audit-service` 的 `AuditPayloadSanitizer.ALLOWED_KEYS` 与 Python 的 `governance/audit.ALLOWED_PAYLOAD_KEYS`，
- * 两边逐键相同（S9-2 同步过一次）。这张表只决定「有没有中文名」：契约上 `payload` 是
+ * 两边逐键相同（同步过一次）。这张表只决定「有没有中文名」：契约上 `payload` 是
  * `additionalProperties: true` 的开放对象，未知键仍然按原始键名渲染，所以它不构成一份校验清单——
  * 拿它当校验就会把服务端将来新增的治理字段静默吞掉，而那是 US-08 可追溯性的一部分。
  */
@@ -171,11 +171,11 @@ export const USAGE_STATUS_LABELS: Readonly<Record<UsageStatus, string>> = {
   FAILED: '失败',
 };
 
-/** `avgLatencyMs` 的口径标注（D-200）：本项目的性能结论一律是「未压测」，均值缺这句就会被读成性能结论。 */
+/** `avgLatencyMs` 的口径标注：本项目的性能结论一律是「未压测」，均值缺这句就会被读成性能结论。 */
 export const LATENCY_NOTE = '平均延迟是服务端记录的历史均值 · 非压测结论。';
 
 /**
- * 空态文案单点（D-191）：新增空态必须先在这里登记，视图里的 `<EmptyState>` 只允许引用本表的键，
+ * 空态文案单点：新增空态必须先在这里登记，视图里的 `<EmptyState>` 只允许引用本表的键，
  * 由 `src/components/ui/EmptyState.spec.ts` 机判。「筛选后为空」与「一条都没有」给出的是两种行动指引，
  * 因此刻意分成两条文案，不允许合并成一句「暂无数据」。
  */
@@ -233,7 +233,7 @@ export function formatLeadMinutes(minutes: number): string {
 }
 
 /**
- * 课表行的上课时刻 = 触发时刻 + 提前量（D-72）。契约的 `plannedTriggerAt` / `nextTriggerAt`
+ * 课表行的上课时刻 = 触发时刻 + 提前量。契约的 `plannedTriggerAt` / `nextTriggerAt`
  * 都是「上课时刻 − lead_minutes」的提前提醒时刻，界面要说「上课」就得换算一次。
  * 这是**纯显示层**换算：结果不参与任何身份判定、也不回写任何字段；
  * 非课程行的 `leadMinutes` 恒为 0，因此对该函数是恒等变换。无法解析的输入返回 null 而不是猜一个时刻。

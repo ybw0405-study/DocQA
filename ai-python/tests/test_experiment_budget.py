@@ -48,7 +48,7 @@ async def test_token_ceiling_blocks_the_call_that_would_cross_it() -> None:
 
 
 async def test_zero_limit_refuses_every_call_including_the_first() -> None:
-    """默认配置就是「额度未放行」，此时任何真实调用都不该被授权（D-106 的 fail-closed）。"""
+    """默认配置就是「额度未放行」，此时任何真实调用都不该被授权（的 fail-closed）。"""
 
     for call_limit, token_limit in ((0, 100), (10, 0), (0, 0)):
         store = redis_store(call_limit, token_limit)
@@ -82,7 +82,7 @@ async def test_settlement_never_drives_the_ledger_negative() -> None:
 
 
 async def test_release_call_returns_both_the_call_and_the_reservation() -> None:
-    """本地检查在授权之后拒绝时外呼没有发生：调用数与预订都要退回，额度可以再用一次（D-121）。"""
+    """本地检查在授权之后拒绝时外呼没有发生：调用数与预订都要退回，额度可以再用一次。"""
 
     store = redis_store(1, 1000)
     assert await store.authorize_call(400) is True
@@ -193,7 +193,7 @@ def test_negative_limits_are_rejected_at_construction() -> None:
 
 
 async def test_in_memory_store_matches_the_redis_semantics_step_by_step() -> None:
-    """两个实现必须逐条同形，否则「CI 里绿、真实额度超支」会在 S6 变成不可见差异。"""
+    """两个实现必须逐条同形，否则「CI 里绿、真实额度超支」会在真实额度场景变成不可见差异。"""
 
     redis = FakeRedis(decode_responses=True)
     redis_side = RedisExperimentBudgetStore(redis, 3, 100)

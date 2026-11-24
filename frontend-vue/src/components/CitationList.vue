@@ -38,7 +38,7 @@ function displayName(citation: Citation): string {
           <!-- 文件名与片段都是服务端/对象存储回来的不可信文本，一律文本插值。 -->
           <span class="citations__name">{{ displayName(citation) }}</span>
           <span class="muted">分块 {{ citation.chunkIndex }}</span>
-          <!-- score 为 0 是「向量通道没匹配上」，不是「相关度 0%」（D-202 / D-84）。 -->
+          <!-- score 为 0 是「向量通道没匹配上」，不是「相关度 0%」。 -->
           <span
             v-if="citation.score === 0"
             class="muted"

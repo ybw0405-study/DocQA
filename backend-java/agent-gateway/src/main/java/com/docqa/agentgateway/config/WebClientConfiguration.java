@@ -54,7 +54,7 @@ public class WebClientConfiguration {
     }
 
     /**
-     * 把上面手工创建的 {@link CircuitBreakerRegistry} 显式绑定到 Micrometer（S11-3-M3）。
+     * 把上面手工创建的 {@link CircuitBreakerRegistry} 显式绑定到 Micrometer（-M3）。
      *
      * <p>不能只靠自动配置：resilience4j 2.1.0 的 {@code CircuitBreakerMetricsAutoConfiguration}
      * 里，唯一会调用 {@code bindTo(meterRegistry)} 的 {@code registerCircuitBreakerMetrics}

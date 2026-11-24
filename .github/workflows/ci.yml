@@ -270,3 +270,14 @@ jobs:
         run: |
           npm ci
           npx vitest run tests/contract-drift.spec.ts
+
+  compose-config:
+    name: compose config（infra + app 叠加）
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 全栈编排语法与插值校验（不需要 docker daemon）
+        run: |
+          docker compose --env-file ops/env/local.env.example \
+            -f ops/docker-compose.infra.yml -f ops/docker-compose.app.yml config -q

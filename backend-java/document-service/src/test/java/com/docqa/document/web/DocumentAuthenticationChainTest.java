@@ -36,7 +36,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
- * 跨越真实过滤器链的鉴权取证（{@code S10-H1} 在文档服务的推广位，D-236）。
+ * 跨越真实过滤器链的鉴权取证（{@code } 在文档服务的推广位，）。
  *
  * <p>本模块既有控制器测试是 standalone MockMvc 并显式 {@code .requestAttr(...)} 注入用户身份，
  * 等于绕过了 {@link JwtAuthenticationFilter}：过滤器写不进属性时那些用例照样绿。这里用真实 Web
@@ -48,9 +48,9 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * {@code GlobalExceptionHandler}，绑定失败只会落到 Spring 默认的 400 而不是生产环境的
  * 500 {@code COM-INTERNAL-001}——症状被裁剪掉了，反例也就测不出来。
  *
- * <p>带合法令牌的一支只取两条 GET（D-239）：七个写操作都要求 {@code Idempotency-Key} 头与请求体，
+ * <p>带合法令牌的一支只取两条 GET：七个写操作都要求 {@code Idempotency-Key} 头与请求体，
  * 缺任何一项都会先落 400，届时「200」证明的是别的东西。写侧属性绑定由 {@code DocumentControllerTest}
- * 的 standalone 用例覆盖，幂等语义归 S11-6。
+ * 的 standalone 用例覆盖，幂等语义归 。
  */
 @WebMvcTest
 @Import(CommonWebAutoConfiguration.class)
@@ -127,7 +127,7 @@ class DocumentAuthenticationChainTest {
 
     /**
      * 门禁的优先序：写端点缺 Bearer 时先 401，轮不到「缺 {@code Idempotency-Key} 头」的 400。
-     * 这条与 D-239 的取舍不冲突——它断言的正是鉴权发生在参数校验之前。
+     * 这条与  的取舍不冲突——它断言的正是鉴权发生在参数校验之前。
      */
     @Test
     void uploadInitWithoutTokenIsRejectedBeforeHeaderValidation() throws Exception {
@@ -142,7 +142,7 @@ class DocumentAuthenticationChainTest {
 
     /**
      * 覆盖守卫：本模块每条业务映射路径都必须被过滤器拦截，「新增控制器却没被鉴权覆盖」当场落红。
-     * 这正是 {@code S10-H1} 的成因形态——旧白名单只认 {@code /api/v1/documents}，其余前缀整体漏网。
+     * 这正是 {@code } 的成因形态——旧白名单只认 {@code /api/v1/documents}，其余前缀整体漏网。
      *
      * <p>按控制器所在包筛选，而不是把 {@code /error} 逐条排除：{@code BasicErrorController} 与业务
      * 控制器共用同一张 MVC 映射表，它注册在 {@code org.springframework.boot.autoconfigure.web}，

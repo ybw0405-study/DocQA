@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from docqa_ai.governance.audit import AuditEvent
 
-# D-123 / D-139：内置七名 + `mcp__<server>__<tool>`；协议版本仍是 1.0——新值只由新配置产生。
+# 内置七名 + `mcp__<server>__<tool>`；协议版本仍是 1.0——新值只由新配置产生。
 TOOL_NAME_PATTERN = (
     r"^(document_search|calculator|current_time|web_fetch|web_search|academic_search|wikipedia_lookup"
     r"|mcp__[a-z0-9_]{1,32}__[a-z0-9_]{1,32})$"
@@ -18,7 +18,7 @@ BudgetStatus = Literal["OK", "BUDGET_EXHAUSTED", "LOW_CONFIDENCE"]
 HistoryRole = Literal["USER", "ASSISTANT"]
 
 PROTOCOL_VERSION = "1.0"
-# S8-3 / D-177：流式端点 `POST /agent/ask/stream` 的请求侧准入版本（纯新增操作）。
+# 流式端点 `POST /agent/ask/stream` 的请求侧准入版本（纯新增操作）。
 # 响应信封的 protocolVersion 仍回写 PROTOCOL_VERSION——网关 PythonResponseValidator 对同步与
 # 流式两条路径都硬校验响应为 "1.0"，且「旧字段不动」要求旧端点行为逐字节不变。
 STREAM_PROTOCOL_VERSION = "1.1"
