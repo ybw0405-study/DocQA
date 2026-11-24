@@ -153,7 +153,7 @@ services:
         mysql -h mysql -uroot --default-character-set=utf8mb4 docqa < /tmp/grants.sql
 
   user-service:
-    image: ghcr.io/ybw0405-study/docqa-user-service:${DOCQA_IMAGE_TAG:-2.1.0}
+    image: ghcr.io/ybw0405-study/docqa-user-service:${DOCQA_IMAGE_TAG:-2.2.0}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -172,7 +172,7 @@ services:
         condition: service_completed_successfully
 
   document-service:
-    image: ghcr.io/ybw0405-study/docqa-document-service:${DOCQA_IMAGE_TAG:-2.1.0}
+    image: ghcr.io/ybw0405-study/docqa-document-service:${DOCQA_IMAGE_TAG:-2.2.0}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -193,7 +193,7 @@ services:
         condition: service_completed_successfully
 
   reminder-service:
-    image: ghcr.io/ybw0405-study/docqa-reminder-service:${DOCQA_IMAGE_TAG:-2.1.0}
+    image: ghcr.io/ybw0405-study/docqa-reminder-service:${DOCQA_IMAGE_TAG:-2.2.0}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -212,7 +212,7 @@ services:
         condition: service_completed_successfully
 
   audit-service:
-    image: ghcr.io/ybw0405-study/docqa-audit-service:${DOCQA_IMAGE_TAG:-2.1.0}
+    image: ghcr.io/ybw0405-study/docqa-audit-service:${DOCQA_IMAGE_TAG:-2.2.0}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -238,7 +238,7 @@ services:
         condition: service_completed_successfully
 
   ai-python:
-    image: ghcr.io/ybw0405-study/docqa-ai-python:${DOCQA_IMAGE_TAG:-2.1.0}
+    image: ghcr.io/ybw0405-study/docqa-ai-python:${DOCQA_IMAGE_TAG:-2.2.0}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -255,7 +255,7 @@ services:
         condition: service_completed_successfully
 
   parse-worker:
-    image: ghcr.io/ybw0405-study/docqa-ai-python:${DOCQA_IMAGE_TAG:-2.1.0}
+    image: ghcr.io/ybw0405-study/docqa-ai-python:${DOCQA_IMAGE_TAG:-2.2.0}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -273,7 +273,7 @@ services:
         condition: service_completed_successfully
 
   vector-worker:
-    image: ghcr.io/ybw0405-study/docqa-ai-python:${DOCQA_IMAGE_TAG:-2.1.0}
+    image: ghcr.io/ybw0405-study/docqa-ai-python:${DOCQA_IMAGE_TAG:-2.2.0}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -289,7 +289,7 @@ services:
         condition: service_completed_successfully
 
   agent-gateway:
-    image: ghcr.io/ybw0405-study/docqa-agent-gateway:${DOCQA_IMAGE_TAG:-2.1.0}
+    image: ghcr.io/ybw0405-study/docqa-agent-gateway:${DOCQA_IMAGE_TAG:-2.2.0}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -314,7 +314,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: ghcr.io/ybw0405-study/docqa-frontend:${DOCQA_IMAGE_TAG:-2.1.0}
+    image: ghcr.io/ybw0405-study/docqa-frontend:${DOCQA_IMAGE_TAG:-2.2.0}
     build:
       context: ..
       dockerfile: Dockerfile
