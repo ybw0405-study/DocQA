@@ -114,6 +114,23 @@ public class MinioObjectStorage implements ObjectStorage {
     }
 
     @Override
+    public List<Integer> listUploadedPartNumbers(String objectKey, String uploadId) {
+        try {
+            return multipartClient.listUploadedPartNumbers(properties.getBucket(), objectKey, uploadId);
+        } catch (ErrorResponseException ex) {
+            // uploadId 已失效（如 MinIO 重启清理了未完成的 multipart）：视为无已上传分片，
+            // 让上层走全量重签而不是中断断点续传。
+            if ("NoSuchUpload".equals(ex.errorResponse().code())) {
+                return List.of();
+            }
+            throw new ObjectStorageException(
+                    ex.errorResponse().code(), "Unable to list uploaded parts", true, ex);
+        } catch (Exception ex) {
+            throw new ObjectStorageException("MINIO_UNAVAILABLE", "Unable to list uploaded parts", false, ex);
+        }
+    }
+
+    @Override
     public long size(String objectKey) {
         try {
             StatObjectResponse stat = client.statObject(

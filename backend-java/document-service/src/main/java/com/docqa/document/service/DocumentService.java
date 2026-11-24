@@ -633,15 +633,26 @@ public class DocumentService {
 
     private SessionPlan createSession(DocumentRow document, UploadPlan plan) {
         Instant now = clock.instant();
-        String minioUploadId = objectStorage.createMultipartUpload(document.objectKey());
+        // 断点续传：复用「未过期且分片参数一致」的旧 session，只补签缺失分片；
+        // 否则新建 multipart 并 abort 旧 session 的孤儿分片（C-3）。
+        Optional<UploadSession> existing = uploadSessionStore.find(document.id());
+        boolean reusable = existing.isPresent()
+                && existing.get().expiresAt().isAfter(now)
+                && existing.get().partSize() == plan.partSize()
+                && existing.get().partCount() == plan.partCount();
+
+        String minioUploadId;
+        if (reusable) {
+            minioUploadId = existing.get().minioUploadId();
+        } else {
+            minioUploadId = objectStorage.createMultipartUpload(document.objectKey());
+            existing.ifPresent(previous -> abortQuietly(previous.objectKey(), previous.minioUploadId()));
+        }
+
         try {
-            // 重复 init 会覆盖 Redis 中同一 documentId 的旧 session；先把旧分片 abort 掉，
-            // 否则旧 minioUploadId 失去引用成为孤儿（C-3）。
-            uploadSessionStore.find(document.id()).ifPresent(previous -> {
-                if (!minioUploadId.equals(previous.minioUploadId())) {
-                    abortQuietly(previous.objectKey(), previous.minioUploadId());
-                }
-            });
+            Set<Integer> uploaded = reusable
+                    ? new HashSet<>(objectStorage.listUploadedPartNumbers(document.objectKey(), minioUploadId))
+                    : Set.of();
             Instant sessionExpiresAt = now.plus(documentProperties.getSessionTtl());
             UploadSession session = new UploadSession(
                     document.id(),
@@ -656,6 +667,9 @@ public class DocumentService {
             Instant partExpiresAt = now.plus(minioProperties.getPresignExpiry());
             List<PresignedPart> parts = new ArrayList<>(plan.partCount());
             for (int partNumber = 1; partNumber <= plan.partCount(); partNumber++) {
+                if (uploaded.contains(partNumber)) {
+                    continue;  // 已上传分片：断点续传不再重复签发
+                }
                 String url = objectStorage.presignPart(
                         document.objectKey(),
                         minioUploadId,
@@ -665,7 +679,11 @@ public class DocumentService {
             }
             return new SessionPlan(session, List.copyOf(parts));
         } catch (RuntimeException ex) {
-            abortQuietly(document.objectKey(), minioUploadId);
+            // 只有本次新建的 uploadId 才需要 abort；复用的旧 uploadId 不能被误删，
+            // 否则已上传分片一并丢失，断点续传失效。
+            if (!reusable) {
+                abortQuietly(document.objectKey(), minioUploadId);
+            }
             throw ex;
         }
     }

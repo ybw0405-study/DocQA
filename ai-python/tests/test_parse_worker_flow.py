@@ -361,7 +361,7 @@ async def test_embedding_shape_failure_is_retryable() -> None:
 class RecordingEmbedder:
     """记录每批行数**与收到的原文**的 Provider 替身。
 
-    `max_batch_rows` 模拟端点自报上限；`texts` 是  的判据载体——「Provider 没见过未掩码文本」
+    `max_batch_rows` 模拟端点自报上限；`texts` 是「掩码是否生效」的判据载体——「Provider 没见过未掩码文本」
     只有把实收文本记下来才可断言，否则只能靠读代码相信它。
     """
 

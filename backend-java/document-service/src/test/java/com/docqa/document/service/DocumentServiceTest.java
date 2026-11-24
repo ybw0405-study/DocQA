@@ -172,6 +172,65 @@ class DocumentServiceTest {
     }
 
     @Test
+    void initResumesExistingSessionAndSkipsUploadedParts() {
+        DocumentRow uploaded = new DocumentRow(
+                DOCUMENT_ID, USER_ID, "notes.pdf", null, "application/pdf",
+                (long) PART_SIZE * 2, MD5, OBJECT_KEY, DocumentStatus.UPLOADED,
+                0, 3, null, null, "v1", null, null, null, null, null, null, NOW, NOW);
+        UploadSession existing = new UploadSession(
+                DOCUMENT_ID, USER_ID, OBJECT_KEY, "minio-upload-1",
+                PART_SIZE, 2, NOW.plus(Duration.ofMinutes(30)));
+
+        when(idempotencyStore.find(USER_ID, IdempotencyOperation.UPLOAD_INIT, IDEMPOTENCY_KEY))
+                .thenReturn(Optional.empty());
+        when(documentRepository.findByUserAndMd5(TENANT_ID, USER_ID, MD5)).thenReturn(Optional.of(uploaded));
+        when(uploadSessionStore.find(DOCUMENT_ID)).thenReturn(Optional.of(existing));
+        when(objectStorage.listUploadedPartNumbers(OBJECT_KEY, "minio-upload-1")).thenReturn(List.of(1));
+        when(objectStorage.presignPart(eq(OBJECT_KEY), eq("minio-upload-1"), eq(2), any()))
+                .thenReturn("https://minio.example/part-2");
+
+        UploadInitResult result = documentService.init(
+                USER_ID, IDEMPOTENCY_KEY,
+                new UploadInitRequest("notes.pdf", (long) PART_SIZE * 2, "application/pdf", MD5));
+
+        // 复用旧 uploadId：不新建 multipart、不 abort 旧分片
+        verify(objectStorage, never()).createMultipartUpload(anyString());
+        verify(objectStorage, never()).abortMultipartUpload(anyString(), anyString());
+        // 只为缺失的分片 2 签发 URL，已上传的分片 1 不再重复签发
+        verify(objectStorage).presignPart(eq(OBJECT_KEY), eq("minio-upload-1"), eq(2), any());
+        verify(objectStorage, never()).presignPart(eq(OBJECT_KEY), anyString(), eq(1), any());
+        assertThat(result.data().parts()).hasSize(1);
+        assertThat(result.data().parts().get(0).partNumber()).isEqualTo(2);
+    }
+
+    @Test
+    void initCreatesNewUploadWhenSessionExpired() {
+        DocumentRow uploaded = document(DocumentStatus.UPLOADED);
+        UploadSession expired = new UploadSession(
+                DOCUMENT_ID, USER_ID, OBJECT_KEY, "old-upload-id",
+                PART_SIZE, 1, NOW.minus(Duration.ofMinutes(1)));
+
+        when(idempotencyStore.find(USER_ID, IdempotencyOperation.UPLOAD_INIT, IDEMPOTENCY_KEY))
+                .thenReturn(Optional.empty());
+        when(documentRepository.findByUserAndMd5(TENANT_ID, USER_ID, MD5)).thenReturn(Optional.of(uploaded));
+        when(uploadSessionStore.find(DOCUMENT_ID)).thenReturn(Optional.of(expired));
+        when(objectStorage.createMultipartUpload(anyString())).thenReturn("new-upload-id");
+        when(objectStorage.presignPart(anyString(), eq("new-upload-id"), anyInt(), any()))
+                .thenReturn("https://minio.example/part");
+
+        UploadInitResult result = documentService.init(
+                USER_ID, IDEMPOTENCY_KEY,
+                new UploadInitRequest("notes.pdf", (long) PART_SIZE, "application/pdf", MD5));
+
+        // 过期 session 不可复用：新建 multipart 并 abort 旧的孤儿分片
+        verify(objectStorage).createMultipartUpload(anyString());
+        verify(objectStorage).abortMultipartUpload(anyString(), eq("old-upload-id"));
+        verify(objectStorage, never()).listUploadedPartNumbers(anyString(), anyString());
+        assertThat(result.data().parts()).hasSize(1);
+        assertThat(result.data().parts().get(0).partNumber()).isEqualTo(1);
+    }
+
+    @Test
     void initReturnsInstantUploadForIndexedDocument() {
         DocumentRow indexed = document(DocumentStatus.INDEXED);
         when(idempotencyStore.find(USER_ID, IdempotencyOperation.UPLOAD_INIT, IDEMPOTENCY_KEY))

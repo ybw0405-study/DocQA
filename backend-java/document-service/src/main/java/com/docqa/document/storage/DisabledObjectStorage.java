@@ -30,6 +30,11 @@ public class DisabledObjectStorage implements ObjectStorage {
     }
 
     @Override
+    public List<Integer> listUploadedPartNumbers(String objectKey, String uploadId) {
+        throw unavailable();
+    }
+
+    @Override
     public long size(String objectKey) {
         throw unavailable();
     }

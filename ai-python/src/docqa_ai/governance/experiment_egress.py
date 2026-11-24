@@ -25,7 +25,7 @@ class ExperimentBudgetExhausted(Exception):
 class BudgetedEmbeddingProvider:
     """包在真实 embedding Provider 外层的额度门禁；离线 Provider 不经过这里。
 
-    只做预订、不做回补：运行时读不到真实 `usage` 是  ② 的裁决（探针 E56 证明响应带
+    只做预订、不做回补：运行时读不到真实 `usage` 是「只预订不回补」这一决策的裁决（探针 E56 证明响应带
     `usage.total_tokens`，但那是**一次性观测**，把它接进运行时就要改 Provider 的返回类型）。
     因此账本停留在估算上界，宁可少花不多花。
     """
