@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 /**
- * 管理面审计查询（D-157 / D-158）。
+ * 管理面审计查询。
  *
  * <p>过滤条件 `traceId` / `userId` / `eventType` 任意组合；三者都缺省时套用最近 24 小时的
  * 默认窗口，已有过滤条件时只按显式给出的 `from` / `to` 限窗。</p>

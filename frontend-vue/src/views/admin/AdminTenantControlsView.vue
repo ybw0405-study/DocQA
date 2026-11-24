@@ -32,7 +32,7 @@ const chipClass = computed(() => {
 
 /**
  * 二次确认只挡「开启」这一个方向：它让本租户所有新问答拿到 503，代价与「关闭＝恢复」不对称；
- * D-198 要求明示影响面的也正是开启分支。
+ *  要求明示影响面的也正是开启分支。
  */
 function askEnable(): void {
   writeResult.value = null;

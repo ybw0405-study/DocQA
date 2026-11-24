@@ -202,7 +202,7 @@ def test_real_model_migration_carries_both_recall_channels() -> None:
 
 
 def test_real_model_index_names_are_unique_across_the_schema() -> None:
-    """PG 索引名在 schema 内全局唯一，所以分表的四条索引必须全部新命名（D-99 代价条目）。"""
+    """PG 索引名在 schema 内全局唯一，所以分表的四条索引必须全部新命名（代价条目）。"""
 
     by_file = {
         name: CREATE_INDEX.findall(executable_sql(name))
@@ -234,7 +234,7 @@ def test_real_model_table_name_is_usable_by_the_repositories() -> None:
 
 
 def test_config_guard_recognizes_the_offline_table_by_its_ddl_name() -> None:
-    """D-117 的判据与 001 的表名必须同源，否则守卫拦的是一个不存在的表名。"""
+    """的判据与 001 的表名必须同源，否则守卫拦的是一个不存在的表名。"""
 
     assert OFFLINE_VECTOR_TABLE == OFFLINE_TABLE
     assert f"create table if not exists {OFFLINE_VECTOR_TABLE}" in executable_sql(VECTOR_MIGRATION)

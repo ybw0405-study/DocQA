@@ -364,7 +364,7 @@ function tsMembers(file: string, iface: string): { required: string[]; optional:
   const text = tsText(file);
   const declaration = new RegExp(
     `export interface ${iface}(?:<[^>]*>)?(?: extends [A-Za-z][A-Za-z0-9_]*)? \\{`,
-  ).exec(text);
+ ).exec(text);
   if (declaration === null) {
     throw new Error(`${file} 缺少 interface ${iface}`);
   }
@@ -485,7 +485,7 @@ const MIRRORED_OBJECTS: { schema: string; file: string; iface: string }[] = [
   { schema: 'NotificationListData', file: TYPES.notifications, iface: 'NotificationListData' },
   { schema: 'NotificationReadRequest', file: TYPES.notifications, iface: 'NotificationReadRequest' },
   { schema: 'NotificationReadData', file: TYPES.notifications, iface: 'NotificationReadData' },
-  // S10-5 管理面：治理开关 → 配额 → 审计 → 用量 → 两个 keyset 列表体。
+  //  管理面：治理开关 → 配额 → 审计 → 用量 → 两个 keyset 列表体。
   { schema: 'AdminAiControls', file: TYPES.admin, iface: 'AdminAiControls' },
   { schema: 'KillSwitchState', file: TYPES.admin, iface: 'KillSwitchState' },
   { schema: 'ExperimentBudgetState', file: TYPES.admin, iface: 'ExperimentBudgetState' },
@@ -502,7 +502,7 @@ const MIRRORED_OBJECTS: { schema: string; file: string; iface: string }[] = [
   { schema: 'AuditEventListData', file: TYPES.admin, iface: 'AuditEventListData' },
   // 契约 2.8.0 可观测性入口：只有一个基地址字段，空串 = 禁用。
   { schema: 'ObservabilityData', file: TYPES.admin, iface: 'ObservabilityData' },
-  // S10-7 用户管理面：改密请求 → 列表行 → 两个写请求 → keyset 列表体。
+  //  用户管理面：改密请求 → 列表行 → 两个写请求 → keyset 列表体。
   { schema: 'ChangePasswordRequest', file: TYPES.users, iface: 'ChangePasswordRequest' },
   { schema: 'UserSummaryData', file: TYPES.users, iface: 'UserSummary' },
   { schema: 'UserRolesUpdateRequest', file: TYPES.users, iface: 'UpdateUserRolesRequest' },
@@ -574,11 +574,11 @@ const NOT_MIRRORED: { schema: string; reason: string }[] = [
   {
     schema: 'AskStreamMeta',
     reason:
-      '事件帧顶层只有 event/data，载荷缩在 data 之下，进不了按顶层字段比对的镜像表；event 取值与 data 字段集合/required 由下方「四帧载荷」专项断言当场锁定，前端 AskStreamMetaPayload 已在 S8-4 交付。',
+      '事件帧顶层只有 event/data，载荷缩在 data 之下，进不了按顶层字段比对的镜像表；event 取值与 data 字段集合/required 由下方「四帧载荷」专项断言当场锁定，前端 AskStreamMetaPayload 已在  交付。',
   },
   {
     schema: 'AskStreamDelta',
-    reason: '同 AskStreamMeta：嵌套载荷由下方专项断言锁定，前端 AskStreamDeltaPayload 已在 S8-4 交付。',
+    reason: '同 AskStreamMeta：嵌套载荷由下方专项断言锁定，前端 AskStreamDeltaPayload 已在  交付。',
   },
   {
     schema: 'AskStreamDone',
@@ -990,7 +990,7 @@ describe('契约 ↔ 前端类型对账', () => {
         problems.push(
           `${entry.schema} ↔ ${entry.iface}：期望 [${expected.join(', ')}]｜实际 [${declared.join(', ')}]` +
             `（契约字段 [${contract.join(', ')}]｜登记多出 [${allowed.join(', ')}]）`,
-        );
+       );
       }
     }
     expect(problems).toEqual([]);
@@ -1037,7 +1037,7 @@ describe('契约 ↔ 前端类型对账', () => {
   });
 
   /**
-   * D-70：`ReminderKind` 读侧三值、创建侧两值，`COURSE` 只能由 ICS 导入产生。
+   * `ReminderKind` 读侧三值、创建侧两值，`COURSE` 只能由 ICS 导入产生。
    * 这条差集是界面上「类型单选不含课程提醒」的唯一依据，因此创建侧全集当场从契约的
    * `discriminator.mapping` 解析，而不是把 DEADLINE/CUSTOM 抄成期望值。
    */
@@ -1045,16 +1045,16 @@ describe('契约 ↔ 前端类型对账', () => {
     const createKinds = contractDiscriminator(SCHEMAS.get('ReminderCreateRequest') ?? []).sort();
     expect(createKinds, '前端 ReminderCreateKind 与契约创建侧判别映射不一致').toEqual(
       tsLiterals(TYPES.reminders, 'ReminderCreateKind', 'type').slice().sort(),
-    );
+   );
     expect(createKinds, '前端 REMINDER_CREATE_KINDS 与契约创建侧判别映射不一致').toEqual(
       tsLiterals(TYPES.reminders, 'REMINDER_CREATE_KINDS', 'const').slice().sort(),
-    );
+   );
 
     const readKinds = contractEnum(SCHEMAS.get('ReminderKind') ?? []).sort();
     expect(
       readKinds.filter((kind) => !createKinds.includes(kind)),
       '读侧相对创建侧多出的类型应恰好只有 COURSE；契约若改了口径，界面文案要一起裁决',
-    ).toEqual(['COURSE']);
+   ).toEqual(['COURSE']);
 
     // 两个读侧 kind 都复用三值 ReminderKind；契约若把它们改成内联枚举，上面的差集断言就失去依据。
     for (const schema of ['ReminderCreateData', 'NotificationData']) {
@@ -1063,7 +1063,7 @@ describe('契约 ↔ 前端类型对账', () => {
       expect(at, `契约 ${schema} 缺少 kind 字段`).toBeGreaterThanOrEqual(0);
       expect(body[at + 1]?.trim(), `契约 ${schema}.kind 应复用三值 ReminderKind`).toBe(
         "$ref: '#/components/schemas/ReminderKind'",
-      );
+     );
     }
   });
 
@@ -1074,7 +1074,7 @@ describe('契约 ↔ 前端类型对账', () => {
       expect(
         inFrontend,
         `${entry.constName} 应等于契约 ${entry.schema}.${entry.field} 的 ${entry.keyword}`,
-      ).toBe(fromContract);
+     ).toBe(fromContract);
     }
     for (const entry of MIRRORED_ITEM_CONSTRAINTS) {
       const fromContract = Number(contractItemConstraint(entry.schema, entry.field, entry.keyword));
@@ -1082,7 +1082,7 @@ describe('契约 ↔ 前端类型对账', () => {
       expect(
         inFrontend,
         `${entry.constName} 应等于契约 ${entry.schema}.${entry.field} 数组项的 ${entry.keyword}`,
-      ).toBe(fromContract);
+     ).toBe(fromContract);
     }
     for (const entry of MIRRORED_PARAMETER_CONSTRAINTS) {
       const fromContract = Number(parameterConstraint(entry.parameter, entry.keyword));
@@ -1090,7 +1090,7 @@ describe('契约 ↔ 前端类型对账', () => {
       expect(
         inFrontend,
         `${entry.constName} 应等于契约参数 ${entry.parameter} 的 ${entry.keyword}`,
-      ).toBe(fromContract);
+     ).toBe(fromContract);
     }
   });
 
@@ -1105,7 +1105,7 @@ describe('契约 ↔ 前端类型对账', () => {
   });
 
   /**
-   * S8-4 的四帧协议（`meta`/`delta`/`done`/`error`）载荷是 `{event, data}` 嵌套形态，
+   *  的四帧协议（`meta`/`delta`/`done`/`error`）载荷是 `{event, data}` 嵌套形态，
    * 顶层字段只有两个，进不了按顶层字段比对的 `MIRRORED_OBJECTS`；这里当场从契约解析出
    * 事件名、顶层 required 与 `data` 载荷，逐帧比对前端 `AskStream*Payload`。
    */
@@ -1139,7 +1139,7 @@ describe('契约 ↔ 前端类型对账', () => {
     expect(done[0]?.trim(), 'done 帧的 data 应是 allOf 组合').toBe('allOf:');
     expect(done[1]?.trim(), 'done 帧的 data 第一支必须复用契约 AskData，前端 extends 的镜像才成立').toBe(
       "- $ref: '#/components/schemas/AskData'",
-    );
+   );
     const doneExtra = done
       .filter((line) => /^ {16}[a-zA-Z][A-Za-z0-9_]*:$/.test(line))
       .map((line) => line.trim().replace(/:$/, ''));
@@ -1152,13 +1152,13 @@ describe('契约 ↔ 前端类型对账', () => {
 
     expect(frameDataBody('AskStreamError')[0]?.trim(), 'error 帧的 data 必须直接复用 ProblemDetail 镜像').toBe(
       "$ref: '#/components/schemas/ProblemDetail'",
-    );
+   );
     // error 帧不进入事件联合：api 层把它映射成 ApiError 抛出，store 只需一个失败分支。
     const union = /export type AskStreamEvent =[\s\S]*?\};/.exec(tsText(TYPES.conversations))?.[0] ?? '';
     expect(
       [...union.matchAll(/kind: '([a-z]+)'/g)].map((match) => match[1] ?? '').sort(),
       'AskStreamEvent 应恰好覆盖 meta/delta/done；error 帧由 api 层抛出，不是可收事件',
-    ).toEqual(['delta', 'done', 'meta']);
+   ).toEqual(['delta', 'done', 'meta']);
   });
 
   it('submits the complete-upload body with exactly the contract field', () => {
@@ -1179,7 +1179,7 @@ describe('契约 ↔ 前端类型对账', () => {
     // 本地预拦读的是 `x-max-bytes` 这个机器可读键，不是 description 里的「2 MiB」人话。
     expect(tsNumberConst('src/types/reminders.ts', 'ICS_MAX_BYTES')).toBe(
       Number(contractConstraint('ScheduleImportRequest', 'file', 'x-max-bytes')),
-    );
+   );
   });
 
   it('sends a page size the contract parameter actually allows', () => {
@@ -1205,7 +1205,7 @@ describe('契约 ↔ 前端类型对账', () => {
     for (const store of stores) {
       expect(readFileSync(store, 'utf8'), `${store} 应从 failureFields.ts 复用 PAGE_LIMIT`).toMatch(
         /import\s*\{[^}]*PAGE_LIMIT[^}]*\}\s*from\s*'\.\/failureFields'/,
-      );
+     );
     }
 
     /**
@@ -1226,7 +1226,7 @@ describe('契约 ↔ 前端类型对账', () => {
       expect(
         limit,
         `${entry.store} 的 PAGE_LIMIT 应等于契约 ${entry.parameter} 默认值`,
-      ).toBe(readFromParameter('default'));
+     ).toBe(readFromParameter('default'));
       expect(limit >= readFromParameter('minimum'), `${entry.store} 的 PAGE_LIMIT 低于契约下限`).toBe(true);
       expect(limit <= readFromParameter('maximum'), `${entry.store} 的 PAGE_LIMIT 高于契约上限`).toBe(true);
     }
@@ -1241,11 +1241,11 @@ describe('契约 ↔ 前端类型对账', () => {
     expect(
       parameterConstraint('AuditTraceId', 'pattern'),
       '查询参数 AuditTraceId.pattern 与读侧 AuditEventItem.traceId 已漂移，前端共用的一套常量不再成立',
-    ).toBe(contractConstraint('AuditEventItem', 'traceId', 'pattern'));
+   ).toBe(contractConstraint('AuditEventItem', 'traceId', 'pattern'));
     expect(
       parameterConstraint('AuditEventType', 'pattern'),
       '查询参数 AuditEventType.pattern 与读侧 AuditEventItem.eventType 已漂移',
-    ).toBe(contractConstraint('AuditEventItem', 'eventType', 'pattern'));
+   ).toBe(contractConstraint('AuditEventItem', 'eventType', 'pattern'));
   });
 
   /**
@@ -1257,15 +1257,15 @@ describe('契约 ↔ 前端类型对账', () => {
     expect(
       tsNumberConst('src/stores/adminUsage.ts', 'TOP_USERS'),
       'adminUsage 的 TOP_USERS 应等于契约 UsageTopUsers 默认值',
-    ).toBe(Number(parameterConstraint('UsageTopUsers', 'default')));
+   ).toBe(Number(parameterConstraint('UsageTopUsers', 'default')));
     expect(
       contractFieldEnum('UsageSummary', 'bucket'),
       '契约的 bucket 枚举不再是单值，前端发送的常量与 UsageBucket 类型都要重新裁决',
-    ).toEqual([tsStringConst('src/stores/adminUsage.ts', 'BUCKET')]);
+   ).toEqual([tsStringConst('src/stores/adminUsage.ts', 'BUCKET')]);
   });
 
   /**
-   * D-197 的机器化。设计期注释曾假设管理端写入带 `version` 乐观锁与幂等键头，交付的契约两样都没有：
+   *  的机器化。设计期注释曾假设管理端写入带 `version` 乐观锁与幂等键头，交付的契约两样都没有：
    * 两个管理面 PUT 的请求体各只有契约列出的字段，管理面八个操作也都不引用任何幂等键参数。
    * 「不加任何头」与「按值幂等、并发覆盖为 last-write-wins」这两条界面表述就站在这条断言上；
    * 契约一旦引入幂等键或给管理端加上 429，这里先红，界面文案与 store 字段都要重新裁决。
@@ -1290,7 +1290,7 @@ describe('契约 ↔ 前端类型对账', () => {
       getAiUsage: ['TimeFrom', 'TimeTo', 'UsageBucket', 'UsageTopUsers'],
       // 契约 2.8.0 可观测性入口：只读部署配置，无参数、无幂等键。
       getObservability: [],
-      // 契约 2.7.0 模型连接管理面：同样按值幂等，不声明幂等键（D-197）。
+      // 契约 2.7.0 模型连接管理面：同样按值幂等，不声明幂等键。
       listModelConnections: [],
       listModelConnectionPresets: [],
       upsertModelConnection: [],
@@ -1298,7 +1298,7 @@ describe('契约 ↔ 前端类型对账', () => {
       authorizeModelConnection: ['ConnectionId'],
       probeModelConnection: ['ConnectionId'],
       updateModelConnectionActivation: ['ConnectionId'],
-      // 契约 2.8.0 长期记忆管理面：读与删都按值幂等，不声明幂等键（D-197）。
+      // 契约 2.8.0 长期记忆管理面：读与删都按值幂等，不声明幂等键。
       listMemories: ['MemoryUserId'],
       deleteMemory: ['MemoryKey', 'MemoryUserId'],
     };
@@ -1306,27 +1306,27 @@ describe('契约 ↔ 前端类型对账', () => {
       const refs = operationParameterRefs(operationBody(operationId));
       expect(refs.slice().sort(), `${operationId} 的参数集合与登记不一致：新增参数要先决定镜像位置`).toEqual(
         names.slice().sort(),
-      );
+     );
       expect(
         refs,
-        `${operationId} 引用了幂等键参数，D-197「管理端不加任何头」的裁决需要重来`,
-      ).not.toContain('IdempotencyKey');
+        `${operationId} 引用了幂等键参数，「管理端不加任何头」的裁决需要重来`,
+     ).not.toContain('IdempotencyKey');
       expect(refs, `${operationId} 引用了可选幂等键参数，同上`).not.toContain('IdempotencyKeyOptional');
       expect(
         operationBody(operationId).join('\n'),
         `${operationId} 出现 429：管理端 store 要按其余域补齐 retryAfterSeconds 与等待文案`,
-      ).not.toContain("'429':");
+     ).not.toContain("'429':");
     }
 
     expect(
       contractFields(SCHEMAS.get('UpdateAiControlsRequest') ?? []),
       'UpdateAiControlsRequest 的字段集合已变化：界面文案里的「按值幂等」要重新核实',
-    ).toEqual(['killSwitchActive']);
+   ).toEqual(['killSwitchActive']);
     expect(contractFields(SCHEMAS.get('UpdateAiQuotaRequest') ?? [])).toEqual(['dailyQuestionLimit', 'dailyTokenLimit']);
   });
 
   /**
-   * D-207 的机器化，方向与上面那条**相反**：用户管理面的两个写操作与改密在契约里都正式声明了
+   *  的机器化，方向与上面那条**相反**：用户管理面的两个写操作与改密在契约里都正式声明了
    * `IdempotencyKey`（Java 侧 `@RequestHeader` 必填），所以这里断言的是「参数集合**含**该参数」。
    * 这一条存在的理由是把两个面隔开：`api/admin.ts` 那条「不加任何头」的裁决一旦被复制到用户面，
    * 三个写请求会直接 400；反过来契约若把该参数删掉，拦截器补的头就成了无契约依据的额外请求头。
@@ -1346,7 +1346,7 @@ describe('契约 ↔ 前端类型对账', () => {
       const refs = operationParameterRefs(operationBody(operationId));
       expect(refs.slice().sort(), `${operationId} 的参数集合与登记不一致：新增参数要先决定镜像位置`).toEqual(
         names.slice().sort(),
-      );
+     );
       if (writes.has(operationId)) {
         expect(refs, `${operationId} 不再声明 IdempotencyKey：拦截器补的那个头就失去契约依据`).toContain('IdempotencyKey');
       }
@@ -1355,24 +1355,24 @@ describe('契约 ↔ 前端类型对账', () => {
     expect(
       contractFields(SCHEMAS.get('ChangePasswordRequest') ?? []),
       'ChangePasswordRequest 的字段集合已变化：改密表单的字段与 writeOnly 口径要重新核实',
-    ).toEqual(['currentPassword', 'newPassword']);
+   ).toEqual(['currentPassword', 'newPassword']);
     expect(contractFields(SCHEMAS.get('UserRolesUpdateRequest') ?? [])).toEqual(['roles']);
     expect(contractFields(SCHEMAS.get('UserStatusUpdateRequest') ?? [])).toEqual(['status']);
     expect(
       contractConstraint('UserSummaryData', 'roles', 'minItems'),
       '读侧 roles 的 minItems 已变化：界面那句「账号必须至少持有 USER」要重新核实',
-    ).toBe('1');
+   ).toBe('1');
 
     const rolesBlock = (SCHEMAS.get('UserRolesUpdateRequest') ?? []).join('\n');
     expect(/ {10}maxItems: 2/.test(rolesBlock), 'UserRolesUpdateRequest.roles 的 maxItems 不再是 2').toBe(true);
     expect(
       rolesBlock.includes('minItems'),
       '契约已给写侧 roles 加上 minItems：空数组不再是「schema 合法、服务端 422」，界面那层预拦要重新裁决',
-    ).toBe(false);
+   ).toBe(false);
 
-    // 改密的两个界面前提都在契约上：204 无响应体 ⇒ 成功后必须重新登录（D-206）；429 ⇒ 需要等待倒数（D-215）。
+    // 改密的两个界面前提都在契约上：204 无响应体 ⇒ 成功后必须重新登录；429 ⇒ 需要等待倒数。
     const changePasswordBody = operationBody('changePassword').join('\n');
-    expect(changePasswordBody, "changePassword 不再返回 204：D-206「成功即登出」的前提变了").toContain("'204':");
+    expect(changePasswordBody, "changePassword 不再返回 204：「成功即登出」的前提变了").toContain("'204':");
     expect(changePasswordBody, "changePassword 不再有 429：账户页的限流倒数与「这算一次失败」文案要撤下").toContain("'429':");
   });
 
@@ -1381,7 +1381,7 @@ describe('契约 ↔ 前端类型对账', () => {
     expect(RESPONSE_BLOCKS).toHaveLength(36);
     const offContract = RESPONSE_BLOCKS.filter(
       (block) => !block.body.some((line) => line.trim() === "$ref: '#/components/schemas/ProblemDetail'"),
-    ).map((block) => block.name);
+   ).map((block) => block.name);
     expect(offContract, `这些响应没有复用 ProblemDetail：${offContract.join(', ')}`).toEqual([]);
   });
 
@@ -1396,7 +1396,7 @@ describe('契约 ↔ 前端类型对账', () => {
     expect(
       offenders,
       `后端引入了排除 null 的 Jackson 装配：${offenders.join(', ')}；前端的「键恒在」镜像需要重新裁决。`,
-    ).toEqual([]);
+   ).toEqual([]);
   });
 
   /**
@@ -1429,7 +1429,7 @@ describe('契约 ↔ 前端类型对账', () => {
     // 正是方案 CT-3 指出的「369 处约束只有约 60 条手工登记、且没有反向扫描」缺口。
     const registry = JSON.parse(
       readFileSync(join(ROOT, '..', 'scripts', 'contract_constraints.json'), 'utf8'),
-    ) as {
+   ) as {
       keywords: string[];
       entries: Array<{ line: number; keyword: string; schema: string; field: string; value: unknown }>;
     };
@@ -1454,12 +1454,12 @@ describe('契约 ↔ 前端类型对账', () => {
   it('contractNullable resolves every registered nullable field (CT-3)', () => {
     const registry = JSON.parse(
       readFileSync(join(ROOT, '..', 'scripts', 'contract_constraints.json'), 'utf8'),
-    ) as {
+   ) as {
       entries: Array<{ keyword: string; schema: string; field: string; value: unknown }>;
     };
     const nullableFields = registry.entries.filter(
       (entry) => entry.keyword === 'nullable' && entry.value === true && entry.schema && entry.field,
-    );
+   );
     expect(nullableFields.length).toBeGreaterThan(0);
     for (const entry of nullableFields) {
       expect(contractNullable(entry.schema, entry.field), `${entry.schema}.${entry.field}`).toBe(true);

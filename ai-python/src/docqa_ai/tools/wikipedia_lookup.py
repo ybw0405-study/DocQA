@@ -51,7 +51,7 @@ def _json_object(response: HttpResponse) -> dict[str, object] | None:
 
 
 class WikipediaLookupTool:
-    """Wikipedia REST summary with a search fallback (D-139)."""
+    """Wikipedia REST summary with a search fallback."""
 
     name = "wikipedia_lookup"
     source = "builtin"

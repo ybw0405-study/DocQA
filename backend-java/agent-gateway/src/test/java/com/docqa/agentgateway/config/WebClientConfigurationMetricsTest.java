@@ -11,7 +11,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * S11-3-M3 的回归网：熔断指标必须真的被绑进 {@link MeterRegistry}。
+ * -M3 的回归网：熔断指标必须真的被绑进 {@link MeterRegistry}。
  *
  * <p>这条用例是为了防「不报错但不干活」——缺陷形态就是熔断功能完全正常、
  * 单测和接口全绿，唯独 {@code resilience4j_*} 序列长期 0 条，导致任何基于

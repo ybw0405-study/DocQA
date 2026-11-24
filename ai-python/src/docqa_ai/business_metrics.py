@@ -1,4 +1,4 @@
-"""`observability.md` §4.2 中发生在 Python 进程内的 9 项业务指标。
+"""9 项业务指标口径 中发生在 Python 进程内的 9 项业务指标。
 
 为什么必须自建 Prometheus 端点：LLM 调用、Agent 轮次、token、PII 阻断、检索与向量查询
 耗时这九项**只存在于 Python 进程内**，Java 侧即使包一层也看不到真实的分段耗时与 token。

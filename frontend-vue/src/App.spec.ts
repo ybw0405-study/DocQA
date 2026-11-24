@@ -110,7 +110,7 @@ describe('skip link', () => {
 
 describe('sign out from the header', () => {
   /**
-   * `signOut()` 只清本地会话、不动路由（S10-M4 的原始形态）：清完还停在原页面，
+   * `signOut()` 只清本地会话、不动路由（的原始形态）：清完还停在原页面，
    * 界面看似在线，此后每个请求都带不上令牌、逐个 401。本用例钉住「清会话之后必须发起导航」。
    */
   it('navigates to the login page instead of leaving a logged-out session on screen', async () => {

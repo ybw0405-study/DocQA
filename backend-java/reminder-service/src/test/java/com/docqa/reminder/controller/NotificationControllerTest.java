@@ -52,7 +52,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
- * 通知的两个端点共用同一套边界：{@code userId} 只来自 JWT 属性，标记已读**有意不要**幂等键（D-67）。
+ * 通知的两个端点共用同一套边界：{@code userId} 只来自 JWT 属性，标记已读**有意不要**幂等键。
  */
 @ExtendWith(MockitoExtension.class)
 class NotificationControllerTest {
@@ -166,7 +166,7 @@ class NotificationControllerTest {
         when(notificationService.markRead(eq(USER_ID), any()))
                 .thenReturn(new NotificationReadData(3, true));
 
-        // 不带 Idempotency-Key 也必须 200：已读是收敛操作，重复提交没有第二次副作用（D-67）。
+        // 不带 Idempotency-Key 也必须 200：已读是收敛操作，重复提交没有第二次副作用。
         mockMvc.perform(post("/api/v1/notifications/read")
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, USER_ID)
                         .contentType(MediaType.APPLICATION_JSON)

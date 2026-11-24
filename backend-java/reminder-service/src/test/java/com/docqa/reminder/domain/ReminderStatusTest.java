@@ -6,8 +6,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * 六条合法边的判据来自契约 2.3.0 与 D-58。这里只回答「哪些边合法」：
- * 同态提交故意返回 false，因为服务层在本判定**之前**就把它短路成 200 no-op（D-60），
+ * 六条合法边的判据来自契约 2.3.0 与 。这里只回答「哪些边合法」：
+ * 同态提交故意返回 false，因为服务层在本判定**之前**就把它短路成 200 no-op，
  * 把同态也算成非法边会让连点两次「暂停」得到 409。
  */
 class ReminderStatusTest {

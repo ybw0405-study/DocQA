@@ -30,7 +30,9 @@ API 未配置 `DOCQA_AI_PG_DSN` 时仍可启动，检索会 fail-closed 为 `AGT
 否则进程以退出码 2 拒绝启动，避免把「未接线」误当成「已消费」。
 
 Windows 侧 `pip` 能装上 `rocketmq-client-python`，但 `import` 即失败（其依赖的 `librocketmq.so`
-仅提供 Linux 绑定），因此 Worker 必须跑在 WSL/Linux：`docs/00-infra/setup-parse-worker.sh start [parse|vector|all]`。
+仅提供 Linux 绑定），因此 Worker 必须跑在 Linux 容器里：
+`docker compose -f ops/docker-compose.infra.yml -f ops/docker-compose.app.yml up -d parse-worker vector-worker`
+（镜像复用 `ai-python` target，entrypoint 分别为 `docqa-parse-worker` / `docqa-vector-worker`）。
 
 首次启动 Worker 前，在 PGVector 库**按序号**执行迁移（`001`–`004` 都要执行；
 `004` 之后读侧按 `tenant_id` 过滤，缺它检索查不到任何行）：

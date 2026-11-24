@@ -19,7 +19,7 @@ export const routes: RouteRecordRaw[] = [
   { path: '/documents', name: 'documents', component: () => import('../views/DocumentsView.vue') },
   { path: '/ask', name: 'ask', component: () => import('../views/AskView.vue') },
   { path: '/reminders', name: 'reminders', component: () => import('../views/RemindersView.vue') },
-  // 管理端页面各自一个 URL：审计查询的游标与用量窗口要能进 query，塞进一个 /admin 的 tab 就做不到（D-195）。
+  // 管理端页面各自一个 URL：审计查询的游标与用量窗口要能进 query，塞进一个 /admin 的 tab 就做不到。
   { path: '/admin/ai-controls', name: 'admin-ai-controls', component: () => import('../views/admin/AdminControlsView.vue'), meta: { requiresAdmin: true } },
   { path: '/admin/tenant-controls', name: 'admin-tenant-controls', component: () => import('../views/admin/AdminTenantControlsView.vue'), meta: { requiresAdmin: true } },
   { path: '/admin/quotas', name: 'admin-quotas', component: () => import('../views/admin/AdminQuotasView.vue'), meta: { requiresAdmin: true } },

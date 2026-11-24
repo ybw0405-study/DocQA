@@ -64,7 +64,7 @@ def _web_url(raw: object) -> str:
 
 
 class WebSearchTool:
-    """SearXNG first, Tavily as an optional fallback; never fabricates results (D-136)."""
+    """SearXNG first, Tavily as an optional fallback; never fabricates results."""
 
     name = "web_search"
     source = "builtin"

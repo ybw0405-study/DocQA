@@ -1,0 +1,327 @@
+# DocQA 应用层（全容器交付）。与 infra 叠加启动：
+#   .\scripts\start-dev.ps1 -Containers     # 推荐：注入 env + 授权 + topic + pg 结构后起容器
+#   docker compose -f ops/docker-compose.infra.yml -f ops/docker-compose.app.yml up -d
+# 直接 compose 时进程环境需自带 ops/env/local.env 的键（start-dev.ps1 -InfraOnly 会在
+# 其进程内注入；脚本退出后消失，故推荐 -Containers 一条命令）。
+#
+# image 为 GHCR 制品名（release 推送）；同时声明 build，镜像不在本地时从源码构建，
+# 私有 package 或未登录 GHCR 的克隆者也能一条命令起全栈。
+# 容器内走 compose 服务名 + 容器端口；宿主机只暴露网关与前端。
+name: docqa
+
+x-java-env: &java-env
+  DOCQA_DB_URL: jdbc:mysql://mysql:3306/docqa?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8
+  DOCQA_REDIS_HOST: redis
+  DOCQA_REDIS_PORT: ${DOCQA_REDIS_CONTAINER_PORT:-16379}
+  DOCQA_ROCKETMQ_NAMESRV: rocketmq-namesrv:${DOCQA_ROCKETMQ_NAMESRV_PORT:-19876}
+  DOCQA_MINIO_ENDPOINT: http://minio:${DOCQA_MINIO_CONTAINER_PORT:-9100}
+  DOCQA_USER_SERVICE_URI: http://user-service:8081
+  DOCQA_DOCUMENT_SERVICE_URI: http://document-service:8082
+  DOCQA_REMINDER_SERVICE_URI: http://reminder-service:8083
+  DOCQA_PYTHON_BASE_URL: http://ai-python:18000
+  DOCQA_COOKIE_SECURE: "false"
+
+x-python-env: &python-env
+  DOCQA_AI_PG_DSN: postgresql://docqa:${DOCQA_PG_PASSWORD}@postgres-vector:5432/docqa_vec
+  DOCQA_AI_REDIS_URL: redis://:${DOCQA_REDIS_PASSWORD}@redis:${DOCQA_REDIS_CONTAINER_PORT:-16379}/0
+  DOCQA_AI_MINIO_ENDPOINT: http://minio:${DOCQA_MINIO_CONTAINER_PORT:-9100}
+  DOCQA_AI_ROCKETMQ_NAMESRV: rocketmq-namesrv:${DOCQA_ROCKETMQ_NAMESRV_PORT:-19876}
+  DOCQA_AI_MQ_ENABLED: "true"
+  DOCQA_AI_MINIO_ENABLED: "true"
+
+# 凭据/配置透传：值来自进程环境（start-dev.ps1 注入），替换结果为字面量。
+# 刻意不用 env_file：compose 会对 env_file 内容做二次插值，bcrypt 哈希里的 $ 段会被吞。
+x-java-secrets: &java-secrets
+  DOCQA_JWT_SECRET: ${DOCQA_JWT_SECRET:-}
+  DOCQA_DB_USERNAME: ${DOCQA_DB_USERNAME:-}
+  DOCQA_DB_PASSWORD: ${DOCQA_DB_PASSWORD:-}
+  DOCQA_APP_DB_USERNAME: ${DOCQA_APP_DB_USERNAME:-}
+  DOCQA_APP_DB_PASSWORD: ${DOCQA_APP_DB_PASSWORD:-}
+  DOCQA_AUDIT_DB_USERNAME: ${DOCQA_AUDIT_DB_USERNAME:-}
+  DOCQA_AUDIT_DB_PASSWORD: ${DOCQA_AUDIT_DB_PASSWORD:-}
+  DOCQA_MIGRATOR_DB_USERNAME: ${DOCQA_MIGRATOR_DB_USERNAME:-}
+  DOCQA_MIGRATOR_DB_PASSWORD: ${DOCQA_MIGRATOR_DB_PASSWORD:-}
+  DOCQA_REDIS_PASSWORD: ${DOCQA_REDIS_PASSWORD:-}
+  DOCQA_REDIS_DATABASE: ${DOCQA_REDIS_DATABASE:-}
+  DOCQA_MINIO_ACCESS_KEY: ${DOCQA_MINIO_ACCESS_KEY:-}
+  DOCQA_MINIO_SECRET_KEY: ${DOCQA_MINIO_SECRET_KEY:-}
+  DOCQA_MINIO_BUCKET: ${DOCQA_MINIO_BUCKET:-}
+  DOCQA_MINIO_ENABLED: ${DOCQA_MINIO_ENABLED:-}
+  DOCQA_CRED_MASTER_KEY: ${DOCQA_CRED_MASTER_KEY:-}
+  DOCQA_CRED_MASTER_KEY_PREVIOUS: ${DOCQA_CRED_MASTER_KEY_PREVIOUS:-}
+  DOCQA_DEMO_USER_ENABLED: ${DOCQA_DEMO_USER_ENABLED:-}
+  DOCQA_DEMO_ADMIN: ${DOCQA_DEMO_ADMIN:-}
+  DOCQA_DEMO_USERNAME: ${DOCQA_DEMO_USERNAME:-}
+  DOCQA_DEMO_USER_ID: ${DOCQA_DEMO_USER_ID:-}
+  DOCQA_DEMO_PASSWORD_HASH: ${DOCQA_DEMO_PASSWORD_HASH:-}
+  DOCQA_SELF_REGISTRATION_ENABLED: ${DOCQA_SELF_REGISTRATION_ENABLED:-}
+  DOCQA_REGISTRATION_ALLOWED_SLUGS: ${DOCQA_REGISTRATION_ALLOWED_SLUGS:-}
+  DOCQA_TENANT_BOOTSTRAP_TOKEN: ${DOCQA_TENANT_BOOTSTRAP_TOKEN:-}
+  DOCQA_AUDIT_ENABLED: ${DOCQA_AUDIT_ENABLED:-}
+  DOCQA_AUDIT_APPEND_ONLY_GUARD: ${DOCQA_AUDIT_APPEND_ONLY_GUARD:-}
+  DOCQA_ROCKETMQ_ENABLED: ${DOCQA_ROCKETMQ_ENABLED:-}
+  DOCQA_LLM_ALLOWED_HOSTS: ${DOCQA_LLM_ALLOWED_HOSTS:-}
+  DOCQA_LLM_ALLOW_PRIVATE: ${DOCQA_LLM_ALLOW_PRIVATE:-}
+  DOCQA_LANGFUSE_BASE_URL: ${DOCQA_LANGFUSE_BASE_URL:-}
+  DOCQA_AI_INTERNAL_TOKEN: ${DOCQA_AI_INTERNAL_TOKEN:-}
+
+x-python-secrets: &python-secrets
+  DOCQA_AI_INTERNAL_TOKEN: ${DOCQA_AI_INTERNAL_TOKEN:-}
+  DOCQA_AI_ENVIRONMENT: ${DOCQA_AI_ENVIRONMENT:-}
+  DOCQA_AI_MINIO_ACCESS_KEY: ${DOCQA_AI_MINIO_ACCESS_KEY:-}
+  DOCQA_AI_MINIO_SECRET_KEY: ${DOCQA_AI_MINIO_SECRET_KEY:-}
+  DOCQA_AI_MINIO_BUCKET: ${DOCQA_AI_MINIO_BUCKET:-}
+  DOCQA_AI_LLM_PROVIDER: ${DOCQA_AI_LLM_PROVIDER:-}
+  DOCQA_AI_LLM_BASE_URL: ${DOCQA_AI_LLM_BASE_URL:-}
+  DOCQA_AI_LLM_API_KEY: ${DOCQA_AI_LLM_API_KEY:-}
+  DOCQA_AI_LLM_MODEL: ${DOCQA_AI_LLM_MODEL:-}
+  DOCQA_AI_EMBEDDING_PROVIDER: ${DOCQA_AI_EMBEDDING_PROVIDER:-}
+  DOCQA_AI_EMBEDDING_BASE_URL: ${DOCQA_AI_EMBEDDING_BASE_URL:-}
+  DOCQA_AI_EMBEDDING_API_KEY: ${DOCQA_AI_EMBEDDING_API_KEY:-}
+  DOCQA_AI_EMBEDDING_MODEL: ${DOCQA_AI_EMBEDDING_MODEL:-}
+  DOCQA_AI_EMBEDDING_DIMENSIONS: ${DOCQA_AI_EMBEDDING_DIMENSIONS:-}
+  DOCQA_AI_RERANK_PROVIDER: ${DOCQA_AI_RERANK_PROVIDER:-}
+  DOCQA_AI_RERANK_BASE_URL: ${DOCQA_AI_RERANK_BASE_URL:-}
+  DOCQA_AI_RERANK_API_KEY: ${DOCQA_AI_RERANK_API_KEY:-}
+  DOCQA_AI_RERANK_MODEL: ${DOCQA_AI_RERANK_MODEL:-}
+  DOCQA_AI_EXPERIMENT_BUDGET: ${DOCQA_AI_EXPERIMENT_BUDGET:-}
+  DOCQA_AI_EXPERIMENT_TOKEN_BUDGET: ${DOCQA_AI_EXPERIMENT_TOKEN_BUDGET:-}
+  DOCQA_AI_MODEL_CONNECTIONS_ENABLED: ${DOCQA_AI_MODEL_CONNECTIONS_ENABLED:-}
+  DOCQA_CRED_MASTER_KEY: ${DOCQA_CRED_MASTER_KEY:-}
+  DOCQA_CRED_MASTER_KEY_PREVIOUS: ${DOCQA_CRED_MASTER_KEY_PREVIOUS:-}
+  DOCQA_AI_MEMORY_ENABLED: ${DOCQA_AI_MEMORY_ENABLED:-}
+  DOCQA_AI_MEMORY_DSN: ${DOCQA_AI_MEMORY_DSN:-}
+  DOCQA_AI_LANGFUSE_TRACING_ENABLED: ${DOCQA_AI_LANGFUSE_TRACING_ENABLED:-}
+  DOCQA_AI_LANGFUSE_BASE_URL: ${DOCQA_AI_LANGFUSE_BASE_URL:-}
+  DOCQA_AI_LANGFUSE_PUBLIC_KEY: ${DOCQA_AI_LANGFUSE_PUBLIC_KEY:-}
+  DOCQA_AI_LANGFUSE_SECRET_KEY: ${DOCQA_AI_LANGFUSE_SECRET_KEY:-}
+  DOCQA_LLM_ALLOWED_HOSTS: ${DOCQA_LLM_ALLOWED_HOSTS:-}
+  DOCQA_LLM_ALLOW_PRIVATE: ${DOCQA_LLM_ALLOW_PRIVATE:-}
+
+services:
+  mq-init:
+    image: apache/rocketmq:5.3.1@sha256:d2b231c1b9204129e4f4dd65ec1521c81b8d6826e5f1fe8daa521dab0db5bf16
+    container_name: docqa-mq-init
+    depends_on:
+      rocketmq-broker:
+        condition: service_healthy
+    environment:
+      HOME: /tmp
+    # mqadmin 失败仍返回 0，按 topicRoute 有无 brokerDatas 判定；注册周期 ~30s 带重试。
+    command:
+      - sh
+      - -c
+      - |
+        for t in parse-requested parse-completed parse-failed vector-change-requested vector-change-completed audit-event; do
+          ok=false
+          for i in $$(seq 1 18); do
+            sh mqadmin updateTopic -n rocketmq-namesrv:${DOCQA_ROCKETMQ_NAMESRV_PORT:-19876} -c DefaultCluster -t $$t >/dev/null 2>&1
+            if sh mqadmin topicRoute -t $$t -n rocketmq-namesrv:${DOCQA_ROCKETMQ_NAMESRV_PORT:-19876} 2>/dev/null | grep -q brokerDatas; then
+              ok=true; break
+            fi
+            sleep 5
+          done
+          [ "$$ok" = true ] || { echo "topic $$t 预建失败" >&2; exit 1; }
+        done
+
+  # Flyway 建表完成后补齐「表尚未存在时被推迟」的逐表 GRANT（等价 start-dev [6b]）。
+  grants-finalize:
+    image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
+    container_name: docqa-grants-finalize
+    depends_on:
+      document-service:
+        condition: service_healthy
+    environment:
+      MYSQL_PWD: ${DOCQA_DB_PASSWORD}
+      APP_PW: ${DOCQA_APP_DB_PASSWORD}
+      AUDIT_PW: ${DOCQA_AUDIT_DB_PASSWORD}
+      MIG_PW: ${DOCQA_MIGRATOR_DB_PASSWORD}
+    volumes:
+      - ./sql:/sql:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        for pw in "$$APP_PW" "$$AUDIT_PW" "$$MIG_PW"; do
+          case "$$pw" in *'|'*|*'&'*|*'\'*) echo '口令含 sed 替换特殊字符，拒绝渲染' >&2; exit 1;; esac
+        done
+        sed -e "s|__ACCOUNT_HOST__|%|g" \
+            -e "s|__APP_PASSWORD__|$$APP_PW|g" \
+            -e "s|__AUDIT_PASSWORD__|$$AUDIT_PW|g" \
+            -e "s|__MIGRATOR_PASSWORD__|$$MIG_PW|g" /sql/least-privilege.sql.tmpl > /tmp/grants.sql
+        mysql -h mysql -uroot --default-character-set=utf8mb4 docqa < /tmp/grants.sql
+
+  user-service:
+    image: ghcr.io/ybw0405-study/docqa-user-service:${DOCQA_IMAGE_TAG:-2.1.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: java-service
+      args:
+        JAR_PATH: /out/user-service.jar
+    container_name: docqa-user
+    environment:
+      <<: [*java-env, *java-secrets]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mq-init:
+        condition: service_completed_successfully
+
+  document-service:
+    image: ghcr.io/ybw0405-study/docqa-document-service:${DOCQA_IMAGE_TAG:-2.1.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: java-service
+      args:
+        JAR_PATH: /out/document-service.jar
+    container_name: docqa-document
+    environment:
+      <<: [*java-env, *java-secrets]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      mq-init:
+        condition: service_completed_successfully
+
+  reminder-service:
+    image: ghcr.io/ybw0405-study/docqa-reminder-service:${DOCQA_IMAGE_TAG:-2.1.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: java-service
+      args:
+        JAR_PATH: /out/reminder-service.jar
+    container_name: docqa-reminder
+    environment:
+      <<: [*java-env, *java-secrets]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mq-init:
+        condition: service_completed_successfully
+
+  audit-service:
+    image: ghcr.io/ybw0405-study/docqa-audit-service:${DOCQA_IMAGE_TAG:-2.1.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: java-service-nonweb
+      args:
+        JAR_PATH: /out/audit-service.jar
+    container_name: docqa-audit
+    environment:
+      <<: [*java-env, *java-secrets]
+    # 非 Web 进程（web-application-type: none），镜像为 java-service-nonweb target；
+    # 存活探针用进程级检查代替 HTTP。
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mq-init:
+        condition: service_completed_successfully
+
+  ai-python:
+    image: ghcr.io/ybw0405-study/docqa-ai-python:${DOCQA_IMAGE_TAG:-2.1.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: ai-python
+    container_name: docqa-ai
+    environment:
+      <<: [*python-env, *python-secrets]
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mq-init:
+        condition: service_completed_successfully
+
+  parse-worker:
+    image: ghcr.io/ybw0405-study/docqa-ai-python:${DOCQA_IMAGE_TAG:-2.1.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: ai-python
+    container_name: docqa-parse-worker
+    entrypoint: ["docqa-parse-worker"]
+    environment:
+      <<: [*python-env, *python-secrets]
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      mq-init:
+        condition: service_completed_successfully
+
+  vector-worker:
+    image: ghcr.io/ybw0405-study/docqa-ai-python:${DOCQA_IMAGE_TAG:-2.1.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: ai-python
+    container_name: docqa-vector-worker
+    entrypoint: ["docqa-vector-worker"]
+    environment:
+      <<: [*python-env, *python-secrets]
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+      mq-init:
+        condition: service_completed_successfully
+
+  agent-gateway:
+    image: ghcr.io/ybw0405-study/docqa-agent-gateway:${DOCQA_IMAGE_TAG:-2.1.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: java-service
+      args:
+        JAR_PATH: /out/agent-gateway.jar
+    container_name: docqa-gateway
+    environment:
+      <<: [*java-env, *java-secrets]
+    ports:
+      - "127.0.0.1:${DOCQA_GATEWAY_PORT:-18080}:8080"
+    depends_on:
+      user-service:
+        condition: service_healthy
+      document-service:
+        condition: service_healthy
+      reminder-service:
+        condition: service_healthy
+      audit-service:
+        condition: service_healthy
+      ai-python:
+        condition: service_healthy
+
+  frontend:
+    image: ghcr.io/ybw0405-study/docqa-frontend:${DOCQA_IMAGE_TAG:-2.1.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: frontend
+    container_name: docqa-frontend
+    ports:
+      - "127.0.0.1:${DOCQA_WEB_PORT:-18090}:8080"
+    depends_on:
+      agent-gateway:
+        condition: service_healthy

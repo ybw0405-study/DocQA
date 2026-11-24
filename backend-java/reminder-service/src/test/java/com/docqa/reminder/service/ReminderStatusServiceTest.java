@@ -96,7 +96,7 @@ class ReminderStatusServiceTest {
 
         assertThat(data.reminderId()).isEqualTo(REMINDER_ID);
         assertThat(data.status()).isEqualTo("PAUSED");
-        // D-59：暂停不清空游标，「本来下次是几点」是暂停区唯一有用的信息。
+        // 暂停不清空游标，「本来下次是几点」是暂停区唯一有用的信息。
         assertThat(data.nextTriggerAt()).isEqualTo(PAUSED_CURSOR);
         assertThat(data.version()).isEqualTo(4L);
         assertThat(data.idempotentReplay()).isFalse();
@@ -129,7 +129,7 @@ class ReminderStatusServiceTest {
 
     @Test
     void sameStatusIsANoOpThatSkipsTheVersionCheckAndWritesNothing() {
-        // 行上是版本 3、游标 X，请求带着过期读出的版本 99：no-op 既不比版本也不写库（D-60）。
+        // 行上是版本 3、游标 X，请求带着过期读出的版本 99：no-op 既不比版本也不写库。
         given(row(ReminderStatus.ACTIVE, "FREQ=WEEKLY;BYDAY=MO", MONDAY_CLASS, 10, PAUSED_CURSOR, 3L));
 
         ReminderStatusUpdateData data = service.update(
@@ -194,7 +194,7 @@ class ReminderStatusServiceTest {
 
     @Test
     void resumeLeavesThePausedRowUntouchedWhenTheRuleHasNoOccurrenceLeft() {
-        // D-73 选 ③：算不出下一时刻时既不写「ACTIVE + 空游标」的永不触发行，也不替用户改成已完成。
+        //  选 ③：算不出下一时刻时既不写「ACTIVE + 空游标」的永不触发行，也不替用户改成已完成。
         given(row(ReminderStatus.PAUSED, "FREQ=DAILY;COUNT=1", NOW.minusSeconds(86400), 0, PAUSED_CURSOR, 4L));
 
         assertThatThrownBy(() -> service.update(

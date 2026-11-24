@@ -1,5 +1,5 @@
 /**
- * SSE 传输层（S8-4，D-175 方案 A）：原生 fetch + 手写帧解析，零新依赖。
+ * SSE 传输层（方案 A）：原生 fetch + 手写帧解析，零新依赖。
  *
  * axios 在浏览器里拿不到响应体的 reader，所以流式通道不能走 `http.ts`；
  * 但会话钩子（取令牌 / 续期 / 结束会话）必须与 axios 共用同一份，否则两条通道的
@@ -128,7 +128,7 @@ export async function* sseFrames(
     buffer += decoder.decode();
     // 流结束时未以空行收尾的最后一帧按 SSE 规范丢弃，不做「补一帧」的猜测。
   } finally {
-    // 消费者提前 break 也必须断开连接——这是 D-174「客户端断开即取消上游」的客户端一侧。
+    // 消费者提前 break 也必须断开连接——这是 「客户端断开即取消上游」的客户端一侧。
     try {
       await reader.cancel();
     } catch {
@@ -210,7 +210,7 @@ async function problemApiError(response: Response): Promise<ApiError> {
     problem?.traceId ?? null,
     problem?.errors ?? [],
     readRetryAfter((name) => response.headers.get(name), response.status),
-  );
+ );
 }
 
 async function cancelQuietly(response: Response): Promise<void> {

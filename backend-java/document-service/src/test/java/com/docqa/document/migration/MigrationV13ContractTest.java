@@ -58,7 +58,7 @@ class MigrationV13ContractTest {
         assertThat(migration).doesNotContain("SECRET");
     }
 
-    /** 创建按 (tenant_id, name) upsert，管理面因此按值幂等（D-197：不声明幂等头）。 */
+    /** 创建按 (tenant_id, name) upsert，管理面因此按值幂等（不声明幂等头）。 */
     @Test
     void migrationMakesConnectionNameUniquePerTenant() throws IOException {
         String migration = normalize(readClasspath(MIGRATION)).toUpperCase(Locale.ROOT);

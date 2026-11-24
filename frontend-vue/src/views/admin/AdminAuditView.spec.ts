@@ -34,8 +34,8 @@ function stubRows(items: unknown[]): void {
   server.use(
     mswHttp.get('/api/v1/admin/audit/events', () =>
       HttpResponse.json(envelope({ items, nextCursor: null, limit: 100 })),
-    ),
-  );
+   ),
+ );
 }
 
 function rowActions(view: ViewWrapper, index = 0) {
@@ -86,7 +86,7 @@ describe('AdminAuditView', () => {
 
   it('keeps the returned page order instead of re-sorting it in the browser', async () => {
     // 倒序由服务端的 `occurred_at DESC, id DESC` 决定；桩数据第一页是 item 1（10:00:01）在前、
-    // item 2（10:15:42）在后，故意不是时间序，用来证明前端没有重新排序（D-201 边界：不做再计算）。
+    // item 2（10:15:42）在后，故意不是时间序，用来证明前端没有重新排序（边界：不做再计算）。
     const view = await mountView();
     const rows = view.findAll('tbody tr');
 
@@ -115,7 +115,7 @@ describe('AdminAuditView', () => {
         (row.findAll('td')[3]?.text() ?? ''),
         row.find('.governance__chip--warn').exists(),
       ]),
-    ).toEqual([
+   ).toEqual([
       [AUDIT_SEVERITY_LABELS.ERROR, true],
       [AUDIT_SEVERITY_LABELS.WARN, true],
       [AUDIT_SEVERITY_LABELS.INFO, false],
@@ -206,7 +206,7 @@ describe('AdminAuditView', () => {
         sent.push(new URL(request.url).searchParams);
         return HttpResponse.json(envelope({ items: [], nextCursor: null, limit: 100 }));
       }),
-    );
+   );
     const view = await mountView();
 
     await view.findAll('input[type="text"]')[0]?.setValue(DEMO_TRACE_ID);

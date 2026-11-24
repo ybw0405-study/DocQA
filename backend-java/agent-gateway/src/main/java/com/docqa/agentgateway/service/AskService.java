@@ -216,7 +216,7 @@ public class AskService {
         try {
             events = pythonAgentClient.openStream(pythonRequest, prepared.traceId());
         } catch (PythonCallException ex) {
-            // meta 未发：维持首字节前 JSON 语义（D-173），与非流式 executeFresh 的 PythonCallException 分支一致
+            // meta 未发：维持首字节前 JSON 语义，与非流式 executeFresh 的 PythonCallException 分支一致
             failAfterUserMessage(prepared, execution.userMessageId(), ex);
             clearState(prepared.traceId());
             throw new BusinessException(ex.getErrorCode(), ex.getMessage());
@@ -266,7 +266,7 @@ public class AskService {
             if (killSwitch.isActive()) {
                 handleKillSwitch(tenantId, userId, conversationId, traceId, startedAt);
             }
-            // 准入即计数：幂等重放已在上面返回；Kill Switch 拒绝的请求不消耗配额；缓存命中仍计 1 次问答（D-155）。
+            // 准入即计数：幂等重放已在上面返回；Kill Switch 拒绝的请求不消耗配额；缓存命中仍计 1 次问答。
             quotaGuard.reserve(userId);
 
             PiiMaskingResult masked = piiMasker.mask(question);
@@ -1073,7 +1073,7 @@ public class AskService {
 
         private void onCompletion() {
             if (terminated.compareAndSet(false, true)) {
-                // 客户端断开（D-174）：记 FAILED、幂等标记失败（同 key 可重试），配额不退还
+                // 客户端断开：记 FAILED、幂等标记失败（同 key 可重试），配额不退还
                 failAfterUserMessage(prepared, userMessageId, new PythonCallException(
                         ErrorCode.AGT_UPSTREAM_002, "SSE client disconnected", List.of(), false));
             }

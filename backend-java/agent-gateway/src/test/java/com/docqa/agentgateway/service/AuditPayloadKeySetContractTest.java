@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * 三处审计白名单必须逐字一致：任何一侧少一个键，治理信号就在那条路径上无声消失（S9-M1）。
+ * 三处审计白名单必须逐字一致：任何一侧少一个键，治理信号就在那条路径上无声消失。
  *
  * <p>网关的集合按运行期反射读取，另两侧按源码解析——它们位于不同模块/语言，无法在编译期共享常量；
  * 解析范围严格限定在常量声明体内，避免把同文件其它字符串误算进来。
@@ -40,7 +40,7 @@ class AuditPayloadKeySetContractTest {
         assertThat(python).as("Python 白名单与网关不一致").isEqualTo(gateway);
         assertThat(auditService).as("audit-service 白名单与网关不一致").isEqualTo(gateway);
         assertThat(gateway)
-                .as("S9-M1：toolSource 与 targetUserId 必须留在三侧白名单里")
+                .as("toolSource 与 targetUserId 必须留在三侧白名单里")
                 .hasSize(17)
                 .contains("toolSource", "targetUserId");
     }

@@ -12,11 +12,11 @@
 --      simple 解析器就会把整段中文粘成一个词位（E18），按单字发出的查询永不命中；
 --   2) 第 4 个参数 'g'：少写它就只替换首个匹配，索引内容与正文脱节，且计划从 Bitmap Index Scan 退化成 Seq Scan（E8/E21）。
 -- 字符类只覆盖 U+4E00–U+9FFF。扩展 A 区（U+3400–U+4DBF）与兼容表意区（U+F900–U+FAFF）的汉字
--- 既不会被拆成单字，查询侧也一律按分隔符丢弃，因此「生僻字精确术语」在 S5 是结构性缺失（D-96），
--- 不报错、不降级、不产生观测信号，能观察它的只有 S6 的真实标注集。
+-- 既不会被拆成单字，查询侧也一律按分隔符丢弃，因此「生僻字精确术语」在纯词法形态下是结构性缺失，
+-- 不报错、不降级、不产生观测信号，能观察它的只有真实标注集。
 --
 -- 没有按用户过滤的列或索引：词法通道读的是同一张表、同一套授权入参 (document_id, index_version)，
--- 授权范围由 Java 侧结论原样喂进来（D-87 红线），对 001 生效的「迁移文本里不得出现按用户过滤的列」断言同样覆盖本文件。
+-- 授权范围由 Java 侧结论原样喂进来（红线），对 001 生效的「迁移文本里不得出现按用户过滤的列」断言同样覆盖本文件。
 --
 -- 不安装任何扩展：pg_trgm 虽 available 但实测不能作为召回通道（LIKE '%学习%' 不走 gin_trgm_ops，
 -- 三个相似算子命中 0 / 1613 / 0 而子串真值 8979，E10）；中文分词器 zhparser / pg_jieba 在本镜像
@@ -27,7 +27,7 @@ CREATE INDEX IF NOT EXISTS idx_chunk_embedding_lexical
   USING gin (
     to_tsvector('simple'::regconfig,
                 regexp_replace(content, '([一-鿿])', ' \1 ', 'g'))
-  );
+ );
 
 COMMENT ON INDEX idx_chunk_embedding_lexical IS
-  'Lexical recall channel (S5). Expression GIN over content with CJK chars space-padded; no new column, no HNSW impact. Authorization stays on (document_id, index_version); no per-user column exists in PG.';
+  'Lexical recall channel. Expression GIN over content with CJK chars space-padded; no new column, no HNSW impact. Authorization stays on (document_id, index_version); no per-user column exists in PG.';

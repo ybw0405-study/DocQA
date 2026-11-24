@@ -99,7 +99,7 @@ export interface RemindersState extends FailureFields {
   listLoaded: boolean;
   /** 列表取数代号：过滤切换与写后刷新递增它，在途翻页的过期响应一律丢弃。 */
   listSeq: number;
-  /** null 表示「全部」，此时根本不发送 `status` 参数（D-9 方案 A）。 */
+  /** null 表示「全部」，此时根本不发送 `status` 参数（方案 A）。 */
   statusFilter: ReminderStatus | null;
 
   form: ReminderForm;
@@ -130,7 +130,7 @@ function applyStatusToRow(row: ReminderListItemData, data: ReminderStatusUpdateD
 }
 
 /**
- * 默认时区取引擎给出的 IANA 名（D-11 方案 A）；取不到或形态非法时退回 UTC。
+ * 默认时区取引擎给出的 IANA 名（方案 A）；取不到或形态非法时退回 UTC。
  * 时区是否存在、RRULE 语义是否合法，权威始终在服务端 `RruleParser` 与 `RecurrenceCalculator`。
  * 课表导入的 `fallbackTimezone` 默认值复用本函数，两条链路的「默认区」必须是同一个口径。
  */
@@ -268,7 +268,7 @@ export const useRemindersStore = defineStore('reminders', {
     canLoadMore: (state): boolean => !state.listLoading && state.nextCursor !== null,
 
     groups: (state): ReminderGroup[] => {
-      // 分组按 `status` 而不是「`nextTriggerAt` 是否为空」：2.3.0 起暂停行**保留**原计划时刻（D-59），
+      // 分组按 `status` 而不是「`nextTriggerAt` 是否为空」：2.3.0 起暂停行**保留**原计划时刻，
       // 按后者划分会把一条不会响的提醒挂进「待触发」，用户会读成「暂停没生效」。
       const upcoming = state.items.filter((item) => item.status === 'ACTIVE');
       const paused = state.items.filter((item) => item.status === 'PAUSED');
@@ -369,7 +369,7 @@ export const useRemindersStore = defineStore('reminders', {
       }
     },
 
-    /** 过滤在服务端做（D-9 方案 A），换过滤等于换一页，必须清空已拼接的旧结果。 */
+    /** 过滤在服务端做（方案 A），换过滤等于换一页，必须清空已拼接的旧结果。 */
     async updateStatusFilter(value: string): Promise<void> {
       const next: ReminderStatus | null = value === '' ? null : (value as ReminderStatus);
       if (next === this.statusFilter) {
@@ -386,7 +386,7 @@ export const useRemindersStore = defineStore('reminders', {
     patchForm(patch: Partial<ReminderForm>): void {
       const touched = (Object.keys(patch) as (keyof ReminderForm)[]).some(
         (field) => this.form[field] !== patch[field],
-      );
+     );
       if (!touched) {
         return;
       }
@@ -494,7 +494,7 @@ export const useRemindersStore = defineStore('reminders', {
     },
 
     /**
-     * 状态过滤生效时（D-9 方案 A，过滤在服务端做），改完状态的行可能已不属于当前筛选：
+     * 状态过滤生效时（方案 A，过滤在服务端做），改完状态的行可能已不属于当前筛选：
      * 按「进行中」过滤后把它暂停，回填就留下一行与筛选条件矛盾的记录。
      * 所以只有「无筛选」或「新状态仍匹配筛选」时回填，否则重取第一页，让这一行按服务端口径消失。
      */

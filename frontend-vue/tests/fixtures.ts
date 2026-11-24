@@ -39,7 +39,7 @@ function validationProblem(instance: string, detail: string): Response {
   return HttpResponse.json(
     problem({ status: 400, code: 'COM-VALIDATION-001', detail, instance }),
     { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
-  );
+ );
 }
 
 export const DEMO_USER = {
@@ -65,7 +65,7 @@ export const authHandlers = [
       return HttpResponse.json(
         problem({ status: 409, code: 'USR-CONFLICT-001', detail: '用户名已被占用。', instance: '/api/v1/auth/register' }),
         { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
-      );
+     );
     }
     if (typeof body.password === 'string' && body.password.length < 10) {
       return HttpResponse.json(
@@ -77,12 +77,12 @@ export const authHandlers = [
           errors: [{ field: 'password', message: '至少 10 个字符且同时含字母与数字。' }],
         }),
         { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
-      );
+     );
     }
     return HttpResponse.json(
       envelope({ accessToken: DEMO_TOKEN, tokenType: 'Bearer', expiresIn: 900 }),
       { status: 201 },
-    );
+   );
   }),
   mswHttp.post('/api/v1/auth/refresh', () =>
     HttpResponse.json(
@@ -93,8 +93,8 @@ export const authHandlers = [
         instance: '/api/v1/auth/refresh',
       }),
       { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
-    ),
-  ),
+   ),
+ ),
   mswHttp.post('/api/v1/auth/logout', () => new HttpResponse(null, { status: 204 })),
   /**
    * 改密桩。默认 204 且无响应体——契约上这是本组接口唯一的 204，成功后所有凭据失效，
@@ -114,7 +114,7 @@ export const authHandlers = [
       return HttpResponse.json(
         problem({ status: 429, code: 'USR-RATE_LIMIT-001', detail: '登录失败次数过多，请稍后再试。', instance }),
         { status: 429, headers: { 'Content-Type': 'application/problem+json', 'Retry-After': '42' } },
-      );
+     );
     }
     if (current === 'policy-rejects') {
       return HttpResponse.json(
@@ -126,7 +126,7 @@ export const authHandlers = [
           errors: [{ field: 'newPassword', message: 'must contain at least one letter and one digit' }],
         }),
         { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
-      );
+     );
     }
     if (next !== '' && current === next) {
       return HttpResponse.json(
@@ -138,7 +138,7 @@ export const authHandlers = [
           errors: [{ field: 'newPassword', message: 'must differ from the current password' }],
         }),
         { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
-      );
+     );
     }
     return new HttpResponse(null, { status: 204 });
   }),
@@ -147,7 +147,7 @@ export const authHandlers = [
       return HttpResponse.json(
         problem({ status: 401, detail: '令牌无效。', code: 'USR-AUTH-001', instance: '/api/v1/auth/me' }),
         { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
-      );
+     );
     }
     return HttpResponse.json(envelope(DEMO_USER));
   }),
@@ -157,7 +157,7 @@ export const authHandlers = [
 export function refreshHandler(token: string = DEMO_TOKEN): RequestHandler {
   return mswHttp.post('/api/v1/auth/refresh', () =>
     HttpResponse.json(envelope({ accessToken: token, tokenType: 'Bearer', expiresIn: 900 })),
-  );
+ );
 }
 
 /**
@@ -168,7 +168,7 @@ export function refreshHandler(token: string = DEMO_TOKEN): RequestHandler {
 export function currentUserHandler(roles: UserRole[]): RequestHandler {
   return mswHttp.get('/api/v1/auth/me', () =>
     HttpResponse.json(envelope({ ...DEMO_USER, roles })),
-  );
+ );
 }
 
 export interface Echo {
@@ -283,7 +283,7 @@ export const documentListHandlers = [
     return HttpResponse.json(
       problem({ status: 400, code: 'COM-VALIDATION-001', detail: '请求参数校验失败。', instance: '/api/v1/documents' }),
       { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
-    );
+   );
   }),
 ];
 
@@ -309,7 +309,7 @@ export const uploadHandlers = [
         idempotentReplay: false,
       }),
       { status: 201 },
-    );
+   );
   }),
   mswHttp.post('/api/v1/documents/:uploadId/complete', async ({ request }) => {
     const body = (await request.json()) as { parts?: { partNumber: number }[] };
@@ -324,7 +324,7 @@ export const uploadHandlers = [
           instance: '/api/v1/documents/upload/complete',
         }),
         { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
-      );
+     );
     }
     return HttpResponse.json(
       envelope({
@@ -336,11 +336,11 @@ export const uploadHandlers = [
         idempotentReplay: false,
       }),
       { status: 202 },
-    );
+   );
   }),
   mswHttp.get('/api/v1/documents/:documentId/status', ({ params }) =>
     HttpResponse.json(envelope(documentStatusData(String(params.documentId)))),
-  ),
+ ),
   /** 分片 PUT 的目标是对象存储而不是 Java 服务；这里只回一个 ETag，供 complete 提交。 */
   mswHttp.put(PART_OBJECT_PATH, () => new HttpResponse(null, { status: 200, headers: { ETag: '"part-etag"' } })),
 ];
@@ -400,9 +400,9 @@ export const documentWriteHandlers = [
           vectorConsistency: 'UNKNOWN',
           indexedAt: null,
         }),
-      ),
+     ),
       { status: 202 },
-    );
+   );
   }),
   mswHttp.post('/api/v1/documents/:documentId/reindex', ({ request, params }) => {
     recordDocumentOp('POST', request, null);
@@ -410,7 +410,7 @@ export const documentWriteHandlers = [
     return HttpResponse.json(
       envelope(documentStatusData(String(params.documentId), { pendingIndexVersion: 'v2' })),
       { status: 202 },
-    );
+   );
   }),
 ];
 
@@ -596,7 +596,7 @@ export const conversationHandlers = [
     if (cursor === null) {
       return HttpResponse.json(
         envelope({ items: [conversationListItem(1), conversationListItem(2)], nextCursor: 'PAGE2', limit: 20 }),
-      );
+     );
     }
     if (cursor === 'PAGE2') {
       return HttpResponse.json(envelope({ items: [conversationListItem(3, null)], nextCursor: null, limit: 20 }));
@@ -604,7 +604,7 @@ export const conversationHandlers = [
     return HttpResponse.json(
       problem({ status: 400, code: 'COM-VALIDATION-001', detail: '游标非法。', instance: '/api/v1/conversations' }),
       { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
-    );
+   );
   }),
   mswHttp.post('/api/v1/conversations', async ({ request }) => {
     callLog.createdKeys.push(request.headers.get('Idempotency-Key') ?? '');
@@ -618,7 +618,7 @@ export const conversationHandlers = [
         createdAt: '2026-10-26T09:00:00Z',
       }),
       { status: 201 },
-    );
+   );
   }),
   mswHttp.get('/api/v1/conversations/:conversationId/messages', ({ request }) => {
     const params = new URL(request.url).searchParams;
@@ -630,7 +630,7 @@ export const conversationHandlers = [
           nextCursor: 'OLDER',
           limit: 20,
         }),
-      );
+     );
     }
     if (params.get('cursor') === 'OLDER') {
       return HttpResponse.json(
@@ -640,12 +640,12 @@ export const conversationHandlers = [
           nextCursor: null,
           limit: 20,
         }),
-      );
+     );
     }
     return HttpResponse.json(
       problem({ status: 400, code: 'COM-VALIDATION-001', detail: '游标非法。', instance: '/api/v1/conversations/messages' }),
       { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
-    );
+   );
   }),
   mswHttp.post('/api/v1/conversations/:conversationId/ask', async ({ request }) => {
     callLog.askedKeys.push(request.headers.get('Idempotency-Key') ?? '');
@@ -658,7 +658,7 @@ export const DEMO_REMINDER_ID = '00000000-0000-0000-0000-0000000000f1';
 export const DEMO_COURSE_REMINDER_ID = '00000000-0000-0000-0000-0000000000fa';
 
 /**
- * 第 2 行是**暂停**样本：契约 D-59 规定暂停只改状态、`nextTriggerAt` 保留原计划值，
+ * 第 2 行是**暂停**样本：契约  规定暂停只改状态、`nextTriggerAt` 保留原计划值，
  * 所以这一行带着一个未来的时刻却不会响——前端若按「时刻是否为空」分组就会把它说成待触发。
  * 第 3 行只在游标页出现。
  */
@@ -703,7 +703,7 @@ export function terminalReminderListItem(overrides: Record<string, unknown> = {}
 
 /**
  * 唯一带非零提前量的行：只有 `COURSE` 携带真实 `leadMinutes`，
- * 「上课时刻 = 触发时刻 + 提前量」这条显示层换算（D-72）必须有它才测得到。
+ * 「上课时刻 = 触发时刻 + 提前量」这条显示层换算必须有它才测得到。
  */
 export function courseReminderListItem(overrides: Record<string, unknown> = {}) {
   return {
@@ -874,7 +874,7 @@ const reminderStatusHandlers = [
           updatedAt: current.updatedAt,
           idempotentReplay: false,
         }),
-      );
+     );
     }
     if (current.status === 'COMPLETED' || current.status === 'CANCELLED') {
       return statusProblem(409, 'REM-CONFLICT-004', '该提醒当前状态不允许此变更。', instance);
@@ -889,7 +889,7 @@ const reminderStatusHandlers = [
           'REM-CONFLICT-004',
           'the rule has no occurrence at or after now, so the reminder cannot be resumed',
           instance,
-        );
+       );
       }
       // 恢复是「按当前时刻重算」，绝不能沿用暂停期间保留的那个旧计划值——桩不重实现 RRULE 展开，
       // 只保证返回值来自服务端且与保留值不同，界面才有「时刻确实被重排过」可断言。
@@ -1241,7 +1241,7 @@ export const adminStubState = {
    * 关掉本租户键、有效状态仍为 true」这条最容易被界面撒谎掩盖的语义。
    */
   tenantKillSwitch: { active: false, updatedAt: null as string | null, updatedBy: null as string | null },
-  /** 摆出 S9-5b 的形态：平台级开关已写入 Redis，随后审计失败 → 500 且 detail 说明状态已变更。 */
+  /** 摆出  的形态：平台级开关已写入 Redis，随后审计失败 → 500 且 detail 说明状态已变更。 */
   controlsAuditFails: false,
   /** 租户级开关的同一形态：状态已变更、审计写入失败。 */
   tenantControlsAuditFails: false,
@@ -1495,7 +1495,7 @@ export const adminHandlers = [
           instance: '/api/v1/admin/ai/controls',
         }),
         { status: 500, headers: { 'Content-Type': 'application/problem+json' } },
-      );
+     );
     }
     return HttpResponse.json(envelope(adminControlsData()));
   }),
@@ -1527,7 +1527,7 @@ export const adminHandlers = [
           instance,
         }),
         { status: 500, headers: { 'Content-Type': 'application/problem+json' } },
-      );
+     );
     }
     // 回显仍是 OR 叠加后的有效状态：平台级键开着时，写入 false 拿到的 active 依旧是 true。
     return HttpResponse.json(envelope({
@@ -1550,7 +1550,7 @@ export const adminHandlers = [
       instance,
       2,
       limit,
-    );
+   );
   }),
   mswHttp.put('/api/v1/admin/ai/quotas/:userId', async ({ request, params }) => {
     const userId = String(params.userId);
@@ -1592,7 +1592,7 @@ export const adminHandlers = [
         updatedAt: KILL_SWITCH_WRITE_AT,
         updatedBy: DEMO_USER_ID,
       }),
-    );
+   );
   }),
   mswHttp.get('/api/v1/admin/audit/events', ({ request }) => {
     recordAdminOp('GET', request, null);
@@ -1620,7 +1620,7 @@ export const adminHandlers = [
         (traceId === null || item.traceId === traceId) &&
         (userId === null || item.userId === userId) &&
         (eventType === null || item.eventType === eventType),
-    );
+   );
     return pageRows(rows, params.get('cursor'), instance, 2, limit);
   }),
   mswHttp.get('/api/v1/admin/observability', ({ request }) => {
@@ -1873,11 +1873,11 @@ function policyProblem(instance: string, field: string, message: string, detail:
   return HttpResponse.json(
     problem({ status: 422, code: 'USR-VALIDATION-001', detail, instance, errors: [{ field, message }] }),
     { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
-  );
+ );
 }
 
 /**
- * 用户管理面三操作（契约 2.5.0 的 `User` tag；第四个「按 id 读取」前端刻意不消费，见 D-214）。
+ * 用户管理面三操作（契约 2.5.0 的 `User` tag；第四个「按 id 读取」前端刻意不消费，见）。
  * 桩按契约校验入参形态：`limit` 上下限、两个枚举过滤、`additionalProperties: false`、
  * 写操作必须带 Idempotency-Key（Java 侧 `@RequestHeader` 为必填）、未知 id 一律 404；
  * 再把 `AdminUserService.rejectSelfLockout` 的三条策略原样落成 422。
@@ -1902,7 +1902,7 @@ export const usersHandlers = [
     const rows = USER_ROWS.map(mergedUserRow).filter(
       (item) =>
         (status === null || item.status === status) && (role === null || item.roles.includes(role as UserRole)),
-    );
+   );
     return pageRows(rows, params.get('cursor'), instance, 2, limit);
   }),
   mswHttp.put('/api/v1/users/:userId/roles', async ({ request, params }) => {
@@ -1935,7 +1935,7 @@ export const usersHandlers = [
         'roles',
         'cannot remove ADMIN from the calling administrator',
         '不能移除当前调用者自身的 ADMIN 角色。',
-      );
+     );
     }
     usersStubState.roleOverrides.set(userId, roles);
     return HttpResponse.json(envelope(userRowByUserId(userId)));
@@ -1966,7 +1966,7 @@ export const usersHandlers = [
         'status',
         'cannot disable the calling administrator',
         '不能停用当前调用者自身的账号。',
-      );
+     );
     }
     usersStubState.statusOverrides.set(userId, status);
     return HttpResponse.json(envelope(userRowByUserId(userId)));

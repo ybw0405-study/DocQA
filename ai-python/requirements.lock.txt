@@ -1,4 +1,4 @@
-# DocQA ai-python 依赖锁文件（G15：精确版本 + 真实 --hash）
+# DocQA ai-python 依赖锁文件（精确版本 + 真实 --hash）
 # 由 ops/gen-requirements-hashes.py 生成：版本取自本机 ai-python/.venv 的
 # dist-info（即通过测试的那套依赖），hash 取自 PyPI JSON API，覆盖全部发行文件。
 # 请勿手工编辑；重新生成：python ops/gen-requirements-hashes.py

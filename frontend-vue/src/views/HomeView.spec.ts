@@ -87,9 +87,9 @@ function identityReadFails(): void {
           instance: '/api/v1/auth/me',
         }),
         { status: 503, headers: { 'Content-Type': 'application/problem+json' } },
-      ),
-    ),
-  );
+     ),
+   ),
+ );
 }
 
 /** 把等待窗改短：倒数按秒观察，用服务端的 42 秒就永远看不到它归零。 */
@@ -107,9 +107,9 @@ function rateLimitedFor(seconds: number): void {
           status: 429,
           headers: { 'Content-Type': 'application/problem+json', 'Retry-After': String(seconds) },
         },
-      ),
-    ),
-  );
+     ),
+   ),
+ );
 }
 
 describe('HomeView', () => {
@@ -135,7 +135,7 @@ describe('HomeView', () => {
       '普通用户、管理员',
       `剩余 ${String(DEMO_USER.accessTokenExpiresIn)} 秒`,
     ]);
-    // 三条口径注脚各自单点取自 display.ts：契约对这三个字段的陈旧性承诺并不相同（D-212）。
+    // 三条口径注脚各自单点取自 display.ts：契约对这三个字段的陈旧性承诺并不相同。
     expect(view.text()).toContain(IDENTITY_STATUS_NOTE);
     expect(view.text()).toContain(IDENTITY_ROLES_NOTE);
     expect(view.text()).toContain(IDENTITY_TOKEN_TTL_NOTE);
@@ -171,7 +171,7 @@ describe('HomeView', () => {
     const next = view.find('[data-testid="new-password"]');
 
     // 契约上 currentPassword 只有 minLength 1 / maxLength 72 且没有 pattern：本地补一条强度规则就会把「旧口令打错了」
-    // 误报成「格式不符」（D-216），所以这里刻意不出现 minlength 与 pattern。
+    // 误报成「格式不符」，所以这里刻意不出现 minlength 与 pattern。
     expect(current.attributes('type')).toBe('password');
     expect(current.attributes('maxlength')).toBe('72');
     expect(current.attributes('minlength')).toBeUndefined();
@@ -205,7 +205,7 @@ describe('HomeView', () => {
     await submitPasswords(view, 'policy-rejects', 'brandnewpass1');
     await vi.waitFor(() => expect(view.find('[role="alert"]').exists()).toBe(true));
 
-    // 服务端给出 newPassword 的字段违规时，明细贴到输入项旁，告警条就不再重复报 code（D-190）。
+    // 服务端给出 newPassword 的字段违规时，明细贴到输入项旁，告警条就不再重复报 code。
     expect(fieldError(view, '新口令')).toBe('must contain at least one letter and one digit');
     expect(view.find('[role="alert"]').text()).toContain('口令强度或授权变更不满足策略要求。');
     expect(view.find('[role="alert"]').text()).not.toContain('code USR-VALIDATION-001');
@@ -218,7 +218,7 @@ describe('HomeView', () => {
     await vi.waitFor(() => expect(view.text()).toContain('限流等待'));
 
     // 窗口一开显示的就是服务端给的 42 秒、一秒不多：`now` 必须在开窗那一刻重取，
-    // 否则用的是 composable 建立时的旧读数去减，42 会显成 43（S10-7e 注入实测）。
+    // 否则用的是 composable 建立时的旧读数去减，42 会显成 43（注入实测）。
     expect(view.text()).toContain('限流等待 42 秒。');
     // 秒数来自服务端 `Retry-After: 42`，前端不自造等待时间；这条 429 也计入登录失败限流。
     expect(view.find('[role="alert"]').text()).toContain('code USR-RATE_LIMIT-001');
@@ -279,7 +279,7 @@ describe('HomeView', () => {
     await submitPasswords(view, 'rightpass123', 'brandnewpass1');
     await vi.waitFor(() => expect(replace).toHaveBeenCalled());
 
-    // 204 不带任何令牌，服务端已吊销该用户全部刷新家族并推进吊销水位：本地会话必须随即清空（D-206）。
+    // 204 不带任何令牌，服务端已吊销该用户全部刷新家族并推进吊销水位：本地会话必须随即清空。
     expect(replace).toHaveBeenCalledWith({ name: 'login', query: { notice: 'password-changed' } });
     expect(auth.token).toBeNull();
     expect(auth.userId).toBeNull();

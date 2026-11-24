@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 模型连接管理面。路径落在 {@code /api/v1/admin/} 下，ADMIN 判定由
  * {@link JwtAuthenticationFilter} 统一强制，这里不再重复写权限注解。
  *
- * <p>写操作按值幂等（D-197）：创建按租户内 name upsert，凭据/生效状态都是覆盖式写入，
+ * <p>写操作按值幂等：创建按租户内 name upsert，凭据/生效状态都是覆盖式写入，
  * 因此不声明 Idempotency-Key 参数，与其余管理面一致。
  *
  * <p>凭据只进 {@code PUT /{id}/credential} 的请求体；所有读响应只有 hasCredential 布尔。

@@ -93,7 +93,7 @@ class AskStreamControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body()))
                 .andExpect(status().isOk())
-                // 精确断言而非「兼容」：这就是 S9-3a 推迟到 S8 的 no-rewrite 回归——
+                // 精确断言而非「兼容」：这就是 no-rewrite 回归——
                 // JsonCharsetFilter 已在这条链上，但它不得给事件流追加 charset。
                 .andExpect(content().contentType("text/event-stream"))
                 .andExpect(content().string(containsString("event:meta")))

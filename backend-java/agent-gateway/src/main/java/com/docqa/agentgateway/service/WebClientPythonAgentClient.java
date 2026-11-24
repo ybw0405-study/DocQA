@@ -152,7 +152,7 @@ public class WebClientPythonAgentClient implements PythonAgentClient {
     /**
      * 把 SSE body 的订阅搬进 exchange 回调**内部**。
      *
-     * <p>缺陷复现（S11-10，真实链路）：原实现 {@code return Mono.just(response.bodyToFlux(...))}
+     * <p>缺陷复现（，真实链路）：原实现 {@code return Mono.just(response.bodyToFlux(...))}
      * 把 body 的 Flux 带出了 exchange 回调，而 {@code exchangeToMono} 的契约是「回调完成即释放
      * body」。结果：Python 侧的图真的跑完了（Redis 预算键 {@code roundsUsed=1}、
      * {@code tokensUsed≈3.8k}），网关却收到 0 个 delta、0 个 done，最终以 AGT-UPSTREAM-004
@@ -162,10 +162,10 @@ public class WebClientPythonAgentClient implements PythonAgentClient {
      * <p>修法：趁回调仍然持有连接时就把 body 订阅掉，写进一个 unicast sink；调用方拿到的
      * Flux 订阅的是 sink，与连接生命周期解耦。unicast sink 在首个订阅者到达前会缓存元素与
      * 终态信号，因此「先 block 拿到 Flux、再由 StreamSession 订阅」的既有顺序不变，meta 帧
-     * 先发与首字节前的 JSON 错误语义（D-173）都不受影响。
+     * 先发与首字节前的 JSON 错误语义都不受影响。
      *
      * <p>取消要向上游传播：客户端断开时 {@code StreamSession} 取消的是 sink 的 Flux，
-     * 若不处置上游订阅，Python 的图会继续跑到 deadline，白烧 token（D-174 的相反面）。
+     * 若不处置上游订阅，Python 的图会继续跑到 deadline，白烧 token（的相反面）。
      */
     private static Mono<Flux<ServerSentEvent<String>>> relayBody(Flux<ServerSentEvent<String>> body) {
         Sinks.Many<ServerSentEvent<String>> relay = Sinks.many().unicast().onBackpressureBuffer();

@@ -27,7 +27,7 @@ class RerankOutputInvalid(RerankError):
 class RerankedItem:
     """名次载体：`index` 指回传入 `documents` 的原下标，`score` 是第三方相关性分。
 
-    按 D-104，`score` 不得对外冒充相似度，只用于决定名次。
+    按 ，`score` 不得对外冒充相似度，只用于决定名次。
     """
 
     index: int
@@ -41,7 +41,7 @@ class RerankProvider(Protocol):
 
 
 class NoopRerank:
-    """离线形态：原样返回融合次序，零外呼，保证默认配置与 CI 不联网（D-113）。"""
+    """离线形态：原样返回融合次序，零外呼，保证默认配置与 CI 不联网。"""
 
     def __init__(self, model: str = "offline-noop") -> None:
         self.model = model
@@ -53,7 +53,7 @@ class NoopRerank:
 class DashScopeRerankProvider:
     """DashScope 原生 rerank 端点（E46：该能力不在 OpenAI 兼容面上，形态也不同）。
 
-    正文由调用方负责掩码后再传入（D-116）；本类不记录请求与响应内容。
+    正文由调用方负责掩码后再传入；本类不记录请求与响应内容。
     """
 
     def __init__(

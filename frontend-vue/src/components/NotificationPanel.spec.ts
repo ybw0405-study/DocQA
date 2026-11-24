@@ -46,9 +46,9 @@ function failedRead() {
       HttpResponse.json(
         problem({ status: 401, code: 'USR-AUTH-001', detail: '令牌无效。', instance: '/api/v1/notifications/read' }),
         { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
-      ),
-    ),
-  );
+     ),
+   ),
+ );
 }
 
 /** 看板行的提前量是显示层换算的唯一来源：把它单独摆出来，面板才有「上课时刻」可说。 */
@@ -56,8 +56,8 @@ async function loadCourseBoardRow() {
   server.use(
     mswHttp.get('/api/v1/reminders', () =>
       HttpResponse.json(envelope({ items: [courseReminderListItem()], nextCursor: null, limit: 20 })),
-    ),
-  );
+   ),
+ );
   await useRemindersStore().loadListFirst();
 }
 
@@ -96,9 +96,9 @@ describe('NotificationPanel', () => {
             nextCursor: null,
             limit: 20,
           }),
-        ),
-      ),
-    );
+       ),
+     ),
+   );
     const { wrapper } = await mountPanel();
 
     expect(wrapper.text()).toContain('<img src=x onerror=alert(1)>');
@@ -112,10 +112,10 @@ describe('NotificationPanel', () => {
     const { wrapper } = await mountPanel();
     const first = wrapper.findAll('.notifications__item')[0];
 
-    // 契约的 plannedTriggerAt 是提前提醒的时刻，上课时刻要用看板行的 leadMinutes 换算（D-72）。
+    // 契约的 plannedTriggerAt 是提前提醒的时刻，上课时刻要用看板行的 leadMinutes 换算。
     expect(first?.text()).toContain(
       new Date('2026-10-26T01:05:00Z').toLocaleString('zh-CN', { hour12: false }),
-    );
+   );
     expect(first?.text()).toContain('提前 15 分钟');
   });
 
@@ -126,7 +126,7 @@ describe('NotificationPanel', () => {
     // 看板行不在已加载页时不猜提前量，措辞必须与换算过的口径明确不同。
     expect(first?.text()).toContain(
       `触发时刻 ${new Date('2026-10-26T00:50:00Z').toLocaleString('zh-CN', { hour12: false })}`,
-    );
+   );
     expect(first?.text()).not.toContain('上课 ');
   });
 
@@ -152,7 +152,7 @@ describe('NotificationPanel', () => {
     // 面板是在 `markRead()` resolve 之后才清空勾选的，也就是重取完成后，因此这里等的同样是渲染。
     await vi.waitFor(() =>
       expect(wrapper.get('[data-testid="notifications-mark-selected"]').text()).toBe('标记所选（0）'),
-    );
+   );
   });
 
   it('spells out what a zero-row mark actually means', async () => {
@@ -172,7 +172,7 @@ describe('NotificationPanel', () => {
     // updated=0 有两种成因（越权或列表过期），不能含糊成「已经全部读完了」。
     expect(wrapper.get('[data-testid="notifications-note"]').text()).toContain(
       '服务端没有把任何一条改为已读',
-    );
+   );
   });
 
   it('sends all=true without ids for mark-all-read', async () => {
@@ -229,7 +229,7 @@ describe('NotificationPanel', () => {
   /**
    * 首屏失败时 `fetchFirstPage` 的 finally 仍会把 `listLoaded` 置真（加载骨架必须收起）。
    * 只判 `listLoaded && items.length === 0` 就会在失败页同时渲染「还没有通知」与错误条，
-   * 等于把「取数失败」说成「成功但没有数据」（S10-M3）。
+   * 等于把「取数失败」说成「成功但没有数据」。
    */
   it('shows the failure without an empty state when the first page cannot be loaded', async () => {
     server.use(
@@ -242,9 +242,9 @@ describe('NotificationPanel', () => {
             instance: '/api/v1/notifications',
           }),
           { status: 500, headers: { 'Content-Type': 'application/problem+json' } },
-        ),
-      ),
-    );
+       ),
+     ),
+   );
 
     const { wrapper, notifications } = await mountPanel();
 

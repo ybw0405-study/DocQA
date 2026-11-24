@@ -217,11 +217,11 @@ class AgentGraph:
             raise PiiLeakError(gate.categories, gate.count)
         reserved = self._estimate_prompt(context) + self._max_output_tokens
         if self._experiment is not None and not await self._experiment.authorize_call(reserved):
-            # D-118 ②：全局额度先于每轮预算判定，拒绝即零字节离开本机；反过来要先为没发生的调用回补账本。
+            #  ②：全局额度先于每轮预算判定，拒绝即零字节离开本机；反过来要先为没发生的调用回补账本。
             return self._budget_stop(state, round_number)
         if not await self._budget.reserve_tokens(self._trace_id, reserved):
             if self._experiment is not None:
-                # D-121：这次外呼没有发生，调用数与预订一起退回；只退 token 会白吃一份额度。
+                # 这次外呼没有发生，调用数与预订一起退回；只退 token 会白吃一份额度。
                 await self._experiment.release_call(reserved)
             return self._budget_stop(state, round_number)
         self._rounds_used = max(self._rounds_used, round_number)
@@ -298,7 +298,7 @@ class AgentGraph:
                 )
                 return updates
             if not await self._allow_tool(tool_name):
-                # D-145：每用户限流先于每请求额度判定，拒绝的调用不吃工具预算，但仍记录观测与签名。
+                # 每用户限流先于每请求额度判定，拒绝的调用不吃工具预算，但仍记录观测与签名。
                 updates.update(
                     pending_tool=(tool_name, output.tool_input),
                     tool_refused=True,
@@ -334,7 +334,7 @@ class AgentGraph:
         return updates
 
     async def _stream_plan(self, context: PlanContext) -> PlannerOutput:
-        """流式终答（D-177）：delta 经 sink 实时外发，final 与 `plan` 产出同构。
+        """流式终答：delta 经 sink 实时外发，final 与 `plan` 产出同构。
 
         工具轮次与预算停止的内部形态完全不变——provider 保证 tool 动作不发 delta，
         这里只负责搬运与终态解析。
@@ -424,7 +424,7 @@ class AgentGraph:
         try:
             allowed = await self._rate_limiter.allow(self._user_id)
         except ToolRateLimitUnavailable:
-            # D-145：限流器不可用即 fail-closed；宁可这一次不调用工具，也不放开无限调用。
+            # 限流器不可用即 fail-closed；宁可这一次不调用工具，也不放开无限调用。
             LOGGER.warning("Tool rate limiter unavailable, failing closed: tool=%s", tool_name)
             return False
         if not allowed:

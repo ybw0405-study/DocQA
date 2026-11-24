@@ -35,7 +35,7 @@ def _key(user_id: str | uuid.UUID, now: datetime) -> str:
 
 
 class RedisToolRateLimiter:
-    """D-145 fixed-window limiter: one INCR + EXPIRE per call, 20 calls per user-minute.
+    """fixed-window limiter: one INCR + EXPIRE per call, 20 calls per user-minute.
 
     The key embeds the epoch minute, so a stale key can never be read by the next window;
     the 90s TTL only keeps abandoned keys from accumulating.

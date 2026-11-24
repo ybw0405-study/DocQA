@@ -35,9 +35,9 @@ function createFailures(status: number, code: string, detail: string, headers: R
       return HttpResponse.json(
         problem({ status, code, detail, instance: '/api/v1/reminders' }),
         { status, headers: { 'Content-Type': 'application/problem+json', ...headers } },
-      );
+     );
     }),
-  );
+ );
 }
 
 /** 默认桩忽略 status；过滤用例必须让「服务端真的过滤」成为可证伪的事实。 */
@@ -48,10 +48,10 @@ function statusAwareListHandler(searches: (string | null)[]) {
       searches.push(status);
       const items = [reminderListItem(1), reminderListItem(2), reminderListItem(3)].filter(
         (item) => status === null || item.status === status,
-      );
+     );
       return HttpResponse.json(envelope({ items, nextCursor: null, limit: 20 }));
     }),
-  );
+ );
 }
 
 function fillDeadlineForm(store: ReturnType<typeof useRemindersStore>): void {
@@ -77,7 +77,7 @@ describe('RemindersView', () => {
 
     expect(groups).toHaveLength(2);
     expect(groups[0]?.text()).toContain('待触发');
-    // D-59：暂停行仍带着原计划时刻，按「时刻是否为空」分组就会把它挂进待触发。
+    // 暂停行仍带着原计划时刻，按「时刻是否为空」分组就会把它挂进待触发。
     expect(groups[1]?.text()).toContain('已暂停，到点不会响');
     expect(groups[1]?.text()).not.toContain('提醒 1');
     // 暂停行照原样带着「本来下次是几点」和排除日，界面不替它编造也不会让它响。
@@ -85,7 +85,7 @@ describe('RemindersView', () => {
     expect(pausedRow?.text()).toContain('排除日 1 天');
     expect(pausedRow?.text()).toContain(
       new Date('2026-10-22T13:59:59Z').toLocaleString('zh-CN', { hour12: false }),
-    );
+   );
 
     const firstRow = wrapper.findAll('.reminders__item')[0];
     expect(firstRow?.text()).toContain('提醒 1');
@@ -95,7 +95,7 @@ describe('RemindersView', () => {
     expect(firstRow?.text()).toContain('第三章习题');
     expect(firstRow?.text()).toContain(
       new Date('2026-10-21T13:59:59Z').toLocaleString('zh-CN', { hour12: false }),
-    );
+   );
   });
 
   it('shows a dash instead of a fake time for the no-next-trigger group', async () => {
@@ -103,8 +103,8 @@ describe('RemindersView', () => {
     server.use(
       mswHttp.get('/api/v1/reminders', () =>
         HttpResponse.json(envelope({ items: [reminderListItem(1), terminalReminderListItem()], nextCursor: null, limit: 20 })),
-      ),
-    );
+     ),
+   );
     const { wrapper } = await mountView();
     const groups = wrapper.findAll('.reminders__group');
     const stopped = groups[1]?.findAll('.reminders__item')[0];
@@ -115,8 +115,8 @@ describe('RemindersView', () => {
     expect(stopped?.findAll('.reminders__times span')[1]?.text()).toBe('—');
     expect(stopped?.findAll('.reminders__times span')[3]?.text()).toBe(
       new Date('2026-10-20T12:00:00Z').toLocaleString('zh-CN', { hour12: false }),
-    );
-    // 终态没有出边（D-58），这一行只能给说明、不能再给一个必然 409 的按钮。
+   );
+    // 终态没有出边，这一行只能给说明、不能再给一个必然 409 的按钮。
     expect(stopped?.findAll('button')).toHaveLength(0);
   });
 
@@ -134,9 +134,9 @@ describe('RemindersView', () => {
             nextCursor: null,
             limit: 20,
           }),
-        ),
-      ),
-    );
+       ),
+     ),
+   );
     const { wrapper } = await mountView();
 
     expect(wrapper.text()).toContain('<img src=x onerror=alert(1)>');
@@ -297,7 +297,7 @@ describe('RemindersView', () => {
     const { wrapper } = await mountView();
     const complete = wrapper.get('[data-testid="status-COMPLETED"]');
 
-    // D-58：终态没有出边，误点只能靠重建一条挽回，所以「不可回退」与确认必须同屏。
+    // 终态没有出边，误点只能靠重建一条挽回，所以「不可回退」与确认必须同屏。
     expect(complete.text()).toBe('完成（不可回退）');
     await complete.trigger('click');
     expect(wrapper.get('[data-testid="status-COMPLETED"]').text()).toBe('确认完成？');
@@ -320,7 +320,7 @@ describe('RemindersView', () => {
     const row = wrapper.findAll('.reminders__item').find((item) => item.text().includes('提醒 1'));
     expect(row?.text()).toContain('终态，不可回退');
     expect(row?.findAll('button')).toHaveLength(0);
-    // 完成是终态、没有出边（D-58），这一行因此必须落到终态组；第 2 行仍在自己的暂停组里。
+    // 完成是终态、没有出边，这一行因此必须落到终态组；第 2 行仍在自己的暂停组里。
     const group = store.groups.find((candidate) => candidate.items.some((item) => item.reminderId === reminderId));
     expect(group?.heading).toBe('不再有下一次触发');
   });
@@ -334,9 +334,9 @@ describe('RemindersView', () => {
             nextCursor: null,
             limit: 20,
           }),
-        ),
-      ),
-    );
+       ),
+     ),
+   );
     const { wrapper } = await mountView();
     const rows = wrapper.findAll('.reminders__item');
 
@@ -345,7 +345,7 @@ describe('RemindersView', () => {
     expect(course?.text()).toContain('课程提醒');
     expect(course?.text()).toContain(
       new Date('2026-10-26T01:05:00Z').toLocaleString('zh-CN', { hour12: false }),
-    );
+   );
     expect(course?.text()).toContain('提前 15 分钟');
     // DEADLINE 行的提前量已并进 dtstart、读侧恒为 0，换算出来的「上课时刻」只会是触发时刻本身，属于假信息。
     expect(rows[1]?.text()).not.toContain('上课 ');

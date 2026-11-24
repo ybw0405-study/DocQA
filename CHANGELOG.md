@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### 修复：深度体检第一轮（2026-11-24）
+
+- **启动链收敛**：删除旧 WSL 链全部 9 个文件（compose / 启动 / 自启 / worker 脚本 / broker 模板）；解析与向量 worker 改由容器承载；`start-dev.ps1 -Containers` 与新增 `ops/docker-compose.app.yml`（含 `mq-init` topic 预建与 `grants-finalize` 建表后补授权）一条命令起全栈；getting-started 改写为单启动路径。
+- **Docker 修复**：前端镜像 COPY nginx 样例配置到正确落点（SPA fallback + `/api` 反代 + 安全响应头），构建期固定绝对 base 修复深链接 assets 解析；audit-service 改用 `java-service-nonweb` target（无 HTTP 探针）；compose 凭据改进程环境透传，规避 env_file 二次插值吞掉 bcrypt 哈希的 `$` 段。
+- **真实模型评测**：nightly secrets 配置后全绿；标注集 17→21 查询（新增同法条细粒度排序压力对），本地真实复现 recall@1 0.976 / recall@3,5 1.0 / MRR 1.0 / nDCG@5 0.996，数字入 README 与 retrieval-eval.md；离线基线同步重录。
+- **Agent 工具协议**：新增 `DOCQA_AI_TOOL_PROTOCOL=json|native`（默认 json 行为不变）；native 走 OpenAI 兼容 function tools，流式按 index 累积 tool_calls 片段，终答仍走 JSON 保留引用治理；新增 8 条回归用例。
+- **文档纠偏**：README 环境变量名纠正为 `DOCQA_AI_*` 并说明服务 / 评测 / nightly 三套变量面；仓库 description 与 topics 改为 RAG Agent 主线；README 重构一屏化，旧全文归档 `docs/product-guide.md`；悬空阶段代号改写，迁移注释代号新增索引文档。
+- **CI**：ci 工作流新增 `compose-config` job 校验叠加编排。
+
 ### Fixed（第二轮）
 
 - **P0：真实 PG 上的租户检索恒失败**。`PgVectorRepository.search()` 把 `tenant_value` 放在绑定参数

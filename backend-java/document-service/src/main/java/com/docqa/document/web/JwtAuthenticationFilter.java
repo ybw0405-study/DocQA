@@ -28,7 +28,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>此处曾是「只拦已知前缀」的白名单（仅 {@code /api/v1/documents}），覆盖守卫也因此只能守住一条路径。
  * {@code reminder-service} 的同形态白名单漏掉了 {@code /api/v1/notifications}，令身份属性从不写入、
- * 端点恒返回 500（{@code S10-H1}）；白名单要人记得来登记，默认拦截则由结构本身保证新端点落到鉴权一侧。
+ * 端点恒返回 500（{@code }）；白名单要人记得来登记，默认拦截则由结构本身保证新端点落到鉴权一侧。
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)

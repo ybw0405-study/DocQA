@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * 网关路由前缀与契约 paths 必须双向对账（S9-6，关闭 S4-M2）。
+ * 网关路由前缀与契约 paths 必须双向对账（关闭路由漂移缺口）。
  *
  * <p>路由与契约之间没有编译期约束：契约新增路径而网关忘配前缀时，Spring 不会报错，
  * 线上表现为 404。这里直接解析真实 {@code application.yml} 的 {@code Path} 谓词、

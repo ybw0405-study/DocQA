@@ -60,7 +60,7 @@ def test_unknown_pii_category_drops_the_list() -> None:
 
 
 def test_mcp_tool_names_and_source_survive_the_whitelist() -> None:
-    """D-127：MCP 名与来源必须留在审计里，否则治理信号在最关键的路径上无声消失。"""
+    """MCP 名与来源必须留在审计里，否则治理信号在最关键的路径上无声消失。"""
 
     clean, dropped = sanitize_payload({"toolName": "mcp__dict__lookup", "toolSource": "mcp"})
     assert clean == {"toolName": "mcp__dict__lookup", "toolSource": "mcp"}

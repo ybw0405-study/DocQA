@@ -49,7 +49,7 @@ def build_lexical_search_sql(table: str, scope_count: int, *, tenant_scoped: boo
     `to_tsquery(...)` 在同样两处引用同一个绑定值。理由不是风格——只按 `vector_id` 排时密集命中
     会被规划成不使用 GIN 的主键顺序扫描（E30），而这一形态在零命中、窄授权、密集命中三种分布下
     都稳定走 `BitmapAnd(docver, lexical)`（E31）。授权谓词与向量通道逐字同形，词法通道不单独
-    构造范围（D-87）。
+    构造范围。
 
     `tenant_scoped=True` 时在 WHERE 最前追加 `tenant_id = %s`，与 `lexical_params` 的同名开关
     必须成对传入，否则占位符与参数错位（由 MAINT-1 的 SQL 契约测试对账）。
@@ -173,7 +173,7 @@ def phrase_surfaces(lexical_query: str) -> tuple[str, ...]:
 
 
 class InMemoryLexicalRepository:
-    """确定性替身，供服务层逻辑测试使用（D-93）。
+    """确定性替身，供服务层逻辑测试使用。
 
     它复刻**授权过滤**与实测过的「相邻二元组 = 精确子串」语义；它**不**复刻 `ts_rank`
     随词频移动的那一半，名次只按命中词组数排。真实计划形态、索引命中与延迟需在一次性

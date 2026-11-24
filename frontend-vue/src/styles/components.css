@@ -1,6 +1,6 @@
 /*
  * 组件层：页面级类的唯一落点。颜色只允许来自 tokens.css 的语义别名，
- * 尺寸走 --space-* / --text-* 刻度；历史 class 名按 D-188 保留，改名不属于本次视觉重构的收益。
+ * 尺寸走 --space-* / --text-* 刻度；历史 class 名按  保留，改名不属于本次视觉重构的收益。
  *
  * 三条贯穿全篇的规则：
  * 1. 层级靠底色亮度差与线宽差，不靠阴影——阴影在深色底上会糊成一团。
@@ -1039,7 +1039,7 @@ form > button[type='submit']:disabled {
   border-color: var(--color-border-strong);
 }
 
-/* 首次加载的占位骨架（D-189）：只表示「这里将有内容」，骨架内禁止出现任何数字，否则占位的「0」会被读成真实计数。 */
+/* 首次加载的占位骨架：只表示「这里将有内容」，骨架内禁止出现任何数字，否则占位的「0」会被读成真实计数。 */
 .skeleton {
   display: flex;
   flex-direction: column;
@@ -1076,7 +1076,7 @@ form > button[type='submit']:disabled {
 }
 
 /*
- * 跳转链接（D-193）：平时移出视口但仍留在 Tab 序列里，键盘聚焦到它才现身。
+ * 跳转链接：平时移出视口但仍留在 Tab 序列里，键盘聚焦到它才现身。
  * 刻意不复用 .visually-hidden——那套 1px 裁剪会让它聚焦后依然看不见，等于把无障碍判据做成装饰。
  */
 .skip-link {
@@ -1101,7 +1101,7 @@ form > button[type='submit']:disabled {
 }
 
 /*
- * 宽表格在窄档的统一落点（D-192）：横向滚动而不是把 td 堆成「行 + 卡片」。
+ * 宽表格在窄档的统一落点：横向滚动而不是把 td 堆成「行 + 卡片」。
  * 后者要把 table/tr/td 的 display 改掉，浏览器会一并剥掉 role=table/row/cell 与列对应关系——
  * 等于用响应式判据去换无障碍判据，这两条在本片里不能互相抵消。
  * 宿主清单由 a11y 守卫按 class 对账，这里不重复记数。
@@ -1114,8 +1114,8 @@ form > button[type='submit']:disabled {
 
 /*
  * 工具条把条件字段与按钮排在同一行，窄屏靠 flex-wrap 换行：
- * 断点只许留在 base/components 已有的两处 @media 里，否则 D-192 的三档会被这一层悄悄扩成四档。
- * 类名按 D-188 保留；自 S10-7 起账户页的「重新读取」也落在这一条规则上。
+ * 断点只许留在 base/components 已有的两处 @media 里，否则  的三档会被这一层悄悄扩成四档。
+ * 类名按  保留；自  起账户页的「重新读取」也落在这一条规则上。
  */
 .admin__toolbar {
   display: flex;
@@ -1127,7 +1127,7 @@ form > button[type='submit']:disabled {
 
 /*
  * dl 承载「标签 → 服务端字段」的键值对，降列节奏与文档明细同刻度，避免为管理端另开一套栅格。
- * 账户页的身份块（D-212）用的是同一套栅格，因此这个类名不代表「只有管理端才有的状态」。
+ * 账户页的身份块用的是同一套栅格，因此这个类名不代表「只有管理端才有的状态」。
  */
 .admin-state {
   display: grid;
@@ -1166,7 +1166,7 @@ form > button[type='submit']:disabled {
   font-size: var(--text-sm);
 }
 
-/* 二次确认的影响面与确认按钮同屏（D-198）：分居两处就等于允许在没读到后果时按下总闸。 */
+/* 二次确认的影响面与确认按钮同屏：分居两处就等于允许在没读到后果时按下总闸。 */
 .admin-confirm {
   border: var(--border-width) solid var(--color-warn-border);
   border-left: var(--border-width-accent) solid var(--color-warn-border);
@@ -1256,7 +1256,7 @@ form > button[type='submit']:disabled {
   overflow-wrap: anywhere;
 }
 
-/* 原文 JSON 默认折叠，展开后仍是文本插值（D-201）；等宽 + 任意断行，长哈希不会撑破表格。 */
+/* 原文 JSON 默认折叠，展开后仍是文本插值；等宽 + 任意断行，长哈希不会撑破表格。 */
 .admin-raw {
   margin: var(--space-3) 0;
   font-size: var(--text-sm);
@@ -1300,7 +1300,7 @@ form > button[type='submit']:disabled {
   padding: 0 var(--space-2);
 }
 
-/* D-199 的比例条：宽度由视图按「本列最大值」归一后以行内 style 给出，数字仍逐行文本呈现，条只表达相对高低。 */
+/*  的比例条：宽度由视图按「本列最大值」归一后以行内 style 给出，数字仍逐行文本呈现，条只表达相对高低。 */
 /*
  * 比例条必须先有一条「轨道」，否则 100% 的那根填充会被读成一行分隔线——
  * 之前用量页的「按日序列」看起来就是一横一横的表线。

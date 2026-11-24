@@ -29,7 +29,8 @@ WORKDIR /src/frontend-vue
 COPY frontend-vue/package.json frontend-vue/package-lock.json ./
 RUN npm ci
 COPY frontend-vue/ ./
-RUN npm run build
+# 相对 base 在 history 深链接下会把 assets 解析到子路径；镜像内固定绝对 base。
+RUN VITE_APP_BASE=/ npm run build
 
 # ---------- 3. Java 运行时公共层（非 root + readiness 探针） ----------
 FROM eclipse-temurin:17-jre-jammy@sha256:b3054a20e1a851574cdb1692dd0db5310c647e62214a2a7abecbec1b9e3ae8f1 AS java-base
@@ -45,6 +46,14 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=45s --retries=5 \
 
 FROM java-base AS java-service
 ARG JAR_PATH=/out/document-service.jar
+COPY --from=java-build --chown=10001:10001 ${JAR_PATH} /app/app.jar
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
+# audit-service 为 web-application-type: none（无 HTTP 端口），共享层的 readiness
+# 探针不适用；该 target 关闭 HEALTHCHECK，存活由编排层进程级探针负责。
+FROM java-base AS java-service-nonweb
+HEALTHCHECK NONE
+ARG JAR_PATH=/out/audit-service.jar
 COPY --from=java-build --chown=10001:10001 ${JAR_PATH} /app/app.jar
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
 
@@ -69,9 +78,12 @@ ENTRYPOINT ["python", "-m", "uvicorn", "docqa_ai.api.main:app", "--host", "0.0.0
 # ---------- 5. 前端静态站 ----------
 FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 AS frontend
 COPY --from=frontend-build /src/frontend-vue/dist /usr/share/nginx/html
+# SPA history fallback + /api 反代 + 安全响应头；include 按 nginx prefix（/etc/nginx）解析，
+# 故 security-headers 落在 /etc/nginx 而非 conf.d。
+COPY frontend-vue/nginx.conf.example /etc/nginx/conf.d/default.conf
+COPY frontend-vue/security-headers.conf.example /etc/nginx/security-headers.conf.example
 USER root
-RUN chown -R 10001:10001 /usr/share/nginx/html /var/cache/nginx /var/log/nginx /var/run /tmp \
- && sed -i 's/listen  *80;/listen 8080;/' /etc/nginx/conf.d/default.conf
+RUN chown -R 10001:10001 /usr/share/nginx/html /var/cache/nginx /var/log/nginx /var/run /tmp
 USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \

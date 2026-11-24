@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size;
  * 因此创建请求体可以安全地进访问日志与错误回显，密钥只在那一个请求里出现。
  *
  * <p>同名重复提交收敛到同一行且**不改变生效状态**，所以本操作按值幂等，
- * 沿用 D-197「管理端不声明幂等头」。
+ * 沿用 「管理端不声明幂等头」。
  */
 public record CreateModelConnectionRequest(
         @JsonProperty(required = true)

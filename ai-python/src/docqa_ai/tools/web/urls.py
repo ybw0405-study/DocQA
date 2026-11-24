@@ -10,7 +10,7 @@ from urllib.parse import urlsplit, urlunsplit
 _ALLOWED_SCHEMES = frozenset({"http", "https"})
 _MAX_URL_CHARS = 2048
 _MAX_HOST_CHARS = 253
-# D-141：预检只拒绝「解析结果含内网地址」的确定形态；连接后的对端地址由
+# 预检只拒绝「解析结果含内网地址」的确定形态；连接后的对端地址由
 # client.py 的 `_connected_peer` 再校验一次，封住 DNS rebinding 的 TOCTOU（S7b3-M2）。
 _FORBIDDEN_HOST_SUFFIXES = (".localhost", ".local", ".internal", ".home.arpa")
 _FORBIDDEN_HOSTS = frozenset({"localhost"})

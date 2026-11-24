@@ -77,7 +77,7 @@ export const useAdminControlsStore = defineStore('adminControls', {
     },
 
     /**
-     * 开关是全量赋值、按值幂等：契约上既没有 `version` 也没有幂等键参数（D-197），
+     * 开关是全量赋值、按值幂等：契约上既没有 `version` 也没有幂等键参数，
      * 重复提交同一个值仍然合法。并发覆盖在服务端是 last-write-wins，界面检测不到，
      * 所以这里不做任何本地比对，也不假装能拦住别人的写入。
      *

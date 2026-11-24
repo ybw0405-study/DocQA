@@ -1,5 +1,5 @@
 /**
- * 流式通道的测试替身（S8-4）。
+ * 流式通道的测试替身。
  *
  * `api/sse.ts` 用原生 fetch：Node 侧既解析不了相对 URL，msw 对 `text/event-stream` 的
  * 逐帧到达也没有保真度可言，所以「分片切在哪、注释行会不会漏、401 重放几次、abort 是否静默」
@@ -41,7 +41,7 @@ export function stubFetch(respond: (call: StreamCall, attempt: number) => Respon
       calls.push(call);
       return respond(call, calls.length);
     }),
-  );
+ );
   return calls;
 }
 
@@ -119,7 +119,7 @@ export function problemStreamResponse(status: number, code: string, detail: stri
   return new Response(
     JSON.stringify(problem({ status, code, detail, instance: '/api/v1/conversations/ask:stream' })),
     { status, headers: { 'Content-Type': 'application/problem+json', ...headers } },
-  );
+ );
 }
 
 /** error 帧：契约上它就是 ProblemDetail 同构，与首字节前的 JSON 拒绝同一个错误码集合。 */

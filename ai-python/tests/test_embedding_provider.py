@@ -1,6 +1,6 @@
-"""D-114：批量上限与维度声明是 Provider 的自报属性，不是业务配置。
+"""批量上限与维度声明是 Provider 的自报属性，不是业务配置。
 
-依据为 §1.8.1 的 E43 / E45 与 S6-2b-2 前置探针 R1…R6（真实端点实测）：
+依据为 §1.8.1 的 E43 / E45 与 -2 前置探针 R1…R6（真实端点实测）：
 11 行请求固定返回 400 且与是否携带 `dimensions` 无关；`dimensions` 被接受且生效
 （1024→1024、768→768、v3 512→512）；`dimensions=0` 同样 400。
 """
@@ -46,7 +46,7 @@ def capturing_provider(dimensions: int = 1024, **kwargs: Any) -> tuple[OpenAIEmb
 
 
 def test_offline_provider_is_never_the_batch_bottleneck() -> None:
-    """本地特征哈希没有端点，任何合法配置值都不该被它压低（D-114 的「宽松上界」）。"""
+    """本地特征哈希没有端点，任何合法配置值都不该被它压低（的「宽松上界」）。"""
 
     provider = OfflineEmbeddingProvider()
     assert provider.max_batch_rows == UNRESTRICTED_BATCH_ROWS

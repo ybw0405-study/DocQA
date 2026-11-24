@@ -80,7 +80,7 @@ describe('model connections api', () => {
       baseUrl: 'https://api.deepseek.com/v1',
       model: 'deepseek-reasoner',
     });
-    // 管理面不声明幂等键参数（D-197）：拦截器补的随机头不被服务端消费，但这里断言它确实存在且非空。
+    // 管理面不声明幂等键参数：拦截器补的随机头不被服务端消费，但这里断言它确实存在且非空。
     expect(write?.key).toBeTruthy();
   });
 
@@ -154,7 +154,7 @@ describe('model connections api', () => {
     const id = String(modelConnectionsStubState.rows[0].id);
     const error = await expectApiError(
       updateModelConnectionActivation(id, {} as { active: boolean }),
-    );
+   );
 
     expect(error.status).toBe(400);
     expect(error.code).toBe('COM-VALIDATION-001');

@@ -39,7 +39,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
- * 跨越真实过滤器链的鉴权取证（{@code S10-H1} 的回归位）。
+ * 跨越真实过滤器链的鉴权取证（{@code } 的回归位）。
  *
  * <p>本模块既有控制器测试都是 standalone MockMvc 并显式 {@code .requestAttr(...)} 注入用户身份，
  * 等于绕过了 {@link JwtAuthenticationFilter}：过滤器写不进属性时那些用例照样绿。
@@ -136,7 +136,7 @@ class ReminderAuthenticationChainTest {
 
     /**
      * 覆盖守卫：本模块每条业务映射路径都必须被过滤器拦截，「新增控制器却没被鉴权覆盖」当场落红。
-     * 这正是 {@code S10-H1} 的成因形态——旧白名单只认 {@code /api/v1/reminders}，通知前缀整体漏网。
+     * 这正是 {@code } 的成因形态——旧白名单只认 {@code /api/v1/reminders}，通知前缀整体漏网。
      *
      * <p>按控制器所在包筛选，而不是把 {@code /error} 逐条排除：{@code BasicErrorController} 与业务
      * 控制器共用同一张 MVC 映射表，它注册在 {@code org.springframework.boot.autoconfigure.web}，

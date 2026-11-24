@@ -35,7 +35,7 @@ _TOOL_NAME = re.compile(r"^[a-z0-9_]{1,32}$")
 _ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 _WINDOWS_NATIVE_SUFFIXES = frozenset({".exe"})
 
-# D-140：子进程只继承运行时必需的系统变量；业务密钥必须显式列入 Server 配置。
+# 子进程只继承运行时必需的系统变量；业务密钥必须显式列入 Server 配置。
 _BASE_ENV = (
     "PATH",
     "PATHEXT",
@@ -300,7 +300,7 @@ class _SessionHost:
 
 
 class SdkMcpClient:
-    """Long-lived official-SDK session with supervision, timeout and circuit breaking (D-132/D-140).
+    """Long-lived official-SDK session with supervision, timeout and circuit breaking.
 
     Requests run on the host loop; the application loop only waits on futures.
     A failed session is discarded, and a new one starts on the next call until

@@ -105,7 +105,7 @@ describe('admin api', () => {
   });
 
   it('rejects an invented version field because the contract accepts no more than one key', async () => {
-    // D-197 的反证：S9-2 遗留注释里的「version 乐观锁」在交付契约上不存在，多一个键就是 400。
+    //  的反证： 遗留注释里的「version 乐观锁」在交付契约上不存在，多一个键就是 400。
     const invented = { killSwitchActive: true, version: 3 } as unknown as UpdateAiControlsRequest;
 
     const error = await expectApiError(updateAiControls(invented));
@@ -200,7 +200,7 @@ describe('admin api', () => {
 
     const error = await expectApiError(updateAiControls({ killSwitchActive: true }));
 
-    // S9-5b 的真实形态：先写 Redis 再插审计，500 不等于回滚，调用方只能重读。
+    //  的真实形态：先写 Redis 再插审计，500 不等于回滚，调用方只能重读。
     expect(error.status).toBe(500);
     expect(error.code).toBe('COM-INTERNAL-001');
     expect(adminStubState.killSwitch.active).toBe(true);
@@ -263,7 +263,7 @@ describe('admin api', () => {
 
     const error = await expectApiError(
       updateAiQuota('missing-user', { dailyQuestionLimit: 10, dailyTokenLimit: null }),
-    );
+   );
 
     // 机器可读的码只有一个写法：`USR-NOT_FOUND-001`，与契约文首描述里那处连字符排版无关。
     expect(error.status).toBe(404);
@@ -307,9 +307,9 @@ describe('admin api', () => {
       mswHttp.get('/api/v1/admin/ai/usage', () =>
         HttpResponse.json(
           envelope(usageSummaryData({ totals: { ...usageSummaryData().totals, avgLatencyMs: null } })),
-        ),
-      ),
-    );
+       ),
+     ),
+   );
 
     const summary = await getAiUsage({ from: '2026-11-02T09:00:00Z', to: '2026-11-03T09:00:00Z' });
 
@@ -360,9 +360,9 @@ describe('admin api', () => {
             instance: '/api/v1/admin/ai/controls',
           }),
           { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
-        ),
-      ),
-    );
+       ),
+     ),
+   );
 
     const error = await expectApiError(getAiControls());
 

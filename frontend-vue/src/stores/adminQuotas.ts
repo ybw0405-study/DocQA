@@ -131,7 +131,7 @@ export const useAdminQuotasStore = defineStore('adminQuotas', {
     },
 
     /**
-     * 全量替换（D-197）：两个字段都必须出现，缺一个不是「保持原值」而是 400。
+     * 全量替换：两个字段都必须出现，缺一个不是「保持原值」而是 400。
      * 成功后重取第一页而不是就地改这一行——排序键是 `updated_at DESC`，
      * 刚写入的行本来就该换到最前面，本地拼接会把顺序说成服务端没有承诺的样子。
      */
@@ -143,7 +143,7 @@ export const useAdminQuotasStore = defineStore('adminQuotas', {
         rejectLocal(
           this,
           `上限必须是 ${String(QUOTA_LIMIT_MIN)}–${String(QUOTA_LIMIT_MAX)} 的整数，留空表示该维度不设上限。`,
-        );
+       );
         return false;
       }
       this.submitting = true;

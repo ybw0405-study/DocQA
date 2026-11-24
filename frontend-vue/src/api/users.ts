@@ -5,12 +5,12 @@ import { get, patch, put } from './http';
 /**
  * 用户管理面的唯一出口（契约 2.5.0 的 `User` tag，ADMIN 专用）。
  *
- * 与管理面 `api/admin.ts` 的**方向相反**（D-207）：角色替换与状态变更这两个写操作
+ * 与管理面 `api/admin.ts` 的**方向相反**：角色替换与状态变更这两个写操作
  * 在契约里都正式声明了 `IdempotencyKey` 参数，Java 侧 `@RequestHeader` 为必填。
  * 本文件仍然**不构造任何请求头**——共享拦截器已覆盖「非 GET 且缺该头」并补一个随机键，
  * 401 刷新重放复用同一 `config.headers` 因而复用同一个键；在这里再拼一次就是第二套键生成逻辑。
  *
- * 第五个操作（按 id 读取单个用户）**刻意不实现**（D-214）：`UserSummaryData` 的字段集合
+ * 第五个操作（按 id 读取单个用户）**刻意不实现**：`UserSummaryData` 的字段集合
  * 与列表行完全同构，重读拿不到列表以外的信息，而随后的写操作自己就会回 404。
  * 路径上的身份参数是**被管理对象**的标识，不是调用者身份来源——身份只来自 JWT `sub`。
  */
@@ -48,7 +48,7 @@ export function replaceUserRoles(userId: string, request: UpdateUserRolesRequest
 
 /**
  * 停用或启用账号。`DISABLED` 即时吊销该用户全部刷新令牌家族并推进用户级吊销水位，
- * 且**重新启用不复活已吊销凭据**——这是停用需要二次确认、启用不需要的唯一依据（D-209）。
+ * 且**重新启用不复活已吊销凭据**——这是停用需要二次确认、启用不需要的唯一依据。
  */
 export function updateUserStatus(userId: string, request: UpdateUserStatusRequest): Promise<UserSummary> {
   return patch<UserSummary>(`/users/${encodeURIComponent(userId)}/status`, request);

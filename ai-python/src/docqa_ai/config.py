@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# offline 空间的表名（迁移 001）。它同时是 D-117 启动守卫识别「真实向量被写进了 offline 空间」的判据。
+# offline 空间的表名（迁移 001）。它同时是  启动守卫识别「真实向量被写进了 offline 空间」的判据。
 OFFLINE_VECTOR_TABLE = "chunk_embedding_1024"
 
 McpToolName = Annotated[str, Field(pattern=r"^[a-z0-9_]{1,32}$")]
@@ -20,14 +20,14 @@ _HOST_ENTRY = re.compile(
 
 
 class McpServerSettings(BaseModel):
-    """D-124 / D-133：一条 Server 配置要么是远程 HTTP，要么是本地 stdio，二者互斥。"""
+    """一条 Server 配置要么是远程 HTTP，要么是本地 stdio，二者互斥。"""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True, frozen=True)
 
     name: str = Field(pattern=r"^[a-z0-9_]{1,32}$")
     transport: Literal["http", "stdio"] = "http"
     url: str = Field(default="", max_length=2048)
-    # stdio：命令必须是已预置的绝对路径可执行文件，运行期不做 npx/uvx/pip 安装（D-134）。
+    # stdio：命令必须是已预置的绝对路径可执行文件，运行期不做 npx/uvx/pip 安装。
     command: str = Field(default="", max_length=1024)
     args: list[str] = Field(default_factory=list, max_length=32)
     env: list[McpEnvName] = Field(default_factory=list, max_length=32)
@@ -111,23 +111,23 @@ class Settings(BaseSettings):
     max_prompt_chars: int = Field(default=32000, ge=1000, le=100000)
     max_observation_chars: int = Field(default=6000, ge=1000, le=20000)
 
-    # D-23 / D-122：MCP 默认关闭。关闭时不构造任何客户端 ⇒ 结构上零外呼。
+    # MCP 默认关闭。关闭时不构造任何客户端 ⇒ 结构上零外呼。
     mcp_enabled: bool = False
     mcp_servers: list[McpServerSettings] = Field(default_factory=list, max_length=8)
     mcp_call_timeout_ms: int = Field(default=3000, ge=100, le=15000)
     mcp_discovery_ttl_seconds: int = Field(default=300, ge=1, le=86400)
     mcp_max_response_bytes: int = Field(default=262144, ge=1024, le=1048576)
     mcp_max_tools: int = Field(default=20, ge=0, le=100)
-    # D-145：每用户每分钟工具调用上限（Redis 固定窗口）。
+    # 每用户每分钟工具调用上限（Redis 固定窗口）。
     tool_rate_limit_enabled: bool = True
     tool_rate_limit_per_minute: int = Field(default=20, ge=1, le=1000)
-    # D-140：stdio 进程治理。启动超时与调用超时分开，冷启动不计入工具预算。
+    # stdio 进程治理。启动超时与调用超时分开，冷启动不计入工具预算。
     mcp_startup_timeout_ms: int = Field(default=5000, ge=100, le=60000)
     mcp_max_concurrency: int = Field(default=4, ge=1, le=32)
     mcp_failure_threshold: int = Field(default=3, ge=1, le=20)
     mcp_circuit_open_seconds: int = Field(default=60, ge=1, le=3600)
 
-    # D-147 / D-149：真实联网工具默认关闭。关闭时四个工具都不注册，客户端也不构造 ⇒ 结构上零外呼。
+    # 真实联网工具默认关闭。关闭时四个工具都不注册，客户端也不构造 ⇒ 结构上零外呼。
     real_tools_enabled: bool = False
     web_search_provider: Literal["none", "searxng", "tavily"] = "none"
     searxng_url: str = Field(default="http://127.0.0.1:8888", max_length=2048)
@@ -141,7 +141,7 @@ class Settings(BaseSettings):
     web_tool_max_results: int = Field(default=5, ge=1, le=10)
     web_robots_cache_seconds: int = Field(default=3600, ge=0, le=86400)
     academic_mailto: str = Field(default="", max_length=254)
-    # D-139 只开放中英文两个语言面，避免把模型输入直接拼进任意子域。
+    #  只开放中英文两个语言面，避免把模型输入直接拼进任意子域。
     wikipedia_language: Literal["zh", "en"] = "zh"
 
     embedding_provider: Literal["offline", "openai"] = "offline"
@@ -157,6 +157,9 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
     llm_timeout_ms: int = Field(default=10000, ge=100, le=30000)
     llm_max_output_tokens: int = Field(default=1024, ge=16, le=4096)
+    # 工具调用协议：json=提示词约束的 JSON action（默认，行为不变）；
+    # native=OpenAI 兼容 function tools（tool_calls），终答仍走 JSON 以保留引用治理。
+    tool_protocol: Literal["json", "native"] = "json"
 
     # 界面配置的模型连接（契约 2.7.0）。关闭时行为与改动前逐字节一致：只用上面的 env provider。
     # 打开后按请求从 Redis 取生效连接的**密文**，本地解密后构造 planner；
@@ -194,7 +197,7 @@ class Settings(BaseSettings):
     rerank_api_key: SecretStr = SecretStr("")
     rerank_timeout_ms: int = Field(default=3000, ge=100, le=15000)
 
-    # 真实调用额度（D-106）。默认 0 = 一次都不允许，且下面的启动期守卫会拒绝
+    # 真实调用额度。默认 0 = 一次都不允许，且下面的启动期守卫会拒绝
     # 「Provider 已切真但额度仍为 0」的组合，避免配置遗漏变成静默放行。
     experiment_budget: int = Field(default=0, ge=0, le=100000)
     experiment_token_budget: int = Field(default=0, ge=0, le=20000000)
@@ -330,13 +333,13 @@ class Settings(BaseSettings):
         for host in self.llm_allowed_host_entries:
             if not _HOST_ENTRY.fullmatch(host):
                 raise ValueError("llm_allowed_hosts entries must be bare hostnames")
-        # D-117：向量空间守卫。放在额度守卫之后——先问「这次能不能花钱」，再问「花完写到哪张表」。
+        # 向量空间守卫。放在额度守卫之后——先问「这次能不能花钱」，再问「花完写到哪张表」。
         # 真实 embedding 写进 offline 表是**无信号**的（`metadata->>'embedding_model'` 没有任何读取点，
         # HNSW 按 vector_cosine_ops 算距离、不知道向量来自哪个模型），所以只能在启动期拦住。
         # 名字与模型是否匹配归运维面（S9），本守卫只消掉最容易踩的那一种组合。
         if self.embedding_provider != "offline" and self.pg_table == OFFLINE_VECTOR_TABLE:
             raise ValueError(
-                "pg_table must point at a dedicated vector space when embedding_provider is not offline (D-99); "
+                "pg_table must point at a dedicated vector space when embedding_provider is not offline; "
                 f"{OFFLINE_VECTOR_TABLE} holds offline-hashing vectors and is not comparable"
             )
         if self.checkpoint_enabled and not (self.checkpoint_dsn or self.pg_dsn):

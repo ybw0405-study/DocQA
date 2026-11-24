@@ -79,7 +79,7 @@ _MEMORY_EMPTY = "记忆内容为空，未写入。请在「记住：」之后补
 
 @dataclass(frozen=True)
 class AskStreamEvent:
-    """`ask_stream` 的事件单元（S8-3）：delta 为回答文本增量，done 携带完整 AgentAskResponse。
+    """`ask_stream` 的事件单元：delta 为回答文本增量，done 携带完整 AgentAskResponse。
 
     失败不产出事件——按与 `ask` 相同的映射抛出 AgentError，由端点层统一转为 error 帧。
     """
@@ -228,7 +228,7 @@ class AgentAskService:
         return self._memory
 
     async def publish_experiment_limits(self) -> None:
-        """启动时把实验额度上限发布到账本，供管理面回显（S9-5e）。
+        """启动时把实验额度上限发布到账本，供管理面回显。
 
         刻意 best-effort：Redis 不可用只让管理面的 `limitsKnown` 保持 false，
         不能让整个问答进程起不来——上限本身仍由配置在准入时强制执行，回显缺失不影响拦截。
@@ -245,7 +245,7 @@ class AgentAskService:
             )
 
     async def prewarm_tools(self) -> None:
-        """lifespan 预热一次：首个请求不必承担第三方发现延迟（D-125）。"""
+        """lifespan 预热一次：首个请求不必承担第三方发现延迟。"""
 
         if self._mcp is not None:
             await self._mcp.tools(force=True)
@@ -315,7 +315,7 @@ class AgentAskService:
         collector: AuditCollector,
         started: float,
     ) -> _Prepared | AgentAskResponse:
-        """`ask` 与 `ask_stream` 共享的治理前段（D-177）：校验 / Kill Switch / 账本 /
+        """`ask` 与 `ask_stream` 共享的治理前段：校验 / Kill Switch / 账本 /
         实验额度预检 / 检索 / 上下文装配 / MCP 发现。返回值是图输入；实验额度用尽时
         直接返回软降级响应（与同步路径同一 _build_response，零外呼零 delta）。"""
         with self._tracer.start_as_current_span("agent.validate"):
@@ -356,7 +356,7 @@ class AgentAskService:
         if self._experiment is not None:
             gate = await self._experiment.snapshot()
             if gate.calls_used >= gate.call_limit or gate.tokens_used >= gate.token_limit:
-                # D-119 ②：额度用尽即在检索前软降级，形态与图内的 `_budget_stop` 逐字段相同——
+                #  ②：额度用尽即在检索前软降级，形态与图内的 `_budget_stop` 逐字段相同——
                 # 零外呼、零引用、零新错误码，也不新增审计事件类型（Java 白名单不动）。
                 # 账本读不到时不软降级：让 BudgetError 走既有 503 分支，宁可少花也不裸奔。
                 log_event(
@@ -406,7 +406,7 @@ class AgentAskService:
                 raise upstream_unavailable(audit_events=collector.events(), trace_id=request.trace_id) from exc
         blocks = self._context_blocks(retrieved, request, history, memory_notes)
         allowed_tools = tuple(request.deduplicated_tools())
-        # D-124 三层交集的第三层：注册表里只放「启动允许表 ∩ 实际发现」，
+        #  三层交集的第三层：注册表里只放「启动允许表 ∩ 实际发现」，
         # 第二层（请求 allowedTools）由 graph 的同一处校验兜住。发现失败只让工具消失，不阻断问答。
         tools = self._tools
         mcp_tool_count = 0
@@ -658,12 +658,12 @@ class AgentAskService:
         *,
         deadline: Deadline | None = None,
     ) -> AsyncIterator[AskStreamEvent]:
-        """流式问答（S8-3 / D-177）：与 `ask` 共享全部治理前段与异常映射，仅终答产出分叉。
+        """流式问答：与 `ask` 共享全部治理前段与异常映射，仅终答产出分叉。
 
         事件序列：delta* → done（载荷为完整 AgentAskResponse，auditEvents 与同步路径
         逐事件一致）。失败不产出事件——按与 `ask` 相同的映射抛出 AgentError（携带完整
         审计事件与错误码），由端点层统一转为 error 帧；客户端断开时取消图任务，
-        上游 LLM 流随之取消（D-174），reserve 不退还（D-155）。
+        上游 LLM 流随之取消，reserve 不退还。
         """
         started = time.monotonic()
         deadline = deadline or Deadline(request.deadline_ms)

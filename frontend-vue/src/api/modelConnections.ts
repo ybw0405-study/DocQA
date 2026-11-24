@@ -12,7 +12,7 @@ import { deleteNoContent, get, post, put } from './http';
 /**
  * 模型连接管理面七个操作的唯一出口（契约 2.7.0 的 `Admin` tag）。
  *
- * **这里不构造任何请求头**：七个操作的参数集合里都没有 `IdempotencyKey` parameter（D-197），
+ * **这里不构造任何请求头**：七个操作的参数集合里都没有 `IdempotencyKey` parameter，
  * 与 `api/admin.ts` 的八个操作同一裁决。共享拦截器仍会给非 GET 补一个随机幂等键头，服务端不消费它。
  * 创建按租户内 `name` upsert、凭据与生效状态都是覆盖式写入，因此按值幂等；
  * 并发覆盖在服务端是 last-write-wins，界面不得假装能拦住别人的写入。

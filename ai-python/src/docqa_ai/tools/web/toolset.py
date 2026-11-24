@@ -18,7 +18,7 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class WebToolset:
-    """联网工具与它们共用的受限客户端；关闭时整个对象为 None，结构上零外呼（D-149）。"""
+    """联网工具与它们共用的受限客户端；关闭时整个对象为 None，结构上零外呼。"""
 
     tools: tuple[Tool, ...]
     client: BoundedHttpClient
@@ -50,7 +50,7 @@ def build_web_toolset(settings: Settings, *, metrics: ToolMetrics | None = None)
     ]
     if settings.web_search_provider != "none":
         if settings.web_search_provider == "tavily" and not os.environ.get(settings.tavily_key_env, "").strip():
-            # D-149：缺 key 只让搜索工具消失并告警，不让整个服务起不来。
+            # 缺 key 只让搜索工具消失并告警，不让整个服务起不来。
             LOGGER.warning("web_search is disabled: %s is not set", settings.tavily_key_env)
         else:
             tools.append(

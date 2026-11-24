@@ -13,7 +13,7 @@ from docqa_ai.governance.budget import BudgetStateInvalid, BudgetUnavailable
 EXPERIMENT_KEY_SUFFIX = "session-tokens"
 _CALLS_FIELD = "callsUsed"
 _TOKENS_FIELD = "tokensUsed"
-# 上限字段只做回显：Java 管理面读它们判断 `limitsKnown`（D-153 / S9-5e），
+# 上限字段只做回显：Java 管理面读它们判断 `limitsKnown`，
 # 不在 Python 的准入逻辑里参与判断——准入用的是构造期传入的限额，不是 Redis 里的值。
 _CALL_LIMIT_FIELD = "callLimit"
 _TOKEN_LIMIT_FIELD = "tokenLimit"
@@ -104,7 +104,7 @@ class RedisExperimentBudgetStore:
         )
 
     async def publish_limits(self) -> None:
-        """启动时把配置里的两个上限写进账本，供 Java 管理面回显（S9-5e）。
+        """启动时把配置里的两个上限写进账本，供 Java 管理面回显。
 
         只写两个字段：`callsUsed` / `tokensUsed` 是花过的钱，任何启动动作都不许动它们。
         每次启动覆盖一次是刻意的——上限来自环境变量，改配置重启后管理面必须看到新值。
@@ -184,7 +184,7 @@ class RedisExperimentBudgetStore:
         raise BudgetUnavailable("redis experiment budget transaction did not converge")
 
     async def release_call(self, reserved: int) -> ExperimentSnapshot:
-        """收回一次**没有发生**的调用：调用数与预订一起退回（D-121）。
+        """收回一次**没有发生**的调用：调用数与预订一起退回。
 
         与 `settle_call(reserved, 0)` 不是一回事：后者表示「调了但没花钱」，调用数必须留下；
         这里的外呼在最外层本地检查就被拒绝，一个字节都没离开本机，把调用数算掉等于让

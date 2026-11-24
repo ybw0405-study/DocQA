@@ -26,7 +26,7 @@ class McpServer:
 
 
 class McpToolProvider:
-    """Process-local tool discovery with TTL and per-server failure isolation (D-125).
+    """Process-local tool discovery with TTL and per-server failure isolation.
 
     A failed refresh keeps the previous snapshot for that server; a server whose startup
     allowlist is empty never contributes tools, so it is never called at all.

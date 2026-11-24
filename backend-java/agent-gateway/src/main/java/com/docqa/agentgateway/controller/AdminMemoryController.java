@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link com.docqa.agentgateway.web.JwtAuthenticationFilter} 统一强制。
  *
  * <p>记忆只由用户在问答里显式下达「记住：…」指令写入（数据面掩码后落库），
- * 管理面只有读与删两个操作；删除按值幂等，不声明 Idempotency-Key（D-197 同裁决）。
+ * 管理面只有读与删两个操作；删除按值幂等，不声明 Idempotency-Key（同裁决）。
  * tenantId 取自已验签 JWT，userId 是被治理用户；数据面未启用记忆时代理回 503，不假装空清单。
  */
 @RestController

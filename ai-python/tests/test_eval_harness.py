@@ -24,7 +24,7 @@ def test_corpus_has_expected_coverage() -> None:
     # 8 跨主题 + 1 劳动法细粒度 + 1 真实条文
     assert len(docs) == 10
     total_queries = sum(len(d.queries) for d in docs)
-    assert total_queries == 17
+    assert total_queries == 21
 
 
 def test_metrics_are_self_consistent() -> None:
@@ -62,7 +62,7 @@ def test_offline_baseline_meets_minimum_quality() -> None:
     """
     payload = asyncio.run(run_eval())
 
-    assert payload["query_count"] == 17
+    assert payload["query_count"] == 21
     assert payload["recall_at_k"]["1"] >= 0.7
     assert payload["recall_at_k"]["3"] == 1.0
     assert payload["mrr"] >= 0.85

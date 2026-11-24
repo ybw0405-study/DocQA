@@ -16,7 +16,7 @@
 | MySQL 业务库 | 14 张表，共享 `docqa` 库，**无 `tenant_id` 列**；`app_user.username` 全局唯一 |
 | JWT | claims 仅 `sub/iss/aud/iat/exp/jti/roles`，**无 tenant claim**；4 处独立验签 |
 | Java 服务间 | Gateway MVC 反向代理，Bearer 原样透传，下游各自验签；无 OpenFeign |
-| pgvector | 2 张向量表，**明确设计红线"没有任何按用户过滤的列"**（D-87） |
+| pgvector | 2 张向量表，**明确设计红线"没有任何按用户过滤的列"** |
 | MinIO | key = `documents/{userId}/{documentId}/source`，有 user 无 tenant |
 | Redis | `agent:*` / `auth:*` 全部以 userId 或 traceId 开头 |
 | Java↔Python | `PythonAskRequest` 15 字段 / `AgentAskRequest` strict + `extra="forbid"`，无 tenant |
@@ -347,8 +347,9 @@ DELETE FROM flyway_schema_history WHERE version = '10' AND success = 0;
    Redis 容器（停掉即消失）；DOCQA 设计上中间件栈没有 Redis，
    `DOCQA_REDIS_HOST` 若指向已失联的历史 VM 地址同样不可用。解法不是蹭
    别的项目那套无密码、数据混用的 Redis，而是给 docqa-infra
-   加**专属 Redis**：`local-stack.compose.yaml` 新增 `docqa-redis`
-   （host 网络、**16379 避让**、`--requirepass` 从 `/opt/docqa-infra/.env` 注入）。
+   加**专属 Redis**：当时的 `local-stack.compose.yaml` 新增 `docqa-redis`
+   （host 网络、**16379 避让**、`--requirepass` 从 `/opt/docqa-infra/.env` 注入；
+   该文件已随 WSL 链于 2026-11-24 退役删除，现行等价物为 `ops/docker-compose.infra.yml`）。
    Windows 侧同步：`DOCQA_REDIS_PORT=16379`、`DOCQA_REDIS_HOST=<当前 WSL IP>`、
    `DOCQA_AI_REDIS_URL=redis://:<密码>@<WSL IP>:16379/0`。
 3. **Machine 作用域残留变量**。`DOCQA_REDIS_PASSWORD`/`DOCQA_DB_PASSWORD` 在
@@ -469,7 +470,7 @@ documentId 的全局唯一性与写侧谓词共同保证。`TenantIsolationContr
 已在注释中记录这四个方法的有意跨租户性质，文件级判定因写侧仍含 tenant_id 而无需新增豁免。
 
 **评估结论**：Python 侧的 pgvector 写入按 documentId 而非 tenant_id 分片，经 §5.16 确认为
-符合 D-87 红线的有意设计（靠授权 scope 隔离），不视为缺陷；Java→Python 的 `AgentAskRequest`
+符合  红线的有意设计（靠授权 scope 隔离），不视为缺陷；Java→Python 的 `AgentAskRequest`
 已由 §5.13 带上 `tenantId`（第 5 条完成）；第 6 条 MinIO 由 §5.14、pgvector/Redis 由 §5.16
 收口；域名路由、OPA ABAC 仍未开始。
 
@@ -493,7 +494,7 @@ Python 侧从此能直接以租户维度做可观测与后续 ABAC 判决。
 `documentScopes` 的全局唯一 `documentId` 为边界（Java 侧 `JdbcDocumentScopeRepository`
 已带 `tenant_id` 谓词）。pgvector 按租户分片仍属 §5.2 第 6 条，届时可直接使用
 `request.tenant_id` 作路由键，无需再改协议字段。若未来真要分 collection，协议字段已就位；
-但经 §5.16 评估，维持 D-87 红线、靠授权 scope 隔离即可，当前不分片。
+但经 §5.16 评估，维持  红线、靠授权 scope 隔离即可，当前不分片。
 
 验证：`mvn -o test` → 全绿；Python 全量测试 → 全绿；`mvn -o checkstyle:check` → 0 违规。
 
@@ -509,7 +510,7 @@ Python 侧从此能直接以租户维度做可观测与后续 ABAC 判决。
 `objectKey` 只校验「相对路径 + 无空段/穿越」，多一段 UUID 不影响校验，故 Java↔Python 消息契约零改动。
 
 **§5.2 第 6 条剩余**：pgvector 与 Redis 的租户维度均已评估为「维持现状」——pgvector 见 §5.16
-（D-87 红线 + 授权 scope 已隔离，加列反而触发 HNSW 后置过滤）；Redis 键**不盲目加段**：
+（红线 + 授权 scope 已隔离，加列反而触发 HNSW 后置过滤）；Redis 键**不盲目加段**：
 `userId` / `traceId` 是全局唯一 UUID 天然不串租户；
 `agent:kill-switch` 是平台级全局熔断（见 `AdminAiControlsService` 注释），改成按租户会破坏
 「一键全停」语义，当时属于产品决策、留待确认。
@@ -542,7 +543,7 @@ tenant 标签会放大时间序列基数，需先评估租户规模（见 §6 �
 
 ### 5.16 pgvector 不加 tenant_id 列的判断（2026-11-19，§5.2 第 6 条评估闭环）
 
-§1.1 D-87 设计红线明确「pgvector 两张向量表没有任何按用户过滤的列」。复核后确认这不是待补的
+§1.1  设计红线明确「pgvector 两张向量表没有任何按用户过滤的列」。复核后确认这不是待补的
 缺口，而是**有意且与多租户兼容的边界设计**，本批决定**不**给向量表加 `tenant_id`，理由如下。
 
 **检索隔离已经由上游完整保证，且不依赖向量表内存租户列**：
@@ -559,7 +560,7 @@ extra="forbid"`，向量变更消息字段集合必须同步）、存量向量�
 以及重建 HNSW 索引。收益仅仅是纵深防御——而它守护的越权路径在上游已经被两层谓词 + 全局唯一 id
 封死。投入产出比与风险都指向「不做」。
 
-**结论**：§5.2 第 6 条的 pgvector 部分以「维持 D-87 红线、靠授权 scope 隔离」收口，不新增列。
+**结论**：§5.2 第 6 条的 pgvector 部分以「维持  红线、靠授权 scope 隔离」收口，不新增列。
 与 §5.14 Redis 的判断一致：先确认隔离语义是否已被上游保证，再决定是否加租户段，避免把「看起来
 该加」误当成「隔离漏洞」。真正需要租户维度的是 MySQL 业务表（已在 V10 完成）与 MinIO 对象键
 （§5.14 完成）；Redis 全局熔断键保持平台级语义不变。
@@ -681,7 +682,7 @@ Python 侧：`RedisKillSwitch.is_active(tenant_id)` 加可选参数，全局键�
 **契约同步**：`openapi-java.yaml` 升 2.6.0，登记 `/api/v1/admin/ai/controls/tenant` 的
 GET/PUT、新增 `KillSwitchStateEnvelope`、`UpdateAiControlsRequest` 描述泛化为覆盖两类端点；
 `frontend-vue/tests/contract-drift.spec.ts` 同步裁决（schema 计数 98→99、envelope 名单、
-admin 参数表加两个新操作）。这一步是 S9-6 对账守护的预期行为：**网关本地新增映射必须
+admin 参数表加两个新操作）。这一步是  对账守护的预期行为：**网关本地新增映射必须
 同时登记契约**，否则 `GatewayRouteContractTest` 判为「契约写 200、线上 404」。
 
 验证：Java `KillSwitchTest` / `RedisAdminControlsStoreTest` / `AdminAiControlsServiceTest` /

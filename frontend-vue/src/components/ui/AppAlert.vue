@@ -16,7 +16,7 @@ const props = withDefaults(defineProps<{
 });
 
 /**
- * 三个展示分支（D-190）：传输失败只说人话（`CLIENT-*` 是前端本地标记，报给使用者没有意义）、
+ * 三个展示分支：传输失败只说人话（`CLIENT-*` 是前端本地标记，报给使用者没有意义）、
  * 校验类只说结论（明细已在输入项旁）、其余如实给出 detail + code + trace 供运维上报。
  * 429 的等待秒数刻意不进这里：它由宿主的 useRetryWindow 逐秒倒数，放进 `role="alert"` 会让告警每秒重播一次。
  */

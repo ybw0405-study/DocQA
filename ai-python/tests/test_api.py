@@ -338,7 +338,7 @@ async def test_trace_mismatch_is_annotated_on_the_span() -> None:
 
 def test_configured_pg_wires_both_retrieval_channels_together() -> None:
     vector, lexical = build_repositories(make_settings(pg_dsn="postgresql://study@127.0.0.1:5432/docqa"))
-    # 只有一路接上 PG 是最危险的装配形态：词法通道会永久降级，而每次请求都看不出来（D-87）。
+    # 只有一路接上 PG 是最危险的装配形态：词法通道会永久降级，而每次请求都看不出来。
     assert isinstance(vector, PgVectorRepository)
     assert isinstance(lexical, PgLexicalRepository)
 
@@ -350,7 +350,7 @@ def test_missing_pg_leaves_both_retrieval_channels_fail_closed() -> None:
 
 
 def real_egress_settings(**overrides: object) -> Settings:
-    """满足启动守卫的「切真」配置：额度为正（D-106 ②）+ 独立向量空间（D-117）。"""
+    """满足启动守卫的「切真」配置：额度为正（②）+ 独立向量空间。"""
 
     data: dict[str, object] = {
         "embedding_provider": "openai",
@@ -364,7 +364,7 @@ def real_egress_settings(**overrides: object) -> Settings:
 
 
 def test_offline_assembly_leaves_the_experiment_ledger_unarmed() -> None:
-    """默认配置的账本必须是 None：不构造 ⇒ 一个 Redis 键都不写，离线不变性由结构保证（D-113）。"""
+    """默认配置的账本必须是 None：不构造 ⇒ 一个 Redis 键都不写，离线不变性由结构保证。"""
 
     settings = make_settings()
     assert build_experiment_ledger(settings, FakeRedis(decode_responses=True)) is None
@@ -381,7 +381,7 @@ def test_real_embedding_assembly_wraps_the_provider_with_the_ledger() -> None:
     assert isinstance(ledger, RedisExperimentBudgetStore)
     embedder = build_embedder(settings, ledger)
     assert isinstance(embedder, BudgetedEmbeddingProvider)
-    # D-114：端点自报的批量上限必须透传，否则 worker 退回配置的 32 行，真实端点 11 行就 400
+    # 端点自报的批量上限必须透传，否则 worker 退回配置的 32 行，真实端点 11 行就 400
     assert embedder.max_batch_rows == OPENAI_COMPATIBLE_MAX_BATCH_ROWS
     assert embedder.dimensions == settings.embedding_dimensions
 
@@ -400,7 +400,7 @@ def test_dashscope_rerank_assembly_wraps_the_provider_with_the_ledger() -> None:
 
 
 def test_rerank_only_egress_still_arms_the_ledger() -> None:
-    """名次也花真实额度：只切 rerank 的组合同样要记账（D-106）。"""
+    """名次也花真实额度：只切 rerank 的组合同样要记账。"""
 
     settings = make_settings(
         rerank_provider="dashscope",
@@ -427,7 +427,7 @@ async def test_offline_default_service_carries_no_ledger() -> None:
 
 
 async def test_real_assembly_shares_one_ledger_across_every_egress_point() -> None:
-    """四个外呼点必须是**同一本账**：各建一份账就等于四个互不知情的天花板（D-118 ②）。"""
+    """四个外呼点必须是**同一本账**：各建一份账就等于四个互不知情的天花板（②）。"""
 
     from opentelemetry import trace
 
@@ -461,7 +461,7 @@ MCP_SERVER_CONFIG = {
 
 
 def test_mcp_disabled_builds_no_client_at_all() -> None:
-    """D-113 同法：关闭时连客户端都不构造，零外呼是结构事实而不是调用点自觉。"""
+    """同法：关闭时连客户端都不构造，零外呼是结构事实而不是调用点自觉。"""
 
     settings = make_settings()
     assert build_mcp_servers(settings) == ()

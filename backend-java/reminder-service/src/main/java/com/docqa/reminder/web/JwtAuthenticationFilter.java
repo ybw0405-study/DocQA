@@ -27,7 +27,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * {@code /api/v1/} 下的全部请求，只放行预检与 {@link PublicPaths} 登记的免 Bearer 端点。
  *
  * <p>此处曾是「只拦已知前缀」的白名单（仅 {@code /api/v1/reminders}），{@code /api/v1/notifications}
- * 因此整体跳过鉴权、{@code USER_ID_ATTRIBUTE} 从不写入，两个通知操作恒返回 500（{@code S10-H1}）。
+ * 因此整体跳过鉴权、{@code USER_ID_ATTRIBUTE} 从不写入，两个通知操作恒返回 500（{@code }）。
  * 白名单要人记得来登记，默认拦截则由结构本身保证新端点落到鉴权一侧。
  */
 @Component

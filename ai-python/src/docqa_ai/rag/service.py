@@ -125,7 +125,7 @@ def reciprocal_rank_fusion(
     lexical_keys: Sequence[ChunkKey],
     rrf_k: int,
 ) -> dict[ChunkKey, float]:
-    """RRF 只累加名次倒数：ts_rank 与余弦相似度的值域、语义、区分度都不同，加权等于给未定标的分数定权重（D-82）。"""
+    """RRF 只累加名次倒数：ts_rank 与余弦相似度的值域、语义、区分度都不同，加权等于给未定标的分数定权重。"""
 
     fused: dict[ChunkKey, float] = {}
     for ranking in (vector_keys, lexical_keys):
@@ -135,10 +135,10 @@ def reciprocal_rank_fusion(
 
 
 def lexical_coverage(content: str, surfaces: Sequence[str]) -> float:
-    """查询切分片段在块正文中的覆盖比例，即 lexical-coverage-v1 的重排键（D-85）。
+    """查询切分片段在块正文中的覆盖比例，即 lexical-coverage-v1 的重排键。
 
     与词法召回通道是否实际执行无关：重排用的是同一套切分口径。子串判定两侧都折叠大小写，
-    与 PG 的 simple 配置一致（E38）。它只能整理次序，修不掉跨词邻接造成的假阳性（D-81 的 E5）。
+    与 PG 的 simple 配置一致（E38）。它只能整理次序，修不掉跨词邻接造成的假阳性（的 E5）。
     """
 
     if not surfaces:
@@ -262,7 +262,7 @@ class RetrievalService:
     ) -> RetrievalResult:
         if not scopes:
             return RetrievalResult.empty()
-        # top_k 是最终输出上限，不是单通道取回上限；两路各取更大候选集，融合重排后再截断（D-91）
+        # top_k 是最终输出上限，不是单通道取回上限；两路各取更大候选集，融合重排后再截断
         output_limit = min(top_k or self._top_k, self._top_k)
         candidate_limit = max(output_limit * 3, self._lexical_candidate_limit)
         with self._tracer.start_as_current_span("rag.retrieve") as span:
@@ -282,7 +282,7 @@ class RetrievalService:
                 kept = ranked[:output_limit]
                 rerank_span.set_attribute("retrieval.kept", len(kept))
                 rerank_span.set_attribute("retrieval.dropped", len(ranked) - len(kept))
-                # D-116：掩码提到名次决定之前发生。它本来就要对 kept 逐篇做，换的只是时机，
+                # 掩码提到名次决定之前发生。它本来就要对 kept 逐篇做，换的只是时机，
                 # 因此外发给第三方的每一串正文都已经过 `pii-v2`；落库与对外的 content 仍是掩码后的同一份。
                 masked_items = [mask_text(candidate.content) for candidate in kept]
                 order, rerank_fallback = await self._rerank(question, masked_items, rerank_span, deadline)
@@ -310,7 +310,7 @@ class RetrievalService:
                     )
                 )
             # 重排后 chunks[0] 不再保证是最高相似度，top_score 必须显式取最大值。
-            # 只被词法命中的块 score=0.0，所以它不会把 confidence 抬上去（D-84）。
+            # 只被词法命中的块 score=0.0，所以它不会把 confidence 抬上去。
             top_score = max((chunk.score for chunk in chunks), default=0.0)
             span.set_attribute("retrieval.chunk_count", len(chunks))
             span.set_attribute("retrieval.top_score", top_score)
@@ -374,7 +374,7 @@ class RetrievalService:
         phrases = extract_phrases(question)
         surfaces = tuple(phrase.surface for phrase in phrases)
         with self._tracer.start_as_current_span("lexical.query") as span:
-            # 实际发出的词位数必须可观测，否则事后无法区分「没召回」与「没参与」（D-97(c)）
+            # 实际发出的词位数必须可观测，否则事后无法区分「没召回」与「没参与」（(c)）
             span.set_attribute("lexical.phrase_count", len(phrases))
             lexical_query = build_lexical_query(question)
             effective_chars = sum(len(phrase.surface) for phrase in phrases)
@@ -415,7 +415,7 @@ class RetrievalService:
         phrase_count: int,
         reason: str,
     ) -> _LexicalChannel:
-        """D-88：词法是增量能力，它挂掉时系统行为等于 S5 之前；但退化必须在观测上可见。"""
+        """词法是增量能力，它挂掉时系统行为等于未引入词法通道之前；但退化必须在观测上可见。"""
 
         span.set_attribute("lexical_fallback", True)
         log_event(LOGGER, logging.WARNING, reason, step="retrieval", operation="lexical.query", status="degraded")
@@ -428,9 +428,9 @@ class RetrievalService:
         span: Span,
         deadline: Deadline | None,
     ) -> tuple[list[int], bool]:
-        """返回 `kept` 的下标顺序；Provider 只决定名次，永不改 `score`（D-104）。
+        """返回 `kept` 的下标顺序；Provider 只决定名次，永不改 `score`。
 
-        不注入 Provider 时这条通道根本不执行，默认配置与 S5 逐字节一致（D-113）。
+        不注入 Provider 时这条通道根本不执行，默认配置与纯离线形态逐字节一致。
         """
 
         provider = self._reranker
@@ -459,7 +459,7 @@ class RetrievalService:
                 f"rerank degraded to fused order ({type(exc).__name__})",
             )
         except (ExperimentBudgetExhausted, BudgetError) as exc:
-            # D-119：额度拦下 rerank 与 rerank 自身失败同形——名次是增量能力，退回融合次序即可，响应体一个字段不变。
+            # 额度拦下 rerank 与 rerank 自身失败同形——名次是增量能力，退回融合次序即可，响应体一个字段不变。
             return self._rerank_degrade(
                 span,
                 size,
@@ -473,7 +473,7 @@ class RetrievalService:
 
     @staticmethod
     def _rerank_degrade(span: Span, size: int, reason: str) -> tuple[list[int], bool]:
-        """D-103 与 D-88 同形：rerank 是增量能力，它挂掉等于退回融合次序，对外响应体一个字段都不变。"""
+        """与  同形：rerank 是增量能力，它挂掉等于退回融合次序，对外响应体一个字段都不变。"""
 
         span.set_attribute("rerank_fallback", True)
         log_event(LOGGER, logging.WARNING, reason, step="retrieval", operation="rerank", status="degraded")
@@ -512,7 +512,7 @@ class RetrievalService:
         for hit in lexical_hits:
             key = (hit.document_id, hit.chunk_index)
             if key not in candidates:
-                # 向量没给的块只靠词法进候选集，相似度未知就写 0，不伪造证据（D-84）
+                # 向量没给的块只靠词法进候选集，相似度未知就写 0，不伪造证据
                 candidates[key] = _Candidate(
                     document_id=hit.document_id,
                     chunk_index=hit.chunk_index,

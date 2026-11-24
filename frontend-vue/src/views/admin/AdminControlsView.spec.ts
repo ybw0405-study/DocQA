@@ -52,9 +52,9 @@ function failControlsRead(detail: string): void {
       HttpResponse.json(
         problem({ status: 500, code: 'COM-INTERNAL-001', detail, instance: '/api/v1/admin/ai/controls' }),
         { status: 500, headers: { 'Content-Type': 'application/problem+json' } },
-      ),
-    ),
-  );
+     ),
+   ),
+ );
 }
 
 async function enableWithConfirmation(view: ViewWrapper): Promise<void> {
@@ -174,7 +174,7 @@ describe('AdminControlsView', () => {
     await byLabel(view, '关闭 Kill Switch')?.trigger('click');
     await vi.waitFor(() => expect(useAdminControlsStore().killSwitchActive).toBe(false));
 
-    // 恢复服务不需要二次确认：D-198 要求明示影响面的只有开启分支。
+    // 恢复服务不需要二次确认： 要求明示影响面的只有开启分支。
     expect(byLabel(view, '确认关闭')).toBeUndefined();
     expect(methods()).toEqual(['GET', 'PUT']);
     expect(callLog.adminOps[1]?.body).toEqual({ killSwitchActive: false });

@@ -9,7 +9,7 @@ MIN_WRAPPED_LIMIT = 120
 
 
 def fit_observation(source: str, body: str, *, limit: int) -> str:
-    """把第三方正文包进 `<untrusted>` 并保证整条观测不超过 `limit` 字符（D-142）。
+    """把第三方正文包进 `<untrusted>` 并保证整条观测不超过 `limit` 字符。
 
     截断提示在包裹内部，闭合标签不会被切掉；转义可能让正文变长，因此逐次收缩直到放得下。
     """

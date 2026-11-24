@@ -42,9 +42,9 @@ pwsh -File ops/sql/apply-least-privilege.ps1
 pwsh -File ops/sql/verify-least-privilege.ps1
 
 # 4) 重启服务，然后打开强校验（违规即拒绝启动）
-pwsh -File docs/00-infra/run-local.ps1 -Action stop
+pwsh -File scripts/stop-dev.ps1
 setx DOCQA_AUDIT_APPEND_ONLY_GUARD enforce
-pwsh -File docs/00-infra/run-local.ps1 -Action start
+pwsh -File scripts/start-dev.ps1
 ```
 
 需要管理员凭据 `DOCQA_DB_USERNAME` / `DOCQA_DB_PASSWORD`（默认 root）。

@@ -12,7 +12,7 @@ from docqa_ai.pii import normalize
 _WORD = re.compile(r"[a-z0-9]+")
 _CJK = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 
-# 单次 embed 调用的最大行数由 Provider 自报（D-114）：它是端点属性，不是业务规则。
+# 单次 embed 调用的最大行数由 Provider 自报：它是端点属性，不是业务规则。
 # 本地特征哈希不受任何端点约束，取值不小于 embedding_batch_size 的配置上界即永不成为瓶颈。
 UNRESTRICTED_BATCH_ROWS = 128
 # E45 实测 DashScope 兼容面 11 行返回 400、10 行通过；本次探针 R2 进一步证明

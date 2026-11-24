@@ -9,7 +9,8 @@
 #
 # 需要的管理员凭据：DOCQA_DB_USERNAME / DOCQA_DB_PASSWORD（默认 root）。
 # 三个受限账号的口令来源优先级：已有环境变量 > 本脚本生成。
-# 生成的口令**不回显**，直接写进用户级环境变量（run-local.ps1 会自动导入）。
+# 生成的口令**不回显**，写进用户级环境变量留档；现行启动链只读 ops/env/local.env，
+# 需把受限账号与口令同步写入该文件（DOCQA_DB_USERNAME / DOCQA_DB_PASSWORD 等）才会被消费。
 #
 # 执行顺序刻意是「先撤多余、后授目标」而不是反过来：
 #   - 中途失败时账号落在**权限不足**一侧，服务会以「表或权限不存在」立刻报错；
@@ -394,7 +395,7 @@ Write-Note '口令值不回显；需要时执行 [Environment]::GetEnvironmentVa
 # 收尾指引
 # -----------------------------------------------------------------------------
 Write-Step '下一步'
-Write-Note '1) 重启服务让新账号生效：docs/00-infra/run-local.ps1 -Action stop，再 -Action start'
+Write-Note '1) 重启服务让新账号生效：scripts/stop-dev.ps1，再 scripts/start-dev.ps1（口令须已同步进 ops/env/local.env）'
 Write-Note '2) 打开审计只追加的强校验（违规即拒绝启动）：'
 Write-Note '     setx DOCQA_AUDIT_APPEND_ONLY_GUARD enforce'
 Write-Note '3) 行为级取证：pwsh -File ops/sql/verify-least-privilege.ps1'

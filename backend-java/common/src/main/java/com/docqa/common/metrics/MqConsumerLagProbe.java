@@ -11,12 +11,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 消费者 lag 探针（{@code observability.md} §4.2 的 {@code docqa_mq_consumer_lag_messages}）。
+ * 消费者 lag 探针（{@code 指标口径文档} §4.2 的 {@code docqa_mq_consumer_lag_messages}）。
  *
  * <p><b>为什么自带线程池而不是 {@code @Scheduled}</b>：Spring 的默认调度器是
  * {@code ThreadPoolTaskScheduler}，默认池大小 1，且本项目已经有其他定时任务在用（提醒扫描、
  * 审计 outbox relay）。{@code examineConsumeStats} 是同步 RPC，broker 慢的时候会把整个调度器
- * 占住——这正是 {@code S11-3-M1} 暴露过的形态（两个不相干的定时任务共用一个小池子，一个慢
+ * 占住——这正是 {@code -M1} 暴露过的形态（两个不相干的定时任务共用一个小池子，一个慢
  * 全拖死）。观测设施不该有能力拖慢业务线程，所以这里起一个只有自己的、daemon 的单线程调度器。
  *
  * <p><b>失败时保留旧读数</b>：采集失败若把 gauge 置 0，Prometheus 侧看起来就是「积压突然清零」，

@@ -17,7 +17,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 /**
- * 直接只读 `audit_event`（D-157）。
+ * 直接只读 `audit_event`。
  *
  * <p>所有条件都参数化；排序固定 `occurred_at DESC, id DESC`，配合 V9 的
  * `idx_audit_occurred (occurred_at, id)` 让纯时间窗查询走索引而不是文件排序。</p>

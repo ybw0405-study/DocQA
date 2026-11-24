@@ -68,7 +68,7 @@ management:
     health:
       probes:
         enabled: true
-      # liveness 只看进程自身；readiness 纳入 db/redis，下游不可用时如实摘流（D-163）
+      # liveness 只看进程自身；readiness 纳入 db/redis，下游不可用时如实摘流
       group:
         liveness:
           include: livenessState,ping
