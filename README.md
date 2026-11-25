@@ -16,7 +16,7 @@
 LangGraph 决策循环 + pgvector 混合检索（向量 + 词法）+ rerank + 引用溯源；MCP 工具接入带
 白名单 / 掩码 / 预算 / 限流 / 审计治理；控制面（Java）与数据面（Python）分离，租户隔离全链路强过滤。
 工具调用协议支持 json / native tool_calls 双通道（`DOCQA_AI_TOOL_PROTOCOL`，默认 json）。
-附带课表导入与提醒等学习工作台功能（见[产品指南](docs/product-guide.md)）。
+Agent 侧以 LangGraph 决策循环驱动检索与工具，支持 Postgres checkpoint 断点续跑、高风险工具的人在回路审批，以及按用户命名空间隔离的长期记忆（默认关）。
 
 ## 真实模型评测（2026-11-25，DashScope，跨文档）
 
@@ -26,7 +26,7 @@ LangGraph 决策循环 + pgvector 混合检索（向量 + 词法）+ rerank + �
 | recall@3 / @5 | 1.0 / 1.0 | 同上 |
 | MRR / nDCG@5 | 0.976 / 0.979 | 同上；跨文档 hard negative 下 `labor-q2`「经济补偿」被干扰块挤下 R@1（正确块落 top2） |
 | faithfulness 均分 | 1.0（门禁 ≥ 0.8） | LLM judge，生成 + 引用核对（nightly 真模型） |
-| recall@1（离线基线） | 0.786 | 特征哈希向量（`eval/baselines/retrieval.json`），与语义检索不同空间，仅作链路回归基线 |
+| recall@1（离线基线） | 0.786 | 特征哈希向量（[`ai-python/src/docqa_ai/eval/baselines/retrieval.json`](ai-python/src/docqa_ai/eval/baselines/retrieval.json)），与语义检索不同空间，仅作链路回归基线 |
 
 复现：`python -m docqa_ai.eval --suite all`（真实 provider 环境变量见下）；
 2026-11-25 本地真实复现与 nightly 同口径一致。
@@ -111,7 +111,6 @@ docker compose -f ops/docker-compose.infra.yml -f ops/docker-compose.app.yml up 
 | 文档管理 | 分片上传、MD5 秒传、标签、软删除、失败重试、重建索引 |
 | 长期记忆 | 显式指令写入（默认关）、按用户命名空间、TTL 与上限、注入为不可信参考 |
 | 可观测 | Prometheus 指标、OTel + LangFuse v3 自托管（可选 profile）、审计只追加 + 追踪外链 |
-| 学习工作台 | ICS 课表导入、作业截止提醒、自定义提醒、站内通知 |
 
 ## 技术栈
 

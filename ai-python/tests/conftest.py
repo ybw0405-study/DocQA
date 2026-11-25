@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import json
-import sys
 import uuid
 from collections.abc import Callable
 from typing import Any
@@ -12,12 +10,12 @@ import pytest
 from docqa_ai.config import Settings
 from docqa_ai.protocol.models import AgentAskRequest
 
-# Windows 默认的 ProactorEventLoop 不被 psycopg 的异步模式支持（会抛
-# "Psycopg cannot use the 'ProactorEventLoop' to run in async mode"）。
-# 在收集阶段就切到 Selector，保证 test_pg_contract.py 这类真库用例在
-# Windows 开发机上也能复现 CI（Linux 默认就是 Selector，行为一致）。
-if sys.platform == "win32":  # pragma: no cover - 平台相关
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# 真库契约测试（tests/test_pg_contract.py）用 psycopg 异步连接，而 Windows 的
+# ProactorEventLoop 不受 psycopg 支持。原先在收集阶段全局切到 SelectorEventLoop，
+# 但 WindowsSelectorEventLoopPolicy、set_event_loop_policy 与 DefaultEventLoopPolicy
+# 均已在 Python 3.16 排期移除，保留这段兼容代码会持续污染测试输出。
+# 现统一约定：真库用例在 Linux 执行（CI 为 ubuntu-latest，本地可用 WSL 或容器）；
+# Windows 上未设置 DOCQA_TEST_PG_DSN 时，这些用例按 test_pg_contract.py 的 skipif 跳过。
 
 TRACE_ID = "0123456789abcdef0123456789abcdef"
 TENANT_ID = uuid.UUID("44444444-4444-4444-8444-444444444444")

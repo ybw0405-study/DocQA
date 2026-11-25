@@ -1,0 +1,402 @@
+{
+  "query_count": 32,
+  "negative_query_count": 5,
+  "recall_at_k": {
+    "1": 0.9375,
+    "3": 1.0,
+    "5": 1.0
+  },
+  "mrr": 0.9688,
+  "by_variant": {
+    "原文问法": 0.875,
+    "反向问法": 1.0,
+    "口语化": 1.0,
+    "易混淆对照": 0.5,
+    "术语替换": 1.0,
+    "部分信息": 1.0
+  },
+  "negative_top_score_mean": 0.1468,
+  "negative_false_hit_rate": 0.0,
+  "negative_threshold": 0.35,
+  "per_query": [
+    {
+      "query_id": "gold-01",
+      "variant": "原文问法",
+      "source": "劳动合同法第四十七条",
+      "top1": 0,
+      "relevant": [
+        0
+      ],
+      "hit_at_1": true,
+      "top_score": 0.5663
+    },
+    {
+      "query_id": "gold-02",
+      "variant": "口语化",
+      "source": "劳动合同法第四十七条",
+      "top1": 0,
+      "relevant": [
+        0
+      ],
+      "hit_at_1": true,
+      "top_score": 0.3576
+    },
+    {
+      "query_id": "gold-03",
+      "variant": "术语替换",
+      "source": "劳动合同法第四十七条",
+      "top1": 0,
+      "relevant": [
+        0
+      ],
+      "hit_at_1": true,
+      "top_score": 0.3633
+    },
+    {
+      "query_id": "gold-04",
+      "variant": "部分信息",
+      "source": "劳动合同法第四十七条",
+      "top1": 0,
+      "relevant": [
+        0
+      ],
+      "hit_at_1": true,
+      "top_score": 0.6105
+    },
+    {
+      "query_id": "gold-05",
+      "variant": "原文问法",
+      "source": "民法典第一千零六十四条",
+      "top1": 1,
+      "relevant": [
+        1
+      ],
+      "hit_at_1": true,
+      "top_score": 0.596
+    },
+    {
+      "query_id": "gold-06",
+      "variant": "部分信息",
+      "source": "民法典第一千零六十四条",
+      "top1": 1,
+      "relevant": [
+        1
+      ],
+      "hit_at_1": true,
+      "top_score": 0.632
+    },
+    {
+      "query_id": "gold-07",
+      "variant": "口语化",
+      "source": "民法典第一千零六十四条",
+      "top1": 1,
+      "relevant": [
+        1
+      ],
+      "hit_at_1": true,
+      "top_score": 0.3827
+    },
+    {
+      "query_id": "gold-08",
+      "variant": "术语替换",
+      "source": "民法典第一千零六十四条",
+      "top1": 1,
+      "relevant": [
+        1
+      ],
+      "hit_at_1": true,
+      "top_score": 0.5204
+    },
+    {
+      "query_id": "gold-09",
+      "variant": "原文问法",
+      "source": "个人所得税法（综合所得税率条款）",
+      "top1": 2,
+      "relevant": [
+        2
+      ],
+      "hit_at_1": true,
+      "top_score": 0.5437
+    },
+    {
+      "query_id": "gold-10",
+      "variant": "术语替换",
+      "source": "个人所得税法（综合所得税率条款）",
+      "top1": 2,
+      "relevant": [
+        2
+      ],
+      "hit_at_1": true,
+      "top_score": 0.4782
+    },
+    {
+      "query_id": "gold-11",
+      "variant": "部分信息",
+      "source": "个人所得税法（综合所得税率条款）",
+      "top1": 2,
+      "relevant": [
+        2
+      ],
+      "hit_at_1": true,
+      "top_score": 0.3731
+    },
+    {
+      "query_id": "gold-12",
+      "variant": "口语化",
+      "source": "个人所得税法（综合所得税率条款）",
+      "top1": 2,
+      "relevant": [
+        2
+      ],
+      "hit_at_1": true,
+      "top_score": 0.3027
+    },
+    {
+      "query_id": "gold-13",
+      "variant": "原文问法",
+      "source": "道路交通安全法第九十一条第一款",
+      "top1": 3,
+      "relevant": [
+        3
+      ],
+      "hit_at_1": true,
+      "top_score": 0.4586
+    },
+    {
+      "query_id": "gold-14",
+      "variant": "口语化",
+      "source": "道路交通安全法第九十一条第一款",
+      "top1": 3,
+      "relevant": [
+        3
+      ],
+      "hit_at_1": true,
+      "top_score": 0.2785
+    },
+    {
+      "query_id": "gold-15",
+      "variant": "部分信息",
+      "source": "道路交通安全法第九十一条第一款",
+      "top1": 3,
+      "relevant": [
+        3
+      ],
+      "hit_at_1": true,
+      "top_score": 0.2448
+    },
+    {
+      "query_id": "gold-16",
+      "variant": "反向问法",
+      "source": "道路交通安全法第九十一条第一款",
+      "top1": 3,
+      "relevant": [
+        3
+      ],
+      "hit_at_1": true,
+      "top_score": 0.4302
+    },
+    {
+      "query_id": "gold-17",
+      "variant": "原文问法",
+      "source": "劳动合同法第八十七条",
+      "top1": 4,
+      "relevant": [
+        4
+      ],
+      "hit_at_1": true,
+      "top_score": 0.4373
+    },
+    {
+      "query_id": "gold-18",
+      "variant": "术语替换",
+      "source": "劳动合同法第八十七条",
+      "top1": 4,
+      "relevant": [
+        4
+      ],
+      "hit_at_1": true,
+      "top_score": 0.5592
+    },
+    {
+      "query_id": "gold-19",
+      "variant": "口语化",
+      "source": "劳动合同法第八十七条",
+      "top1": 4,
+      "relevant": [
+        4
+      ],
+      "hit_at_1": true,
+      "top_score": 0.3626
+    },
+    {
+      "query_id": "gold-20",
+      "variant": "反向问法",
+      "source": "劳动合同法第八十七条",
+      "top1": 4,
+      "relevant": [
+        4
+      ],
+      "hit_at_1": true,
+      "top_score": 0.3602
+    },
+    {
+      "query_id": "gold-21",
+      "variant": "原文问法",
+      "source": "道路交通安全法第九十一条第二款",
+      "top1": 5,
+      "relevant": [
+        5
+      ],
+      "hit_at_1": true,
+      "top_score": 0.4441
+    },
+    {
+      "query_id": "gold-22",
+      "variant": "口语化",
+      "source": "道路交通安全法第九十一条第二款",
+      "top1": 5,
+      "relevant": [
+        5
+      ],
+      "hit_at_1": true,
+      "top_score": 0.2117
+    },
+    {
+      "query_id": "gold-23",
+      "variant": "部分信息",
+      "source": "道路交通安全法第九十一条第二款",
+      "top1": 5,
+      "relevant": [
+        5
+      ],
+      "hit_at_1": true,
+      "top_score": 0.3416
+    },
+    {
+      "query_id": "gold-24",
+      "variant": "易混淆对照",
+      "source": "道路交通安全法第九十一条第二款",
+      "top1": 5,
+      "relevant": [
+        5
+      ],
+      "hit_at_1": true,
+      "top_score": 0.3638
+    },
+    {
+      "query_id": "gold-25",
+      "variant": "原文问法",
+      "source": "民法典第一千零八十九条",
+      "top1": 1,
+      "relevant": [
+        6
+      ],
+      "hit_at_1": false,
+      "top_score": 0.5208
+    },
+    {
+      "query_id": "gold-26",
+      "variant": "口语化",
+      "source": "民法典第一千零八十九条",
+      "top1": 6,
+      "relevant": [
+        6
+      ],
+      "hit_at_1": true,
+      "top_score": 0.4215
+    },
+    {
+      "query_id": "gold-27",
+      "variant": "部分信息",
+      "source": "民法典第一千零八十九条",
+      "top1": 6,
+      "relevant": [
+        6
+      ],
+      "hit_at_1": true,
+      "top_score": 0.5205
+    },
+    {
+      "query_id": "gold-28",
+      "variant": "易混淆对照",
+      "source": "民法典第一千零八十九条",
+      "top1": 1,
+      "relevant": [
+        6
+      ],
+      "hit_at_1": false,
+      "top_score": 0.5433
+    },
+    {
+      "query_id": "gold-29",
+      "variant": "原文问法",
+      "source": "个人所得税法第六条",
+      "top1": 7,
+      "relevant": [
+        7
+      ],
+      "hit_at_1": true,
+      "top_score": 0.4204
+    },
+    {
+      "query_id": "gold-30",
+      "variant": "术语替换",
+      "source": "个人所得税法第六条",
+      "top1": 7,
+      "relevant": [
+        7
+      ],
+      "hit_at_1": true,
+      "top_score": 0.5362
+    },
+    {
+      "query_id": "gold-31",
+      "variant": "反向问法",
+      "source": "个人所得税法第六条",
+      "top1": 7,
+      "relevant": [
+        7
+      ],
+      "hit_at_1": true,
+      "top_score": 0.334
+    },
+    {
+      "query_id": "gold-32",
+      "variant": "部分信息",
+      "source": "个人所得税法第六条",
+      "top1": 7,
+      "relevant": [
+        7
+      ],
+      "hit_at_1": true,
+      "top_score": 0.4344
+    }
+  ],
+  "negatives": [
+    {
+      "query_id": "neg-gold-01",
+      "top_score": 0.1963,
+      "false_hit": false
+    },
+    {
+      "query_id": "neg-gold-02",
+      "top_score": 0.1056,
+      "false_hit": false
+    },
+    {
+      "query_id": "neg-gold-03",
+      "top_score": 0.0779,
+      "false_hit": false
+    },
+    {
+      "query_id": "neg-gold-04",
+      "top_score": 0.0965,
+      "false_hit": false
+    },
+    {
+      "query_id": "neg-gold-05",
+      "top_score": 0.2576,
+      "false_hit": false
+    }
+  ]
+}
