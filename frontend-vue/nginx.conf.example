@@ -13,6 +13,10 @@ server {
     listen 8080;
     server_name _;
 
+    # Docker 内置 DNS。/api 反代用变量形式的 proxy_pass，在请求时解析后端域名，
+    # 避免后端容器重建换 IP 后 nginx 仍持有旧地址导致 502（启动时解析只发生一次）。
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
     root /usr/share/nginx/html;
     index index.html;
 
@@ -45,7 +49,8 @@ server {
     # ── API 反代（容器化部署）：前端 axios/fetch 用相对 /api/v1 ─────────
     # SSE（问答流式）要求关闭代理缓冲，否则逐 token 变成整段到达。
     location /api/ {
-        proxy_pass http://agent-gateway:8080;
+        set $api_upstream "agent-gateway:8080";
+        proxy_pass http://$api_upstream;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
         proxy_set_header Host $host;
