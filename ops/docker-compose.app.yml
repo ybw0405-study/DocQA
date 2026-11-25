@@ -20,6 +20,9 @@ x-java-env: &java-env
   DOCQA_REMINDER_SERVICE_URI: http://reminder-service:8083
   DOCQA_PYTHON_BASE_URL: http://ai-python:18000
   DOCQA_COOKIE_SECURE: "false"
+  # JVM 默认永久缓存 DNS：上游容器重建换 IP 后，下游仍连旧地址（网关曾因此
+  # 对 ai-python 报 AGT-UPSTREAM-001，需手动重启才恢复）。10s TTL 让其自动刷新。
+  JAVA_TOOL_OPTIONS: -Dnetworkaddress.cache.ttl=10 -Dnetworkaddress.cache.negative.ttl=1
 
 x-python-env: &python-env
   DOCQA_AI_PG_DSN: postgresql://docqa:${DOCQA_PG_PASSWORD}@postgres-vector:5432/docqa_vec

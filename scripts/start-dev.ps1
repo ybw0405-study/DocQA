@@ -477,6 +477,9 @@ if ($WithLangfuse) {
 
 if ($Containers) {
     Write-Host '==> [5/8] -Containers：全栈 compose 起应用层（含 parse/vector worker 容器）'
+    # compose 侧该开关默认 false，而非容器分支在 [7/8] 会显式设为 true。
+    # 不在容器分支对齐的话，管理页的模型连接能力会被静默关掉，问答只会走离线抽取式 planner。
+    $env:DOCQA_AI_MODEL_CONNECTIONS_ENABLED = 'true'
     docker compose -f (Join-Path $root 'ops/docker-compose.infra.yml') `
                    -f (Join-Path $root 'ops/docker-compose.app.yml') up -d
     if ($LASTEXITCODE -ne 0) { throw 'compose 应用层启动失败；查看上面的输出。' }
