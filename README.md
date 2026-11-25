@@ -39,6 +39,8 @@ LangGraph 决策循环 + pgvector 混合检索（向量 + 词法）+ rerank + �
 > 零外呼、零成本，但**不是语义检索**。切真需设 `DOCQA_AI_EMBEDDING_PROVIDER` /
 > `DOCQA_AI_LLM_PROVIDER` / `DOCQA_AI_RERANK_PROVIDER`（前缀是 `DOCQA_AI_`）并配
 > `DOCQA_AI_EXPERIMENT_BUDGET > 0`，键集合见 [`ops/env/local.env.example`](ops/env/local.env.example)；
+> 生成模型也可只设机器环境的 `DASHSCOPE_API_KEY`，启动脚本会在进程作用域派生
+> `DOCQA_AI_LLM_*`（容器模式同样生效），无需把 key 写进 local.env。
 > 切真后对已有文档**重建索引**（哈希向量与语义向量不在同一空间）。
 > 三套变量面（服务 `DOCQA_AI_*` / 评测 `DOCQA_EVAL_*` + 无前缀 / nightly secrets）不要混用。
 
