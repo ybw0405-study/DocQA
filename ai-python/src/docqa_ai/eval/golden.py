@@ -37,10 +37,7 @@ class GoldenIndex:
             raise RuntimeError(f"corpus 中找不到 {REAL_DOCUMENT_ID}")
         # 离线 provider 的 embed 是纯计算、无 IO；直接调用其确定性编码函数，
         # 避免每次查询创建事件循环，把调度开销混进延迟测量。
-        self.chunks = [
-            _IndexedChunk(index, self._provider._embed_one(text))
-            for index, text in docs[0].chunks
-        ]
+        self.chunks = [_IndexedChunk(index, self._provider._embed_one(text)) for index, text in docs[0].chunks]
 
     def search(self, question: str, top_k: int = 5) -> list[tuple[int, float]]:
         vector = self._provider._embed_one(question)
@@ -105,15 +102,9 @@ def evaluate(
         "negative_query_count": len(negatives),
         "recall_at_k": {str(k): round(sum(v) / len(v), 4) for k, v in recalls.items()},
         "mrr": round(sum(reciprocal_ranks) / len(reciprocal_ranks), 4),
-        "by_variant": {
-            variant: round(sum(hits) / len(hits), 4) for variant, hits in sorted(by_variant.items())
-        },
-        "negative_top_score_mean": round(
-            sum(item["top_score"] for item in negatives) / len(negatives), 4
-        ),
-        "negative_false_hit_rate": round(
-            sum(bool(item["false_hit"]) for item in negatives) / len(negatives), 4
-        ),
+        "by_variant": {variant: round(sum(hits) / len(hits), 4) for variant, hits in sorted(by_variant.items())},
+        "negative_top_score_mean": round(sum(item["top_score"] for item in negatives) / len(negatives), 4),
+        "negative_false_hit_rate": round(sum(bool(item["false_hit"]) for item in negatives) / len(negatives), 4),
         "negative_threshold": negative_threshold,
         "per_query": per_query,
         "negatives": negatives,
@@ -140,8 +131,11 @@ def main() -> int:
             f"neg_false_hit={payload['negative_false_hit_rate']}"
         )
     else:
-        print(json.dumps({k: v for k, v in payload.items() if k not in {"per_query", "negatives"}},
-                         ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {k: v for k, v in payload.items() if k not in {"per_query", "negatives"}}, ensure_ascii=False, indent=2
+            )
+        )
     return 0
 
 
