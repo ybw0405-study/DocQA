@@ -8,9 +8,9 @@
 
 [![CI](https://github.com/ybw0405-study/DocQA/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ybw0405-study/DocQA/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/badge/release-v2.1.0-blue?style=flat-square)](https://github.com/ybw0405-study/DocQA/releases)
+[![Release](https://img.shields.io/badge/release-v2.2.0-blue?style=flat-square)](https://github.com/ybw0405-study/DocQA/releases)
 [![Java](https://img.shields.io/badge/Java-17-orange?style=flat-square)](https://openjdk.org/projects/jdk/17/)
-[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Node](https://img.shields.io/badge/Node-22.22%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
@@ -127,7 +127,7 @@ Python 数据面 `ai-api` 的端口**不得对公网或不可信网络可达**�
 | 端 | 技术 |
 |---|---|
 | 后端（Java 17） | Spring Boot 3.3、Spring Cloud Gateway、Spring Security、MyBatis / JDBC、Flyway |
-| 数据面（Python ≥3.11） | FastAPI、LangChain/LangGraph、Pydantic v2、psycopg3、OpenTelemetry |
+| 数据面（Python 3.12） | FastAPI、LangChain/LangGraph、Pydantic v2、psycopg3、OpenTelemetry |
 | 前端 | Vue 3.5、TypeScript 5.9、Vite、Pinia（无 UI 组件库，样式自持） |
 | 存储与中间件 | MySQL 8、PostgreSQL 16 + pgvector、Redis、RocketMQ 5、MinIO |
 
@@ -172,7 +172,7 @@ DocQA/
 | JDK | 17 |
 | Maven | 3.9+（父 POM 的 enforcer 拒绝 3.8） |
 | Node.js | ≥ 22.22.2（jsdom 30 与 Vite 8 的下限） |
-| Python | ≥ 3.11（建议 3.13） |
+| Python | 3.12（与 `.python-version`、CI 一致） |
 | 中间件 | MySQL 8、PostgreSQL 16 + pgvector、Redis、RocketMQ 5、MinIO |
 | 虚拟化 | WSL2（解析 worker 的 RocketMQ 客户端仅提供 Linux 绑定） |
 
@@ -246,7 +246,7 @@ Copy-Item ops/env/local.env.example ops/env/local.env   # 按需填写口令
 
 ### 版本号说明
 
-**产品版本**（当前 `2.1.0`，三端 `pom.xml` / `package.json` / `pyproject.toml` 与 Release tag `v2.1.0`）
+**产品版本**（当前 `2.2.0`，三端 `pom.xml` / `package.json` / `pyproject.toml` 与 Release tag `v2.2.0`）
 与 **OpenAPI 契约版本**（`docs/02-design/openapi-java.yaml` 当前 `2.6.0`）是**两条独立的编号线**：
 前者遵循语义化版本描述整个产品发布，后者只描述 Java 对外接口的契约演进，契约文件头部
 `2.0.0` 指的是它自己的一次历史身份模型改造，与产品版本号无关。改动接口时升契约版本，

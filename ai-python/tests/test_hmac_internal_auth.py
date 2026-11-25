@@ -11,6 +11,7 @@ from pydantic import SecretStr
 
 from docqa_ai.api.internal_auth import (
     MAX_SKEW_SECONDS,
+    NONCE_HEADER,
     SIGNATURE_HEADER,
     TIMESTAMP_HEADER,
     sign,
@@ -48,6 +49,7 @@ def test_sign_verify_roundtrip() -> None:
         b'{"question":"x"}',
         headers[TIMESTAMP_HEADER],
         headers[SIGNATURE_HEADER],
+        headers.get(NONCE_HEADER, ""),
     )
 
 
@@ -60,6 +62,7 @@ def test_verify_rejects_stale_timestamp() -> None:
         b"",
         stale[TIMESTAMP_HEADER],
         stale[SIGNATURE_HEADER],
+        stale.get(NONCE_HEADER, ""),
     )
 
 
@@ -72,6 +75,7 @@ def test_verify_rejects_tampered_body() -> None:
         b'{"amount":2}',
         headers[TIMESTAMP_HEADER],
         headers[SIGNATURE_HEADER],
+        headers.get(NONCE_HEADER, ""),
     )
 
 
@@ -84,7 +88,24 @@ def test_signature_covers_method_and_path() -> None:
         b"",
         headers[TIMESTAMP_HEADER],
         headers[SIGNATURE_HEADER],
+        headers.get(NONCE_HEADER, ""),
     )
+
+
+def test_verify_rejects_replayed_nonce() -> None:
+    """P1-6 回归：nonce 一次性——同一签名请求第二次校验必须拒绝（防重放）。"""
+    headers = sign(SECRET, "POST", "/agent/ask", b'{"q":1}')
+    args = (
+        SECRET,
+        "POST",
+        "/agent/ask",
+        b'{"q":1}',
+        headers[TIMESTAMP_HEADER],
+        headers[SIGNATURE_HEADER],
+        headers[NONCE_HEADER],
+    )
+    assert verify(*args) is True
+    assert verify(*args) is False
 
 
 # ── 中间件：HMAC 模式覆盖全部路径，白名单只留 /health* ──────────────────────

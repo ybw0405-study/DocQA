@@ -82,6 +82,24 @@ FROM python-base AS ai-python
 COPY ai-python/ ./
 RUN pip install --no-cache-dir --require-hashes -r requirements.lock.txt \
  && pip install --no-cache-dir --no-deps -e .
+# parse/vector worker 的 MQ 客户端需要 librocketmq.so + rocketmq-client-python。
+# 构建环境 DNS 常不可用，故把官方 deb 随源码放进 build context 离线安装，
+# pip 包也用本地 sdist 离线装（--no-index），不依赖任何外网源（版本与 librocketmq 2.2.0 匹配）。
+COPY ops/infra/librocketmq-2.2.0.amd64.deb /tmp/librocketmq.deb
+COPY ops/infra/rocketmq-client-python-2.0.0.tar.gz /tmp/rocketmq-client.tar.gz
+# sdist 的 PEP 517 构建隔离会尝试联网下载 setuptools，在 --no-index 下必失败。
+# 该包仅依赖标准库（ctypes/enum）+ librocketmq.so，故直接解压把 rocketmq/ 放进
+# site-packages，完全绕过构建后端；运行时非 root 只读亦可 import。
+RUN dpkg -i /tmp/librocketmq.deb \
+ && ldconfig \
+ && mkdir -p /tmp/rmqpkg \
+ && tar -xzf /tmp/rocketmq-client.tar.gz -C /tmp/rmqpkg \
+ && cp -r /tmp/rmqpkg/rocketmq-client-python-2.0.0/rocketmq \
+      "$(python -c 'import site; print(site.getsitepackages()[0])')"/ \
+ && rm -rf /tmp/librocketmq.deb /tmp/rocketmq-client.tar.gz /tmp/rmqpkg
+# librocketmq C++ 按 $HOME/logs/rocketmq-cpp 写日志；非 root UID 10001 的 HOME
+# 默认落在不可写目录，Producer/Consumer.start() 会报 create_directories Permission denied。
+ENV HOME=/tmp
 USER 10001:10001
 ENTRYPOINT ["python", "-m", "uvicorn", "docqa_ai.api.main:app", "--host", "0.0.0.0", "--port", "18000"]
 
@@ -93,9 +111,14 @@ COPY --from=frontend-build /src/frontend-vue/dist /usr/share/nginx/html
 COPY frontend-vue/nginx.conf.example /etc/nginx/conf.d/default.conf
 COPY frontend-vue/security-headers.conf.example /etc/nginx/security-headers.conf.example
 USER root
-RUN chown -R 10001:10001 /usr/share/nginx/html /var/cache/nginx /var/log/nginx /var/run /tmp
+# pid 路径必须在配置文件里改，不能放进 ENTRYPOINT 的 -g：
+# -g 里的 `pid /tmp/nginx.pid;` 与 nginx.conf 第 6 行已有的 `pid /run/nginx.pid;` 重复，
+# nginx 报 "pid directive is duplicate" 直接退出。sed 用宽松空白匹配兼容不同基础镜像的缩进。
+RUN chown -R 10001:10001 /usr/share/nginx/html /var/cache/nginx /var/log/nginx /var/run /tmp \
+ && sed -i -E 's|^[[:space:]]*pid[[:space:]]+/[^;]+;|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf \
+ && sed -i -E 's|^user[[:space:]]+[^;]+;|#user nginx;|' /etc/nginx/nginx.conf
 USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
   CMD wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1
-ENTRYPOINT ["nginx", "-g", "daemon off; pid /tmp/nginx.pid;"]
+ENTRYPOINT ["nginx", "-g", "daemon off;"]

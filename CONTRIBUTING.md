@@ -31,7 +31,7 @@
 | JDK | 17 |
 | Maven | 3.9+（父 POM 的 enforcer 会拒绝 3.8） |
 | Node.js | ≥ 22.22.2 |
-| Python | ≥ 3.11（建议 3.13） |
+| Python | 3.12（与 `.python-version`、CI 一致） |
 | 中间件 | MySQL 8、PostgreSQL 16 + pgvector、Redis、RocketMQ 5、MinIO |
 
 提交前请在仓库根目录跑一遍离线门禁：

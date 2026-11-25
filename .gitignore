@@ -69,6 +69,8 @@ secrets/
 *.zip
 *.7z
 *.tar.gz
+# 例外：worker 离线构建依赖的 rocketmq 客户端源码包（构建环境无 PyPI 访问）
+!ops/infra/rocketmq-client-python-2.0.0.tar.gz
 ~$*
 
 # --- 取证中间产物 ---

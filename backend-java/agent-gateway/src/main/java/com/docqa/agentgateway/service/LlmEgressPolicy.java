@@ -78,8 +78,11 @@ public class LlmEgressPolicy {
         if (!hostAllowed(host, properties.getAllowedHosts())) {
             throw new EgressRejected("URL host is outside the configured allowlist");
         }
+        // P1-5：校验期解析一次 DNS 并固定结果，出网时用这个 IP 直连，
+        // 避免「校验时公网 IP、连接时改指内网」的 DNS rebinding（TOCTOU）。
+        String pinnedIp = null;
         if (!properties.isAllowPrivate()) {
-            rejectPrivateAddresses(host);
+            pinnedIp = resolveAndValidate(host);
         }
         String path = uri.getRawPath() == null || uri.getRawPath().isEmpty() ? "/" : uri.getRawPath();
         String netloc = host.contains(":") ? "[" + host + "]" : host;
@@ -87,7 +90,7 @@ public class LlmEgressPolicy {
             netloc = netloc + ":" + port;
         }
         // query 与 fragment 一律丢弃：OpenAI 兼容端点的路径里不该有它们，留着只会成为 smuggle 面。
-        return new ValidatedEndpoint(scheme + "://" + netloc + path, host, port);
+        return new ValidatedEndpoint(scheme + "://" + netloc + path, host, port, pinnedIp);
     }
 
     private static boolean hostAllowed(String host, List<String> allowedHosts) {
@@ -106,7 +109,11 @@ public class LlmEgressPolicy {
         return false;
     }
 
-    private static void rejectPrivateAddresses(String host) {
+    /**
+     * 解析并校验全部 A/AAAA 记录均非私网，返回可供出网固定的那一个 IP（字符串形式）。
+     * 全部记录都要检查：只要有一条指向私网就拒绝（防止 DNS 轮询下偶发连到内网）。
+     */
+    private static String resolveAndValidate(String host) {
         InetAddress[] addresses;
         try {
             addresses = InetAddress.getAllByName(host);
@@ -121,6 +128,7 @@ public class LlmEgressPolicy {
                 throw new EgressRejected("URL resolves to a private or reserved address");
             }
         }
+        return addresses[0].getHostAddress();
     }
 
     /**
@@ -130,7 +138,7 @@ public class LlmEgressPolicy {
      * （fc00::/7）与 IPv4 的 0/8、100.64/10、240/4；这几段必须显式补上，
      * 否则同一个地址在网关放行、在数据面被拒。
      */
-    private static boolean isForbiddenAddress(InetAddress address) {
+    static boolean isForbiddenAddress(InetAddress address) {
         if (address.isLoopbackAddress() || address.isAnyLocalAddress() || address.isLinkLocalAddress()
                 || address.isSiteLocalAddress() || address.isMulticastAddress()) {
             return true;
@@ -147,8 +155,13 @@ public class LlmEgressPolicy {
         return first == 100 && second >= 64 && second <= 127;
     }
 
-    /** 归一化后的端点：探测与落库都用它，避免同一份配置在两侧长成不同形状。 */
-    public record ValidatedEndpoint(String baseUrl, String host, int port) {
+    /** 归一化后的端点：探测与落库都用它，避免同一份配置在两侧长成不同形状。
+     *  pinnedIp 是校验期解析并校验过的 IP，探测时固定用它出网（P1-5 DNS rebinding 防护）。 */
+    public record ValidatedEndpoint(String baseUrl, String host, int port, String pinnedIp) {
+        /** 兼容旧调用方（测试 / 显式放行私网的场景）：无 pinnedIp 表示用默认 DNS 出网。 */
+        public ValidatedEndpoint(String baseUrl, String host, int port) {
+            this(baseUrl, host, port, null);
+        }
     }
 
     /** 出网被拒；message 是可读原因，不含任何凭据材料。 */

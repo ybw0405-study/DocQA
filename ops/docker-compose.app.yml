@@ -42,69 +42,73 @@ x-java-secrets: &java-secrets
   DOCQA_MIGRATOR_DB_USERNAME: ${DOCQA_MIGRATOR_DB_USERNAME:-}
   DOCQA_MIGRATOR_DB_PASSWORD: ${DOCQA_MIGRATOR_DB_PASSWORD:-}
   DOCQA_REDIS_PASSWORD: ${DOCQA_REDIS_PASSWORD:-}
-  DOCQA_REDIS_DATABASE: ${DOCQA_REDIS_DATABASE:-}
+  # 数值/布尔/枚举类变量必须给与 application.yml 一致的默认值：
+  # 写 ${VAR:-} 会注入空串覆盖 Spring 的 ${VAR:default}，导致 bool/long/JDBC URL 绑定失败。
+  DOCQA_REDIS_DATABASE: ${DOCQA_REDIS_DATABASE:-0}
   DOCQA_MINIO_ACCESS_KEY: ${DOCQA_MINIO_ACCESS_KEY:-}
   DOCQA_MINIO_SECRET_KEY: ${DOCQA_MINIO_SECRET_KEY:-}
-  DOCQA_MINIO_BUCKET: ${DOCQA_MINIO_BUCKET:-}
-  DOCQA_MINIO_ENABLED: ${DOCQA_MINIO_ENABLED:-}
+  DOCQA_MINIO_BUCKET: ${DOCQA_MINIO_BUCKET:-docqa-documents}
+  DOCQA_MINIO_ENABLED: ${DOCQA_MINIO_ENABLED:-true}
   DOCQA_CRED_MASTER_KEY: ${DOCQA_CRED_MASTER_KEY:-}
   DOCQA_CRED_MASTER_KEY_PREVIOUS: ${DOCQA_CRED_MASTER_KEY_PREVIOUS:-}
-  DOCQA_DEMO_USER_ENABLED: ${DOCQA_DEMO_USER_ENABLED:-}
-  DOCQA_DEMO_ADMIN: ${DOCQA_DEMO_ADMIN:-}
-  DOCQA_DEMO_USERNAME: ${DOCQA_DEMO_USERNAME:-}
+  DOCQA_DEMO_USER_ENABLED: ${DOCQA_DEMO_USER_ENABLED:-false}
+  DOCQA_DEMO_ADMIN: ${DOCQA_DEMO_ADMIN:-false}
+  DOCQA_DEMO_USERNAME: ${DOCQA_DEMO_USERNAME:-demo}
   DOCQA_DEMO_USER_ID: ${DOCQA_DEMO_USER_ID:-}
   DOCQA_DEMO_PASSWORD_HASH: ${DOCQA_DEMO_PASSWORD_HASH:-}
-  DOCQA_SELF_REGISTRATION_ENABLED: ${DOCQA_SELF_REGISTRATION_ENABLED:-}
-  DOCQA_REGISTRATION_ALLOWED_SLUGS: ${DOCQA_REGISTRATION_ALLOWED_SLUGS:-}
+  DOCQA_SELF_REGISTRATION_ENABLED: ${DOCQA_SELF_REGISTRATION_ENABLED:-false}
+  DOCQA_REGISTRATION_ALLOWED_SLUGS: ${DOCQA_REGISTRATION_ALLOWED_SLUGS:-default}
   DOCQA_TENANT_BOOTSTRAP_TOKEN: ${DOCQA_TENANT_BOOTSTRAP_TOKEN:-}
-  DOCQA_AUDIT_ENABLED: ${DOCQA_AUDIT_ENABLED:-}
-  DOCQA_AUDIT_APPEND_ONLY_GUARD: ${DOCQA_AUDIT_APPEND_ONLY_GUARD:-}
-  DOCQA_ROCKETMQ_ENABLED: ${DOCQA_ROCKETMQ_ENABLED:-}
+  DOCQA_AUDIT_ENABLED: ${DOCQA_AUDIT_ENABLED:-true}
+  DOCQA_AUDIT_APPEND_ONLY_GUARD: ${DOCQA_AUDIT_APPEND_ONLY_GUARD:-enforce}
+  DOCQA_ROCKETMQ_ENABLED: ${DOCQA_ROCKETMQ_ENABLED:-true}
   DOCQA_LLM_ALLOWED_HOSTS: ${DOCQA_LLM_ALLOWED_HOSTS:-}
-  DOCQA_LLM_ALLOW_PRIVATE: ${DOCQA_LLM_ALLOW_PRIVATE:-}
+  DOCQA_LLM_ALLOW_PRIVATE: ${DOCQA_LLM_ALLOW_PRIVATE:-false}
   DOCQA_LANGFUSE_BASE_URL: ${DOCQA_LANGFUSE_BASE_URL:-}
   DOCQA_AI_INTERNAL_TOKEN: ${DOCQA_AI_INTERNAL_TOKEN:-}
 
 x-python-secrets: &python-secrets
+  # 与 Java 侧同理：所有 bool/int/枚举变量补源码默认值，避免空串覆盖 Pydantic 默认值。
   DOCQA_AI_INTERNAL_TOKEN: ${DOCQA_AI_INTERNAL_TOKEN:-}
-  DOCQA_AI_ENVIRONMENT: ${DOCQA_AI_ENVIRONMENT:-}
+  DOCQA_AI_ENVIRONMENT: ${DOCQA_AI_ENVIRONMENT:-dev}
   DOCQA_AI_MINIO_ACCESS_KEY: ${DOCQA_AI_MINIO_ACCESS_KEY:-}
   DOCQA_AI_MINIO_SECRET_KEY: ${DOCQA_AI_MINIO_SECRET_KEY:-}
-  DOCQA_AI_MINIO_BUCKET: ${DOCQA_AI_MINIO_BUCKET:-}
-  DOCQA_AI_LLM_PROVIDER: ${DOCQA_AI_LLM_PROVIDER:-}
+  DOCQA_AI_MINIO_BUCKET: ${DOCQA_AI_MINIO_BUCKET:-docqa-documents}
+  DOCQA_AI_LLM_PROVIDER: ${DOCQA_AI_LLM_PROVIDER:-offline}
   DOCQA_AI_LLM_BASE_URL: ${DOCQA_AI_LLM_BASE_URL:-}
   DOCQA_AI_LLM_API_KEY: ${DOCQA_AI_LLM_API_KEY:-}
-  DOCQA_AI_LLM_MODEL: ${DOCQA_AI_LLM_MODEL:-}
-  DOCQA_AI_EMBEDDING_PROVIDER: ${DOCQA_AI_EMBEDDING_PROVIDER:-}
+  DOCQA_AI_LLM_MODEL: ${DOCQA_AI_LLM_MODEL:-offline-extractive}
+  DOCQA_AI_EMBEDDING_PROVIDER: ${DOCQA_AI_EMBEDDING_PROVIDER:-offline}
   DOCQA_AI_EMBEDDING_BASE_URL: ${DOCQA_AI_EMBEDDING_BASE_URL:-}
   DOCQA_AI_EMBEDDING_API_KEY: ${DOCQA_AI_EMBEDDING_API_KEY:-}
-  DOCQA_AI_EMBEDDING_MODEL: ${DOCQA_AI_EMBEDDING_MODEL:-}
-  DOCQA_AI_EMBEDDING_DIMENSIONS: ${DOCQA_AI_EMBEDDING_DIMENSIONS:-}
-  DOCQA_AI_RERANK_PROVIDER: ${DOCQA_AI_RERANK_PROVIDER:-}
+  DOCQA_AI_EMBEDDING_MODEL: ${DOCQA_AI_EMBEDDING_MODEL:-offline-hashing-1024}
+  DOCQA_AI_EMBEDDING_DIMENSIONS: ${DOCQA_AI_EMBEDDING_DIMENSIONS:-1024}
+  DOCQA_AI_RERANK_PROVIDER: ${DOCQA_AI_RERANK_PROVIDER:-offline}
   DOCQA_AI_RERANK_BASE_URL: ${DOCQA_AI_RERANK_BASE_URL:-}
   DOCQA_AI_RERANK_API_KEY: ${DOCQA_AI_RERANK_API_KEY:-}
-  DOCQA_AI_RERANK_MODEL: ${DOCQA_AI_RERANK_MODEL:-}
-  DOCQA_AI_EXPERIMENT_BUDGET: ${DOCQA_AI_EXPERIMENT_BUDGET:-}
-  DOCQA_AI_EXPERIMENT_TOKEN_BUDGET: ${DOCQA_AI_EXPERIMENT_TOKEN_BUDGET:-}
-  DOCQA_AI_MODEL_CONNECTIONS_ENABLED: ${DOCQA_AI_MODEL_CONNECTIONS_ENABLED:-}
+  DOCQA_AI_RERANK_MODEL: ${DOCQA_AI_RERANK_MODEL:-offline-noop}
+  DOCQA_AI_EXPERIMENT_BUDGET: ${DOCQA_AI_EXPERIMENT_BUDGET:-0}
+  DOCQA_AI_EXPERIMENT_TOKEN_BUDGET: ${DOCQA_AI_EXPERIMENT_TOKEN_BUDGET:-0}
+  DOCQA_AI_MODEL_CONNECTIONS_ENABLED: ${DOCQA_AI_MODEL_CONNECTIONS_ENABLED:-false}
   DOCQA_CRED_MASTER_KEY: ${DOCQA_CRED_MASTER_KEY:-}
   DOCQA_CRED_MASTER_KEY_PREVIOUS: ${DOCQA_CRED_MASTER_KEY_PREVIOUS:-}
-  DOCQA_AI_MEMORY_ENABLED: ${DOCQA_AI_MEMORY_ENABLED:-}
+  DOCQA_AI_MEMORY_ENABLED: ${DOCQA_AI_MEMORY_ENABLED:-false}
   DOCQA_AI_MEMORY_DSN: ${DOCQA_AI_MEMORY_DSN:-}
-  DOCQA_AI_LANGFUSE_TRACING_ENABLED: ${DOCQA_AI_LANGFUSE_TRACING_ENABLED:-}
+  DOCQA_AI_LANGFUSE_TRACING_ENABLED: ${DOCQA_AI_LANGFUSE_TRACING_ENABLED:-false}
   DOCQA_AI_LANGFUSE_BASE_URL: ${DOCQA_AI_LANGFUSE_BASE_URL:-}
   DOCQA_AI_LANGFUSE_PUBLIC_KEY: ${DOCQA_AI_LANGFUSE_PUBLIC_KEY:-}
   DOCQA_AI_LANGFUSE_SECRET_KEY: ${DOCQA_AI_LANGFUSE_SECRET_KEY:-}
   DOCQA_LLM_ALLOWED_HOSTS: ${DOCQA_LLM_ALLOWED_HOSTS:-}
-  DOCQA_LLM_ALLOW_PRIVATE: ${DOCQA_LLM_ALLOW_PRIVATE:-}
+  DOCQA_LLM_ALLOW_PRIVATE: ${DOCQA_LLM_ALLOW_PRIVATE:-false}
 
 services:
   mq-init:
     image: apache/rocketmq:5.3.1@sha256:d2b231c1b9204129e4f4dd65ec1521c81b8d6826e5f1fe8daa521dab0db5bf16
     container_name: docqa-mq-init
-    depends_on:
-      rocketmq-broker:
-        condition: service_healthy
+    # 共享 broker 网络栈：broker.conf 的 brokerIP1=127.0.0.1（Windows 宿主机端口映射依赖它）。
+    # 独立容器里 127.0.0.1 指向自己，mqadmin 连不上 broker → updateTopic 全部失败。
+    # 共享网络后 localhost 即 broker，宿主机映射也保持不变。
+    network_mode: "service:rocketmq-broker"
     environment:
       HOME: /tmp
     # mqadmin 失败仍返回 0，按 topicRoute 有无 brokerDatas 判定；注册周期 ~30s 带重试。
@@ -112,7 +116,13 @@ services:
       - sh
       - -c
       - |
-        for t in parse-requested parse-completed parse-failed vector-change-requested vector-change-completed audit-event; do
+        # 业务 topic + 消费组的 %RETRY% topic。examineConsumeStats 读消费组位点时会查
+        # %RETRY%<group> 路由；冷启动无重试消息时该 topic 不存在 → CODE 17 → mq health
+        # indicator 误判 DOWN → document-service readiness 503。预建即消除这个假阴性。
+        for t in parse-requested parse-completed parse-failed vector-change-requested vector-change-completed audit-event \
+                 '%RETRY%document-service-parse-result' '%RETRY%document-vector-result' \
+                 '%RETRY%audit-service-audit-event' '%RETRY%reminder-service-reminder-due' \
+                 '%RETRY%ai-python-parse-worker' '%RETRY%ai-python-vector-worker'; do
           ok=false
           for i in $$(seq 1 18); do
             sh mqadmin updateTopic -n rocketmq-namesrv:${DOCQA_ROCKETMQ_NAMESRV_PORT:-19876} -c DefaultCluster -t $$t >/dev/null 2>&1
@@ -161,6 +171,13 @@ services:
       args:
         JAR_PATH: /out/user-service.jar
     container_name: docqa-user
+    # 覆盖 java-base 镜像内置的 8080 探针：本服务实际监听 8081（P0-1 修复）
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/actuator/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 45s
+      retries: 5
     environment:
       <<: [*java-env, *java-secrets]
     depends_on:
@@ -180,6 +197,13 @@ services:
       args:
         JAR_PATH: /out/document-service.jar
     container_name: docqa-document
+    # 覆盖镜像内置 8080 探针：本服务实际监听 8082（P0-1 修复）
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 45s
+      retries: 5
     environment:
       <<: [*java-env, *java-secrets]
     depends_on:
@@ -201,6 +225,13 @@ services:
       args:
         JAR_PATH: /out/reminder-service.jar
     container_name: docqa-reminder
+    # 覆盖镜像内置 8080 探针：本服务实际监听 8083（P0-1 修复）
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8083/actuator/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 45s
+      retries: 5
     environment:
       <<: [*java-env, *java-secrets]
     depends_on:
@@ -262,6 +293,14 @@ services:
       target: ai-python
     container_name: docqa-parse-worker
     entrypoint: ["docqa-parse-worker"]
+    # 继承的基础镜像 HEALTHCHECK 探测 HTTP :18000，但 worker 是纯 MQ 消费者不启
+    # uvicorn，端口无人监听会永远 unhealthy。改为检查进程入口仍在运行。
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qa 'docqa-parse-worker' /proc/1/cmdline || exit 1"]
+      interval: 20s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     environment:
       <<: [*python-env, *python-secrets]
     depends_on:
@@ -280,6 +319,13 @@ services:
       target: ai-python
     container_name: docqa-vector-worker
     entrypoint: ["docqa-vector-worker"]
+    # 同 parse-worker：纯 MQ 消费者，覆盖基础镜像的 HTTP 探针为进程存活检查。
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qa 'docqa-vector-worker' /proc/1/cmdline || exit 1"]
+      interval: 20s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     environment:
       <<: [*python-env, *python-secrets]
     depends_on:

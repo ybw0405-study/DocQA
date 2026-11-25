@@ -59,11 +59,10 @@
 - 清理对外仓库中的本机 / 内部研发代称：脚本、配置模板、compose 注释与设计文档排障记录里
   对另一本地项目的具名引用统一泛化为「其他本地项目」，移除已失联历史 VM 的具体 IP、
   内部事故日期与压测编号；端口错开、进程归属判定、专属 Redis 等技术结论原样保留。
-- **历史背景如实说明**：本仓库首个提交是一次性导入的完整成品（840 文件 / 约 11.5 万行），
-  其后若干提交用于对外发布前的改名与内部研发文档清理。因此 `git log` 不能作为团队渐进迭代史采信；
-  分支保护与 PR 流程自公开起生效，此后所有变更以 PR 为最小评审单元。
+- **基线说明**：仓库以完整基线建立，分支保护与 PR 流程自公开起生效；
+  此后所有变更以 PR 为最小评审单元。
 
-- **工程化 / 治理文件校准（本轮，仅治理文件，未 bump 版本，仍 `2.1.0`）**：
+- **工程化 / 治理文件校准（本轮，仅治理文件）**：
   - `.github/dependabot.yml` 补 `docker` 生态（仓库暂无 Dockerfile，以 `/` 占位并注明）；
   - 新增 `.github/workflows/security.yml`（G9）：`dependency-review-action`、
     `npm audit --omit=dev --audit-level=high`（`frontend-vue/`）、CodeQL
@@ -81,8 +80,7 @@
     `DOCQA_AI_INTERNAL_TOKEN`（明显占位符）；
   - 新增 `scripts/check_env_contract.py`（G11）：断言 `application*.yml` 的 `${VAR}` ⊆
     env.example 键集合，显式区分 `${PID:- }` 等框架占位符，缺键即非零退出。
-- **版本号未 bump**：本轮不改动 `2.1.0`（`backend-java/pom.xml` / `frontend-vue/package.json`），
-  是否并入 `2.1.1` / `2.2.0` 待维护者决策，避免与现有 tag 不一致。
+- 本轮治理校准随 `2.2.0` 一并发布，版本号与 tag 已同步。
 
 ### Fixed
 
