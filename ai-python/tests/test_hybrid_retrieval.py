@@ -398,7 +398,7 @@ def test_lexical_coverage_is_a_ratio_over_the_query_surfaces() -> None:
 
 
 def test_lexical_coverage_folds_case_on_both_sides_like_the_simple_config() -> None:
-    """E38：PG 的 simple 两侧都折叠大小写，Python 侧的覆盖度判定必须同口径。"""
+    """PG 的 simple 两侧都折叠大小写，Python 侧的覆盖度判定必须同口径。"""
 
     assert lexical_coverage("见 Config.Py 文件", ("config.py",)) == 1.0
 
@@ -634,7 +634,7 @@ async def test_unusable_rerank_indexes_fall_back_to_local_order(items: list[Rera
 
 
 async def test_rerank_writes_its_own_span_attributes_and_degrades_on_both_spans() -> None:
-    """「rerank 全失败」与「rerank 没参与」必须可区分（的观测代价）。"""
+    """「rerank 全失败」与「rerank 没参与」必须可区分（观测代价）。"""
 
     exporter = InMemorySpanExporter()
     tracer, _provider = build_tracing(make_settings(), exporter=exporter)

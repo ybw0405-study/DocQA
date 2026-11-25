@@ -48,7 +48,7 @@ async def test_token_ceiling_blocks_the_call_that_would_cross_it() -> None:
 
 
 async def test_zero_limit_refuses_every_call_including_the_first() -> None:
-    """默认配置就是「额度未放行」，此时任何真实调用都不该被授权（的 fail-closed）。"""
+    """默认配置就是「额度未放行」，此时任何真实调用都不该被授权（fail-closed）。"""
 
     for call_limit, token_limit in ((0, 100), (10, 0), (0, 0)):
         store = redis_store(call_limit, token_limit)

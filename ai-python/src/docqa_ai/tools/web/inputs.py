@@ -12,7 +12,7 @@ def parse_argument(argument: str, *, primary: str) -> dict[str, object]:
     """接受「纯字符串」或「JSON 对象」两种形态，二者都归一为字典。
 
     纯字符串形态是为了让离线/小模型不必构造 JSON；一旦以 `{` 开头就按 JSON 解析，
-    解析失败即失败，不做容错猜测（的同序原则：结构非法不外呼）。
+    解析失败即失败，不做容错猜测（同序原则：结构非法不外呼）。
     """
 
     raw = (argument or "").strip()

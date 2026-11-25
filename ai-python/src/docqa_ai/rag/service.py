@@ -138,7 +138,7 @@ def lexical_coverage(content: str, surfaces: Sequence[str]) -> float:
     """查询切分片段在块正文中的覆盖比例，即 lexical-coverage-v1 的重排键。
 
     与词法召回通道是否实际执行无关：重排用的是同一套切分口径。子串判定两侧都折叠大小写，
-    与 PG 的 simple 配置一致（E38）。它只能整理次序，修不掉跨词邻接造成的假阳性（的 E5）。
+    与 PG 的 simple 配置一致。它只能整理次序，修不掉跨词邻接造成的假阳性。
     """
 
     if not surfaces:
@@ -451,7 +451,7 @@ class RetrievalService:
         if timeout <= 0.05:
             return self._rerank_degrade(span, size, "deadline expired before rerank")
         # 查询侧的掩码由调用方完成（`agent/service.py` 传入的就是掩码后的问题），但外发红线不能依赖调用方自觉：
-        # `mask_text` 幂等（E66 的探针断言），重掩一次对已掩码文本是恒等的，对未掩码文本则堵死最后的缺口。
+        # `mask_text` 幂等（有探针断言），重掩一次对已掩码文本是恒等的，对未掩码文本则堵死最后的缺口。
         query = mask_text(question).masked
         span.set_attribute("rerank.model", provider.model)
         span.set_attribute("rerank.document_count", size)
@@ -563,6 +563,6 @@ class RetrievalService:
         return vectors[0]
 
     async def aclose(self) -> None:
-        """关闭共享 httpx client（CON-2）；offline / noop 替身没有 aclose，安全跳过。"""
+        """关闭共享 httpx client；offline / noop 替身没有 aclose，安全跳过。"""
         await _maybe_aclose(self._embedder)
         await _maybe_aclose(self._reranker)

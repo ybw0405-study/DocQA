@@ -1,6 +1,6 @@
 """批量上限与维度声明是 Provider 的自报属性，不是业务配置。
 
-依据为 §1.8.1 的 E43 / E45 与 -2 前置探针 R1…R6（真实端点实测）：
+依据为真实端点实测：
 11 行请求固定返回 400 且与是否携带 `dimensions` 无关；`dimensions` 被接受且生效
 （1024→1024、768→768、v3 512→512）；`dimensions=0` 同样 400。
 """
@@ -46,7 +46,7 @@ def capturing_provider(dimensions: int = 1024, **kwargs: Any) -> tuple[OpenAIEmb
 
 
 def test_offline_provider_is_never_the_batch_bottleneck() -> None:
-    """本地特征哈希没有端点，任何合法配置值都不该被它压低（的「宽松上界」）。"""
+    """本地特征哈希没有端点，任何合法配置值都不该被它压低（宽松上界）。"""
 
     provider = OfflineEmbeddingProvider()
     assert provider.max_batch_rows == UNRESTRICTED_BATCH_ROWS
@@ -54,7 +54,7 @@ def test_offline_provider_is_never_the_batch_bottleneck() -> None:
 
 
 def test_openai_compatible_default_matches_the_measured_endpoint_limit() -> None:
-    """E45：真实端点 10 行通过、11 行 400，默认值就是这条实测线。"""
+    """真实端点 10 行通过、11 行 400，默认值就是这条实测线。"""
 
     provider = OpenAIEmbeddingProvider(BASE_URL, "test-key", "text-embedding-v4", 1024)
     assert provider.max_batch_rows == OPENAI_COMPATIBLE_MAX_BATCH_ROWS == 10
@@ -77,7 +77,7 @@ def test_a_larger_limit_is_a_configuration_choice_not_a_override(value: int = 32
 
 
 async def test_request_declares_dimensions_instead_of_relying_on_the_endpoint_default() -> None:
-    """E43：不发送 dimensions 时端点「恰好」返回 1024，那是默认值不是承诺。"""
+    """不发送 dimensions 时端点「恰好」返回 1024，那是默认值不是承诺。"""
 
     provider, captured = capturing_provider()
     vectors = await provider.embed(["段落甲", "段落乙"], timeout_s=1.0)

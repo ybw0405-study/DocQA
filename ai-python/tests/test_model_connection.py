@@ -379,7 +379,7 @@ def test_ledger_exists_when_ui_connections_are_enabled_even_if_env_is_offline():
         experiment_token_budget=1000,
     )
     assert build_experiment_ledger(settings, FakeRedis(decode_responses=True)) is not None
-    # 开关关闭且全离线时仍然一个键都不写（的默认形态不变）。
+    # 开关关闭且全离线时仍然一个键都不写（默认形态不变）。
     assert build_experiment_ledger(make_settings(), FakeRedis(decode_responses=True)) is None
 
 

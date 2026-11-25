@@ -52,7 +52,7 @@ class NoopRerank:
 
 
 class DashScopeRerankProvider:
-    """DashScope 原生 rerank 端点（E46：该能力不在 OpenAI 兼容面上，形态也不同）。
+    """DashScope 原生 rerank 端点（该能力不在 OpenAI 兼容面上，形态也不同）。
 
     正文由调用方负责掩码后再传入；本类不记录请求与响应内容。
     """

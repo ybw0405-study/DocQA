@@ -219,7 +219,7 @@ def build_embedder(settings: Settings, experiment: ExperimentBudgetStore | None)
 
 
 def build_reranker(settings: Settings, experiment: ExperimentBudgetStore | None) -> RerankProvider:
-    """offline 也注入 `NoopRerank`：名次通道存在但不外呼，结果与不注入逐字段相等（的用例保证）。
+    """offline 也注入 `NoopRerank`：名次通道存在但不外呼，结果与不注入逐字段相等（有对应用例保证）。
 
     这里用 `NoopRerank` 自己的模型名而不是配置里的 `rerank_model`——通道没有外呼，
     把真实模型名写到 span 上就是一条假的出网证据。
@@ -266,7 +266,7 @@ def build_mcp_servers(settings: Settings) -> tuple[McpServer, ...]:
                     circuit_open_s=settings.mcp_circuit_open_seconds,
                 )
             except ValueError as exc:
-                # 依赖未预置或密钥变量缺席只影响这一个 Server（G6），不阻断问答面。
+                # 依赖未预置或密钥变量缺席只影响这一个 Server，不阻断问答面。
                 LOGGER.warning(
                     "MCP stdio server skipped: server=%s error=%s",
                     entry.name,
@@ -650,7 +650,7 @@ def create_app(
 
     @app.get("/health/ready", include_in_schema=False)
     async def readiness() -> Response:
-        """readiness 探真实依赖：任一依赖 down 返回 503，让编排器摘除实例（DQ-3）。"""
+        """readiness 探真实依赖：任一依赖 down 返回 503，让编排器摘除实例。"""
         checks: dict[str, str] = {}
         redis_client = getattr(app.state, "redis_client", None)
         if redis_client is None:

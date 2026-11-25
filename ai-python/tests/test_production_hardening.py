@@ -31,7 +31,7 @@ def _clear_env_signals(monkeypatch: object) -> None:
         monkeypatch.delenv(name, raising=False)  # type: ignore[attr-defined]
 
 
-# ── 生产判据反转（B2）：旧实现「含 prod 才算生产」，全仓无人设置这四个变量 ──────
+# ── 生产判据反转：旧实现「含 prod 才算生产」，全仓无人设置这四个变量 ──────
 
 
 def test_production_is_the_default_when_no_env_signals_are_set(monkeypatch: object) -> None:
@@ -100,7 +100,7 @@ async def test_internal_token_guard_uses_a_whitelist_not_a_blacklist() -> None:
         assert (await client.get("/openapi.json", headers={"x-internal-token": TOKEN})).status_code == 200
 
 
-# ── DQ-3：健康检查不再是恒 200 ──────────────────────────────────────────────
+# ── 健康检查不再是恒 200 ──────────────────────────────────────────────
 
 
 async def test_readiness_returns_503_when_redis_is_unreachable() -> None:
@@ -128,7 +128,7 @@ async def test_liveness_stays_up_when_dependencies_are_absent() -> None:
         assert (await client.get("/health/ready")).status_code == 200
 
 
-# ── 单一组装根（B2）：open_pool() 此前全仓零调用点 ───────────────────────────
+# ── 单一组装根：open_pool() 此前全仓零调用点 ───────────────────────────
 
 
 def test_repositories_share_one_connection_provider() -> None:
@@ -146,7 +146,7 @@ def test_pool_factory_is_wired_into_both_process_entrypoints() -> None:
     assert "connection_provider=pg_provider" in worker_source
 
 
-# ── 租户纵深防御：不再是 duck-typing 静默降级（B2）+ 替身语义（B3） ───────────
+# ── 租户纵深防御：不再是 duck-typing 静默降级 + 替身语义 ───────────
 
 
 async def test_strict_mode_refuses_retrieval_without_a_tenant() -> None:
