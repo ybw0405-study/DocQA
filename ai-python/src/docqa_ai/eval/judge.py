@@ -4,6 +4,11 @@
 (question, context, answer) 输出 JSON verdict（faithfulness ∈ [0,1] + reason），
 均值低于门禁（默认 0.8）即非零退出。JSON 报告供 workflow 上传 artifact。
 
+口径：检索在全语料 scope（含跨文档 hard-negative 干扰文档）下进行——
+干扰块可能挤入 top3 时仍要求回答忠实，与召回评测同难度，不抽单文档易场景。
+judge 默认与 planner 不同源（qwen-max vs qwen-plus），避免 self-judging 宽容偏差；
+可用 DOCQA_EVAL_JUDGE_MODEL 覆盖。
+
 刻意不引 RAGAS：它会把 langchain-community/datasets/nest-asyncio 拖进
 --require-hashes 依赖锁，哈希面与版本 churn 太大；这里的 judge 复用 providers/
 的 OpenAI 兼容 HTTP 形态与 JSON 解析，百行实现、可审计、无新依赖。
@@ -107,7 +112,13 @@ class LlmJudge:
             await self._client.aclose()
 
 
-def judge_summary(per_query: Sequence[dict[str, Any]], gate: float = _DEFAULT_GATE) -> dict[str, Any]:
+def judge_summary(
+    per_query: Sequence[dict[str, Any]],
+    gate: float = _DEFAULT_GATE,
+    *,
+    planner_model: str = "",
+    judge_model: str = "",
+) -> dict[str, Any]:
     """汇总逐查询 verdict；空集视为失败（没有证据不等于通过门禁）。"""
     mean = sum(item["faithfulness"] for item in per_query) / len(per_query) if per_query else 0.0
     return {
@@ -116,6 +127,9 @@ def judge_summary(per_query: Sequence[dict[str, Any]], gate: float = _DEFAULT_GA
         "mean_faithfulness": round(mean, 4),
         "gate": gate,
         "passed": bool(per_query) and mean >= gate,
+        "planner_model": planner_model,
+        "judge_model": judge_model,
+        "retrieval_scope": "all-corpus（含跨文档 hard-negative）",
         "per_query": list(per_query),
     }
 
@@ -126,12 +140,14 @@ async def run_judge_eval(gate: float = _DEFAULT_GATE) -> dict[str, Any]:
         raise SystemExit("nightly judge 需要 DASHSCOPE_API_KEY（或 DOCQA_LLM_API_KEY），不写任何默认密钥")
     base_url = os.getenv("DOCQA_LLM_BASE_URL", _DEFAULT_BASE_URL)
     planner_model = os.getenv("DOCQA_EVAL_PLANNER_MODEL", "qwen-plus")
-    judge_model = os.getenv("DOCQA_EVAL_JUDGE_MODEL", planner_model)
+    judge_model = os.getenv("DOCQA_EVAL_JUDGE_MODEL", "qwen-max")
 
     embedder = _build_embedder()
     reranker = _build_reranker()
     repository = InMemoryVectorRepository()
-    indexed = await index_corpus(embedder, repository, load_corpus())
+    corpus_docs = load_corpus()
+    indexed = await index_corpus(embedder, repository, corpus_docs)
+    all_scopes = [idx.scope for idx in indexed.values()]
     service = RetrievalService(
         repository,
         embedder,
@@ -145,10 +161,11 @@ async def run_judge_eval(gate: float = _DEFAULT_GATE) -> dict[str, Any]:
     judge = LlmJudge(base_url, api_key, judge_model)
     per_query: list[dict[str, Any]] = []
     try:
-        for doc in load_corpus():
-            scope = indexed[doc.document_id].scope
+        for doc in corpus_docs:
             for query in doc.queries:
-                retrieved = await service.retrieve(query.question, [scope])
+                # 全语料 scope：与召回评测同难度——干扰块挤入 top3 时仍要求忠实，
+                # 不抽单文档易场景（那里检索必然命中黄金块，测不出忠实度边界）。
+                retrieved = await service.retrieve(query.question, all_scopes)
                 blocks = tuple(
                     ContextBlock(
                         index=position,
@@ -189,7 +206,7 @@ async def run_judge_eval(gate: float = _DEFAULT_GATE) -> dict[str, Any]:
         await planner.aclose()
         await judge.aclose()
         await service.aclose()
-    return judge_summary(per_query, gate)
+    return judge_summary(per_query, gate, planner_model=planner_model, judge_model=judge_model)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

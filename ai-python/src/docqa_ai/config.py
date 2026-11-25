@@ -100,7 +100,9 @@ class Settings(BaseSettings):
     budget_key_prefix: str = "agent:budget:"
 
     low_confidence_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
-    max_citations: int = Field(default=20, ge=1, le=20)
+    # 引用上限单轨：图内截断、提示词规则与 service 层复核共用这一个值。
+    # 此前默认 20 与提示词/图内的 3 形成双轨（配置改大不生效），现以评测既定行为 3 为准。
+    max_citations: int = Field(default=3, ge=1, le=20)
     retrieval_top_k: int = Field(default=6, ge=1, le=20)
     retrieval_min_score: float = Field(default=0.0, ge=0.0, le=1.0)
     lexical_recall_enabled: bool = True
