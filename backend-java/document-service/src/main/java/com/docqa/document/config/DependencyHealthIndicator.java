@@ -10,7 +10,7 @@ import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 
 /**
- * DQ-3 后半：readiness 对下游依赖的短超时真实探测。
+ * readiness 对下游依赖的短超时真实探测。
  *
  * <p>与 Python 数据面的 {@code /health/live}（恒活）和 {@code /health/ready}（探真实依赖、
  * down 即 503）同口径：liveness 分组不引用本 indicator，只有 readiness 组引用它；任一依赖

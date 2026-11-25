@@ -967,7 +967,7 @@ CREATE TABLE model_connection (
 |---|---|
 | `id` | 连接主键，UUID；同时是凭据密文 AAD 的第一段，密文无法被搬到别的连接下解密 |
 | `tenant_id` | 所属租户，外键兜底；AAD 的第二段，跨租户搬运密文同样解不开 |
-| `name` | 连接显示名，租户内唯一；创建按它 upsert，因此管理面写操作按值幂等（，不声明幂等头） |
+| `name` | 连接显示名，租户内唯一；创建按它 upsert，因此管理面写操作按值幂等（且不声明幂等头） |
 | `preset_id` | 前端预设标识（如 `deepseek`、`qwen`），仅用于回显厂商与申请 Key 的入口；自定义端点为 `NULL` |
 | `base_url` | OpenAI 兼容端点根地址，只允许 `http://` / `https://`；出网前还要过主机白名单与私网判定 |
 | `model` | 实际下发给厂商的模型名；探测到的候选清单是瞬态 UI 数据，不落库 |
@@ -1006,7 +1006,7 @@ Redis 不是业务事实来源，所有关键数据在 MySQL 或 PGVector 有权
 | `idem:{userId}:{operation}:{key}` | String（JSON：请求指纹、状态、原响应摘要） | 24 小时 | 写接口幂等结果；同一指纹返回原结果，不同指纹返回 409；`operation` 如 `UPLOAD_INIT`、`UPLOAD_COMPLETE`、`ASK`、`REMINDER_CREATE`、`USER_ROLE_UPDATE`、`USER_STATUS_UPDATE`、`CHANGE_PASSWORD`，S2 文档域补 `DOCUMENT_RENAME`、`DOCUMENT_TAG_UPDATE`、`DOCUMENT_DELETE`、`DOCUMENT_RETRY`、`DOCUMENT_REINDEX`，S3 课表导入补 `SCHEDULE_IMPORT`（请求指纹 `sha256(文件 SHA-256 \| fallbackTimezone \| leadMinutes)`，落库的 `reminder.idempotency_key` 另用 `sha256hex(requestKey \| uid)` 以覆盖一次导入的多行），S4 提醒状态变更补 `REMINDER_UPDATE`（指纹 `sha256(reminderId \| status \| version)`，同指纹重放**不重复推进 `version`**，同 key 不同指纹返回 409 `REM-CONFLICT-001`）；`REGISTER` 是唯一没有 `userId` 的匿名写接口，key 第一段改用归一化后的 `username`。**S2/S3/S4 都不新增 Redis key 类别**，只扩 `operation` 取值和下面 `mq:idem` 的 topic 前缀 | `agent-gateway`、`document-service`、`reminder-service`、`user-service` | 对应写接口 | 可能重复执行一次请求；数据库唯一键、文档状态机和消息 `client_request_id` 仍提供最终兜底，但上传初始化可能多创建一次会话，必须通过 `uk_document_user_md5` 收敛；重复注册会被 `uk_app_user_username` 拦成 409，不会建出两个账号 |
 | `mq:idem:{topic}:{messageId}` | String（`1`） | 7 天 | 消费者幂等标记；成功处理后写入，业务层仍用数据库唯一约束兜底。S2 新增两个 topic 前缀 `vector-change-requested`、`vector-change-completed`；S4 提醒消费者使用前缀 `reminder-due`，且**它只是加速层**——发布失败重投会给出新 `msgId`，同一次 occurrence 的最终收敛点是 `uk_reminder_trigger_planned` | `document-service`、`audit-service`、`reminder-service`、`ai-python` worker | 对应消费者 | 重复消费；解析分块、审计主键和消息唯一键会阻止重复业务写入；提醒触发仍可能重复，由 `reminder:fired` 补充 |
 | `agent:budget:{traceId}` | Hash（`tokensUsed`、`toolCallsMade`、`roundsUsed`、`tokenBudget`、`maxToolCalls`、`maxRounds`、`deadlineAt`） | 30 分钟 | Agent 的原子预算计数器，支撑 Python 在每次 LLM/工具调用前硬停止 | Java 初始化，Python 原子递增 | Python 读取并校验，Java 终态核对 | Python 若无法读取/重建计数，必须 fail-closed 停止 Agent；否则可能超过 token、工具或轮次预算，造成成本和审计失控 |
-| `agent:budget:session-tokens`（前缀由 `budget_key_prefix` 决定） | Hash（`callsUsed`、`tokensUsed`，另有只读回显字段 `callLimit`、`tokenLimit`） | **无 TTL** | 全局累计额度（配置给定的调用次数与 token 上限），与上面的**每请求**预算正交：前者管一次问答，后者管整轮实验窗口。每个外呼出口在字节离开本机前 `authorize_call` 预订、返回后 `settle_call` 用真实 `usage` 结算（②）。Python 启动时把配置上限写入 `callLimit` / `tokenLimit`，管理面只读展示，**不提供在线重置** | `ai-python`（API 与 Parse Worker 共用同一本账）；启动时补写限额字段 | `ai-python`；`agent-gateway` 管理面只读 | 重置动作是**人工**的（删键或改配置），因此不设 TTL——自动过期等于把额度上限变成滑动窗口，与「本轮上限」的语义冲突。读不到账本时**fail-closed**（503 / rerank 退回融合次序 / worker 可重试），宁可少花一次也不裸奔；反过来**离线 Provider 组合下该键一次都不读写**（账本对象根本不构造，），所以本地与 CI 永不触碰它 |
+| `agent:budget:session-tokens`（前缀由 `budget_key_prefix` 决定） | Hash（`callsUsed`、`tokensUsed`，另有只读回显字段 `callLimit`、`tokenLimit`） | **无 TTL** | 全局累计额度（配置给定的调用次数与 token 上限），与上面的**每请求**预算正交：前者管一次问答，后者管整轮实验窗口。每个外呼出口在字节离开本机前 `authorize_call` 预订、返回后 `settle_call` 用真实 `usage` 结算（②）。Python 启动时把配置上限写入 `callLimit` / `tokenLimit`，管理面只读展示，**不提供在线重置** | `ai-python`（API 与 Parse Worker 共用同一本账）；启动时补写限额字段 | `ai-python`；`agent-gateway` 管理面只读 | 重置动作是**人工**的（删键或改配置），因此不设 TTL——自动过期等于把额度上限变成滑动窗口，与「本轮上限」的语义冲突。读不到账本时**fail-closed**（503 / rerank 退回融合次序 / worker 可重试），宁可少花一次也不裸奔；反过来**离线 Provider 组合下该键一次都不读写**（账本对象根本不构造），所以本地与 CI 永不触碰它 |
 | `agent:kill-switch` | String（`1` 为开；键不存在为关） | 无 TTL | 全局 AI 关闭开关；S9 起由管理 API 写入，读路径不变（Java 30s 缓存、Python 5s 缓存） | `agent-gateway`（管理 API） | `agent-gateway`、`ai-python` | 键丢失等于关闭 Kill Switch（流量恢复），因此依赖 Redis 持久化与运维权限；状态语义保持「键在即开」 |
 | `agent:kill-switch:meta` | Hash（`updatedAt` UTC 毫秒、`updatedBy` UUID） | 无 TTL | 记录最近一次管理 API 开关动作，供管理面展示「谁在何时改的」；**不是状态事实** | `agent-gateway`（管理 API） | `agent-gateway` | 丢失只影响展示；开关状态仍由 `agent:kill-switch` 决定 |
 | `agent:model-connection:tenant:{tenantId}` | String（JSON：`id`、`baseUrl`、`model`、`credentialB64`、`keyId`、`revision`） | 无 TTL | 生效模型连接的分发通道，**只承载 AES-256-GCM 密文**（AAD 绑定 `connectionId\|tenantId`）；Python 用同一把主密钥本地解密后按请求构造 planner，明文 Key 不过这条通道。MySQL `model_connection`（§2.19）才是权威副本，网关在每次写提交后与启动就绪时全量重发布 | `agent-gateway`（管理 API） | `ai-python` | 键丢失等于该租户没有界面配置的连接，回退到 env 配置的 provider（默认离线抽取式，零外呼），不越权也不绕过预算；下一次管理写或网关重启即恢复。Redis 不可达时与 kill switch 一致 fail-closed；密文解不开（未知 keyId / AAD 不匹配）则硬失败，绝不静默降级 |
@@ -1095,7 +1095,7 @@ LIMIT :top_k;
 ```
 
 - `document_id` 等值过滤使用 `idx_chunk_embedding_document`/`idx_chunk_embedding_document_version`。
-- `embedding <=> :query_embedding` 使用余弦距离，分数由 `1 - distance` 给出。**名次与分数解耦（的语义注记）**：S5 的 RRF 融合与 S6 的可选第三方 rerank 只决定引用块的**先后次序**，既不改写也不重新计算这个 `score`；`confidence = max(被引用块的向量相似度)` 并 clamp 到 `0..1`，实现上必须**显式取最大值**而不是读排序后的首元素（首元素现在是名次第一位，不再保证相似度最高）。只被词法通道命中、向量通道没给的块对外 `score = 0.0` 且**不参与取最大值**，所以「引用次序与 score 不单调」是正常形态，不是数据错乱。
+- `embedding <=> :query_embedding` 使用余弦距离，分数由 `1 - distance` 给出。**名次与分数解耦（语义注记）**：S5 的 RRF 融合与 S6 的可选第三方 rerank 只决定引用块的**先后次序**，既不改写也不重新计算这个 `score`；`confidence = max(被引用块的向量相似度)` 并 clamp 到 `0..1`，实现上必须**显式取最大值**而不是读排序后的首元素（首元素现在是名次第一位，不再保证相似度最高）。只被词法通道命中、向量通道没给的块对外 `score = 0.0` 且**不参与取最大值**，所以「引用次序与 score 不单调」是正常形态，不是数据错乱。
 - 过滤后召回不足时，不能放宽到未授权文档；只能返回 `LOW_CONFIDENCE` 或请求用户缩小问题范围。
 - PGVector 只保存 `document_id`，不保存 `userId`；授权责任在 Java，Python 只执行已授权的范围。
 - S2 的向量删除完全复用上述两个索引，**不改 PG DDL**：`DELETE_DOCUMENT` 谓词是 `WHERE document_id = ?`（全部版本，走 `idx_chunk_embedding_document`），`DELETE_VERSION` 谓词是 `WHERE document_id = ? AND index_version = ?`（走 `idx_chunk_embedding_document_version`）。两个作用域都覆盖 `vector_id` 的生成规则 `UUIDv5(documentId, indexVersion, chunkIndex)`，因此删除后同一批 `vector_id` 可以被幂等重写。
@@ -1124,7 +1124,7 @@ LIMIT :top_k;
 ```sql
 -- 词法召回通道：表达式 GIN，零新列、零数据改写、不动 HNSW。
 -- 汉字逐字插空格后交给 'simple' 配置，因为该镜像没有中文分词扩展
--- （pg_jieba / zhparser 不在 pg_available_extensions 中，实测 E11）。
+-- （pg_jieba / zhparser 不在 pg_available_extensions 中，实测）。
 CREATE INDEX IF NOT EXISTS idx_chunk_embedding_lexical
   ON chunk_embedding_1024
   USING gin (
@@ -1173,8 +1173,8 @@ LIMIT :lexical_limit;
 `:lexical_query` 在同一条语句里出现**两次**（`WHERE` 与 `ORDER BY`），必须绑定同一个参数，不允许各生成一份。
 
 - `:lexical_query` 由 Python 用与 4.4.1 **同一套切分口径**生成，成形规则见 CJK 连写段取**相邻二元组**（`学习` → `'学' <-> '习'`），ASCII 段**整段保留**（`config.py`、`3.5-alpha` 各成一个引号段），所有短语一律用 ` | ` 连接，**不使用 ` & `**。词位只允许 `\u4e00-\u9fff` 单字与 `[a-z0-9]+(?:[._-][a-z0-9]+)*` 的 ASCII 整段（**连接符留在词内**：`config.py` 在 `simple` 下是一个词位，拆开检索命中数为 0 而真值为 5000，E13/E14，口径见 ；点、下划线、连字符三种连接符的两侧同形已逐一实测，`'vector_id'` 与 `'3.5-alpha'` 均命中，E28。`+` 只有正文侧证据，本期不作词内字符），运算符只允许 `<->` / `|`，其余一律拒绝；`[a-z0-9]` 这个字母表的前提是**查询侧先 `lower()`**——`simple` 在正文侧与查询侧**都**做小写折叠（`'HELLO'` → `'hello'`，混合大小写正文 `Config.Py` 用小写词位命中 6666 = 真值，E38），所以 `lower()` 是**必要步骤**而不是可选优化（本模块的切分正则只认小写，不折叠就会把 `Config` 当分隔符整段丢掉）。发出的短语数受**模块常量**夹紧（`text/lexical.py` 的 `MAX_PHRASES = 64`，不是配置项—— 的四键集合因此不变；`to_tsquery` 有解析期硬上限，20000 个词位会 `stack depth limit exceeded`，E36）。**字符类必须与索引表达式里的 `[一-鿿]` 逐字相同**——扩展 A 区（U+3400–U+4DBF）不在索引类内，会被 `simple` 粘成多字词位（`㐀㑳` → 一个词位，E18），所以类外汉字一律当分隔符处理、绝不发成词位。查询侧**不做** NFKC / 全半角归一（`simple` 不折叠宽度，归一后与正文词位不同形，E29）。**PII 掩码占位符不贡献词位**：进入词法通道的问句已经过掩码，可能字面含有 `[PHONE]` / `[ID_CARD]` / `[EMAIL]`，若不先整体替换为空格就会发出 `'phone'` / `'id_card'` 这类与用户意图无关的 OR 分支（占位符集合取自 `pii/masker.py` 的 `PLACEHOLDERS`，与词法模块同源，不得各写一份）。`to_tsquery` 的入参是语法而非文本（悬挂运算符会 `ERROR: syntax error in tsquery`、引号内含 `_`/`-` 会被解析器二次拆词，E23；`websearch_to_tsquery` 虽然抗注入但发不出 `<->`、会把 `AND` 降成词位、把 `幂等性` 发成恒不命中的多字词位，E26/E27），必须当作不可信输入处理。
-- 词法通道**不返回分数**：`SELECT` 列表里没有 `1 - (embedding <=> …)`，也没有 `ts_rank` 列，因此没有任何字段可以冒充相似度。融合阶段只用它的**名次**（RRF，`k=60`），只被词法命中的块对外 `score = 0.0`，且不参与 `confidence` 取最大值（对应）。覆盖度（`lexical-coverage-v1`）由 Python 用**已返回的 content** 计算，不能取自 `ts_rank`：实测 rank 既随命中词组集合移动、也随词频移动，9333 个命中行只有 3 个不同 rank 值（E32/E33），它不是计数。
-- 排序键是 `ts_rank(…) DESC, vector_id`。这里推翻本节上一版的「`ORDER BY vector_id`」写法，原因不是相关性而是**计划形态不可推理**：只按 `vector_id` 排时，命中密集的查询会被规划成 `Limit → Nested Loop Semi Join →〔Index Scan using …_pkey + Filter〕`，**完全不使用词法 GIN**，其成本由「凑满 k 条要扫多少行」决定而与授权范围无关（E30）；`ts_rank DESC, vector_id` 在零命中、窄授权范围、密集命中三种分布下都稳定为 `Limit → Sort → Nested Loop →〔HashAggregate ← Function Scan on unnest〕+〔Bitmap Heap Scan → BitmapAnd(idx_chunk_embedding_document_version, idx_chunk_embedding_lexical)〕`，授权 btree 与词法 GIN 同时命中，`Recheck Cond` 里逐候选行重算表达式来收敛真正的邻接与词序（E31；实测 `学 <-> 习` 命中数与 `LIKE '%学习%'` 真值在 30000 行语料上完全相等，反序与隔距样本正确排除）。`vector_id` 作为第二排序键是**必需**而非装饰：rank 并列极重（9333 行只有 3 个不同值、最大并列组 5333），去掉它前 N 条就不可复现（E32）。代价：每行在重检与投影里各多算一次 `to_tsvector(regexp_replace(content…))` + `ts_rank`（E22），且 `Sort` 要吃下授权范围内的全部命中行——**这一段未压测**，不得声称成本可接受。
+- 词法通道**不返回分数**：`SELECT` 列表里没有 `1 - (embedding <=> …)`，也没有 `ts_rank` 列，因此没有任何字段可以冒充相似度。融合阶段只用它的**名次**（RRF，`k=60`），只被词法命中的块对外 `score = 0.0`，且不参与 `confidence` 取最大值。覆盖度（`lexical-coverage-v1`）由 Python 用**已返回的 content** 计算，不能取自 `ts_rank`：实测 rank 既随命中词组集合移动、也随词频移动，9333 个命中行只有 3 个不同 rank 值，它不是计数。
+- 排序键是 `ts_rank(…) DESC, vector_id`。这里推翻本节上一版的「`ORDER BY vector_id`」写法，原因不是相关性而是**计划形态不可推理**：只按 `vector_id` 排时，命中密集的查询会被规划成 `Limit → Nested Loop Semi Join →〔Index Scan using …_pkey + Filter〕`，**完全不使用词法 GIN**，其成本由「凑满 k 条要扫多少行」决定而与授权范围无关；`ts_rank DESC, vector_id` 在零命中、窄授权范围、密集命中三种分布下都稳定为 `Limit → Sort → Nested Loop →〔HashAggregate ← Function Scan on unnest〕+〔Bitmap Heap Scan → BitmapAnd(idx_chunk_embedding_document_version, idx_chunk_embedding_lexical)〕`，授权 btree 与词法 GIN 同时命中，`Recheck Cond` 里逐候选行重算表达式来收敛真正的邻接与词序（实测 `学 <-> 习` 命中数与 `LIKE '%学习%'` 真值在 30000 行语料上完全相等，反序与隔距样本正确排除）。`vector_id` 作为第二排序键是**必需**而非装饰：rank 并列极重（9333 行只有 3 个不同值、最大并列组 5333），去掉它前 N 条就不可复现。代价：每行在重检与投影里各多算一次 `to_tsvector(regexp_replace(content…))` + `ts_rank`，且 `Sort` 要吃下授权范围内的全部命中行——**这一段未压测**，不得声称成本可接受。
 - 召回不足**不放宽**：与 §4.2 同一条规则——不得退化成「去掉授权谓词再查一次」，只能返回 `LOW_CONFIDENCE` 或请用户缩小范围。
 
 #### 4.4.3 与写入侧、删除侧的关系
@@ -1184,19 +1184,19 @@ LIMIT :lexical_limit;
 | 写入（`parse_worker/vector_writer.py` 的 `INSERT … ON CONFLICT (vector_id) DO UPDATE`） | **零改动**。列清单是显式的且不包含新列，表达式索引由 PG 在行写入时自行维护 |  |
 | 删除（S2 的 `DELETE_DOCUMENT` / `DELETE_VERSION`） | **零改动**。两个谓词都只按 `document_id`(+`index_version`) 走既有的 `idx_chunk_embedding_document` / `idx_chunk_embedding_document_version`；GIN 索引条目随堆元组消失 | §4.2 |
 | `remainingRows` / `vectorRows` 同事务确认 | **语义不变**。计数仍是同一事务内的 `COUNT(*)`，索引不参与计数 | §4.2 末条 |
-| 重检成本 | 表达式索引的 `Recheck Cond` 会**逐候选行重算** `to_tsvector(regexp_replace(content…))`；`ORDER BY ts_rank(…)` 使同一表达式在投影里**再算一次**（E22/E31）。候选集已被授权谓词限制在单个用户的文档内，且受 `retrieval_lexical_candidate_limit` 夹紧；**这一段未压测** | E9/E22/E31 |
-| 索引命中条件 | 查询里的表达式必须与索引定义**同形态**：省略 `::regconfig` 仍命中（解析期归一），但 `regexp_replace` 少写第 4 个参数 `'g'` 就退化为 `Seq Scan`；`ORDER BY` 里的那一份与 `WHERE` 里的那一份必须同形，否则只是把同一个脆弱点复制了一遍 | E8/E21 |
+| 重检成本 | 表达式索引的 `Recheck Cond` 会**逐候选行重算** `to_tsvector(regexp_replace(content…))`；`ORDER BY ts_rank(…)` 使同一表达式在投影里**再算一次**。候选集已被授权谓词限制在单个用户的文档内，且受 `retrieval_lexical_candidate_limit` 夹紧；**这一段未压测** |  |
+| 索引命中条件 | 查询里的表达式必须与索引定义**同形态**：省略 `::regconfig` 仍命中（解析期归一），但 `regexp_replace` 少写第 4 个参数 `'g'` 就退化为 `Seq Scan`；`ORDER BY` 里的那一份与 `WHERE` 里的那一份必须同形，否则只是把同一个脆弱点复制了一遍 |  |
 
 最后一行是这个方案唯一的结构性脆弱点，因此它必须被测试钉住而不是被口头约定：Python 侧把该表达式存成**单一常量**（与 002 的 DDL 文本同源），且检索语句里 `WHERE` 与 `ORDER BY` **引用同一个常量、同一个 `:lexical_query` 参数只绑定一次**；`tests/test_migrations.py` 增加一条断言「002 的索引表达式与查询侧常量的函数名、参数个数、flags、`regconfig` 逐字一致」；同时 `test_migrations.py:5` 现在硬编码只读 001 文件，必须扩成遍历 `migrations/*.sql`，否则 002 完全不进门禁。
 
 #### 4.4.4 不变的红线
 
 - **PG 里没有 `user_id`。** 词法通道读的是同一张表、同一套授权入参，不引入任何按用户过滤的列或索引；`tests/test_migrations.py:31` 的 `assert "user_id" not in sql` 必须对 002 同样生效。
-- **维度仍然硬绑 1024**（`config.py:117`）。S5 不换模型、不换维度、不新增扩展；`pg_trgm` 虽 available 但**不安装**——实测它不能作为召回通道（`LIKE '%学习%'` 不走 `gin_trgm_ops`，三个相似算子命中数为 0 / 1613 / 0，而子串真值为 8979），理由与未解释项见 §1.6.1 的 E10。
+- **维度仍然硬绑 1024**（`config.py:117`）。S5 不换模型、不换维度、不新增扩展；`pg_trgm` 虽 available 但**不安装**——实测它不能作为召回通道（`LIKE '%学习%'` 不走 `gin_trgm_ops`，三个相似算子命中数为 0 / 1613 / 0，而子串真值为 8979），理由与未解释项见 §1.6.1。
 - **正文不进日志。** `content` 只在检索结果里向下游传递，与 §4.1 字段约定一致；PII 掩码仍在召回之后、进上下文之前统一执行，词法通道不得绕过这一段。
-- **词法通道对索引字符类之外的汉字没有召回，且这种缺失是静默的。** `[一-鿿]` 只覆盖 U+4E00–U+9FFF，扩展 A 区（U+3400–U+4DBF）与兼容表意区（U+F900–U+FAFF）的字符既不会被索引侧拆成单字，查询侧也一律按分隔符丢弃，因此「生僻字精确术语」在 S5 是**结构性缺失**而不是缺陷：它不报错、不降级、不产生任何观测信号。能观察它的唯一手段是 S6 的真实标注集，所以本期把「扩展区汉字召回」与「真分词器（`zhparser` / `pg_jieba`，本镜像 `pg_available_extensions` 里根本不存在，E11）」一起登记给 S6，不得在 S5 结论里声称已覆盖。`pg_trgm` 保持**不安装**，理由见上一条与 E10。
-- **连接符只能是 ` | `，这不是风格而是召回下限。** 实测掺进一个语料中不存在的词位后，三条件 `&` 命中数为 **0** 而 `|` 仍为 **9333**（E25）——「问句里有一个术语没命中就整条判死」会让词法通道在最需要它的长问句上静默失效。同理，**不得**发多字 CJK 词位（恒 0 命中，E26）、**不得**对查询做全半角归一（与正文词位不同形，E29）、**不得**用 `websearch_to_tsquery` 代替自建引号转义（发不出 `<->`，E27）。
-- **`ts_rank` 只作排序键，永远不得被解释或传递为相关性。** 它既随命中词组集合移动也随词频移动，9333 个命中行只有 3 个不同值、最大并列组 5333（E32/E33）；`SELECT` 列表不含该列，对外 `score` 对纯词法命中恒为 `0.0`，覆盖度另由 Python 用返回的 content 计算。
+- **词法通道对索引字符类之外的汉字没有召回，且这种缺失是静默的。** `[一-鿿]` 只覆盖 U+4E00–U+9FFF，扩展 A 区（U+3400–U+4DBF）与兼容表意区（U+F900–U+FAFF）的字符既不会被索引侧拆成单字，查询侧也一律按分隔符丢弃，因此「生僻字精确术语」在 S5 是**结构性缺失**而不是缺陷：它不报错、不降级、不产生任何观测信号。能观察它的唯一手段是 S6 的真实标注集，所以本期把「扩展区汉字召回」与「真分词器（`zhparser` / `pg_jieba`，本镜像 `pg_available_extensions` 里根本不存在）」一起登记给 S6，不得在 S5 结论里声称已覆盖。`pg_trgm` 保持**不安装**，理由见上一条。
+- **连接符只能是 ` | `，这不是风格而是召回下限。** 实测掺进一个语料中不存在的词位后，三条件 `&` 命中数为 **0** 而 `|` 仍为 **9333**——「问句里有一个术语没命中就整条判死」会让词法通道在最需要它的长问句上静默失效。同理，**不得**发多字 CJK 词位（恒 0 命中）、**不得**对查询做全半角归一（与正文词位不同形）、**不得**用 `websearch_to_tsquery` 代替自建引号转义（发不出 `<->`）。
+- **`ts_rank` 只作排序键，永远不得被解释或传递为相关性。** 它既随命中词组集合移动也随词频移动，9333 个命中行只有 3 个不同值、最大并列组 5333；`SELECT` 列表不含该列，对外 `score` 对纯词法命中恒为 `0.0`，覆盖度另由 Python 用返回的 content 计算。
 
 ### 4.5 LangGraph checkpoint 运行时建表（断点续跑）
 

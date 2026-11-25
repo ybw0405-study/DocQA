@@ -15,7 +15,7 @@ _CJK = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 # 单次 embed 调用的最大行数由 Provider 自报：它是端点属性，不是业务规则。
 # 本地特征哈希不受任何端点约束，取值不小于 embedding_batch_size 的配置上界即永不成为瓶颈。
 UNRESTRICTED_BATCH_ROWS = 128
-# E45 实测 DashScope 兼容面 11 行返回 400、10 行通过；本次探针 R2 进一步证明
+# 实测 DashScope 兼容面 11 行返回 400、10 行通过；本次探针进一步证明
 # 携带 dimensions 的 11 行请求同样 400，即该上限只按行数计，与请求参数无关。
 OPENAI_COMPATIBLE_MAX_BATCH_ROWS = 10
 
@@ -113,7 +113,7 @@ class OpenAIEmbeddingProvider:
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
-        # dimensions 必须显式发送：E43 实测不发送时 v4/v3 都「恰好」返回 1024 维，
+        # dimensions 必须显式发送：实测不发送时 v4/v3 都「恰好」返回 1024 维，
         # 那是端点默认值而非承诺。声明后它成为请求约束，与下面的形状校验闭环。
         payload = {"model": self.model, "input": texts, "dimensions": self.dimensions}
         client = self._client

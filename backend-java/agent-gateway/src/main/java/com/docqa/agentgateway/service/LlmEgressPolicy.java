@@ -78,7 +78,7 @@ public class LlmEgressPolicy {
         if (!hostAllowed(host, properties.getAllowedHosts())) {
             throw new EgressRejected("URL host is outside the configured allowlist");
         }
-        // P1-5：校验期解析一次 DNS 并固定结果，出网时用这个 IP 直连，
+        // DNS rebinding 防护：校验期解析一次 DNS 并固定结果，出网时用这个 IP 直连，
         // 避免「校验时公网 IP、连接时改指内网」的 DNS rebinding（TOCTOU）。
         String pinnedIp = null;
         if (!properties.isAllowPrivate()) {
@@ -156,7 +156,7 @@ public class LlmEgressPolicy {
     }
 
     /** 归一化后的端点：探测与落库都用它，避免同一份配置在两侧长成不同形状。
-     *  pinnedIp 是校验期解析并校验过的 IP，探测时固定用它出网（P1-5 DNS rebinding 防护）。 */
+     * pinnedIp 是校验期解析并校验过的 IP，探测时固定用它出网。 */
     public record ValidatedEndpoint(String baseUrl, String host, int port, String pinnedIp) {
         /** 兼容旧调用方（测试 / 显式放行私网的场景）：无 pinnedIp 表示用默认 DNS 出网。 */
         public ValidatedEndpoint(String baseUrl, String host, int port) {

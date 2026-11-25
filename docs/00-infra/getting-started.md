@@ -77,10 +77,14 @@ PG 侧没有 Flyway 账本，只能这样补：首次搬迁只导回了 MySQL，
   `WindowsSelectorEventLoopPolicy`，否则 psycopg 异步连接在 Proactor 循环上被拒、检索恒定 503。
   脚本只给这个子进程声明 `DOCQA_AI_ENVIRONMENT=dev`，两端因此都不启用 `X-Internal-Token`；
   **生产部署必须另配 `DOCQA_AI_INTERNAL_TOKEN`**（网关与数据面两侧同值）。
-  占位符口令在启动期就被拦：`DOCQA_AI_LLM_PROVIDER=openai` 而 `DOCQA_AI_LLM_API_KEY` 仍是
-  `CHANGE_ME*` 时，脚本会给这个子进程改派 `DOCQA_AI_LLM_PROVIDER=offline`（抽取式，不外呼），
-  并在结尾标注实际生效的生成模式。不这么做的话，占位符要一直到生成那一步才带 401 出去，
-  而网关把上游异常统一塌成 `AGT-UPSTREAM-001`，看不出是凭据问题。填真实 key 即恢复原配置。
+  真模型 key 的接法与 AgentFlow 一致：`start-dev.ps1` 加载 `local.env` 后，若机器环境有
+  `DASHSCOPE_API_KEY`，就在进程作用域派生 `DOCQA_AI_LLM_PROVIDER=openai`、`_API_KEY`、
+  `_MODEL`（`offline-extractive` 这类占位名改为 `qwen-plus`）；密钥不写回 `local.env`、
+  不入库、不回显，`-Containers` 模式同样生效。
+  若既没有 `DASHSCOPE_API_KEY`、`DOCQA_AI_LLM_API_KEY` 又是 `CHANGE_ME*`，脚本会在启动期
+  把数据面改派 `DOCQA_AI_LLM_PROVIDER=offline`（抽取式，不外呼），并在结尾标注实际生效模式。
+  不这么做的话，占位符要一直到生成那一步才带 401 出去，而网关把上游异常统一塌成
+  `AGT-UPSTREAM-001`，看不出是凭据问题。
 - **解析 / 向量 Worker 由容器承载**：`rocketmq-client-python` 只有 Linux 的
   librocketmq C 绑定，Windows 进程起不来，因此 worker 跑在 Linux 容器里：
   `docker compose -f ops/docker-compose.infra.yml -f ops/docker-compose.app.yml up -d parse-worker vector-worker`

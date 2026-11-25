@@ -82,6 +82,29 @@ $required = @(
 $missing = @($required | Where-Object { -not (Get-Conf $_) })
 if ($missing.Count -gt 0) { throw ("local.env 缺少必需项：{0}" -f ($missing -join ', ')) }
 
+# 真模型凭据派生（与 AgentFlow 的 AF_LLM_* 派生同一套做法）：local.env 里保留
+# 占位符即可；只要机器环境有 DASHSCOPE_API_KEY，就在进程作用域覆盖 DOCQA_AI_LLM_*
+# 三项。密钥只活在当前进程，不写回 local.env、不入库、不回显；-Containers 与本地
+# 直起两条路径都会读到同一份派生值。
+$llmSourceKey = $env:DASHSCOPE_API_KEY
+if (-not $llmSourceKey) { $llmSourceKey = [Environment]::GetEnvironmentVariable('DASHSCOPE_API_KEY', 'User') }
+if (-not $llmSourceKey) { $llmSourceKey = [Environment]::GetEnvironmentVariable('DASHSCOPE_API_KEY', 'Machine') }
+$llmKeyCurrent = Get-Conf 'DOCQA_AI_LLM_API_KEY'
+$llmDerivedFromEnv = $false
+if ($llmSourceKey -and (-not $llmKeyCurrent -or $llmKeyCurrent.StartsWith('CHANGE_ME'))) {
+    $env:DOCQA_AI_LLM_API_KEY  = $llmSourceKey
+    $env:DOCQA_AI_LLM_PROVIDER = 'openai'
+    $llmModelCurrent = Get-Conf 'DOCQA_AI_LLM_MODEL'
+    if (-not $llmModelCurrent -or $llmModelCurrent -eq 'offline-extractive') {
+        $env:DOCQA_AI_LLM_MODEL = 'qwen-plus'
+    }
+    if (-not (Get-Conf 'DOCQA_AI_LLM_BASE_URL')) {
+        $env:DOCQA_AI_LLM_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    }
+    $llmDerivedFromEnv = $true
+    Write-Host '   已从 DASHSCOPE_API_KEY 派生 DOCQA_AI_LLM_*（进程作用域，未写 local.env）。'
+}
+
 # 凭据主密钥：模型连接的 API Key 以 AES-256-GCM 密文落库，网关与数据面必须共用同一把。
 # 本地首次启动自动生成一次并写回 gitignored 的 local.env；绝不回显、不入库、不写全局环境变量。
 # 生产部署应自行注入高熵值，本段只在缺失时补本地开发用的那一份。
@@ -194,9 +217,9 @@ if ((Get-Conf 'DOCQA_AI_LLM_PROVIDER') -eq 'openai') {
     $llmKey = Get-Conf 'DOCQA_AI_LLM_API_KEY'
     if (-not $llmKey -or $llmKey.StartsWith('CHANGE_ME')) {
         $llmOfflineFallback = $true
-        Write-Host '   注意：DOCQA_AI_LLM_PROVIDER=openai，但 DOCQA_AI_LLM_API_KEY 仍是占位符。'
+        Write-Host '   注意：DOCQA_AI_LLM_PROVIDER=openai，但 DOCQA_AI_LLM_API_KEY 仍是占位符，且本机未找到 DASHSCOPE_API_KEY。'
         Write-Host '         本次运行把数据面生成降级为 offline-extractive（抽取式，不调外部模型）。'
-        Write-Host '         要真实模型回答：填 key 后重跑，或在 local.env 显式设 DOCQA_AI_LLM_PROVIDER=offline。'
+        Write-Host '         要真实模型回答：设置 DASHSCOPE_API_KEY 后重跑（推荐，密钥不落盘），或把 key 填进 local.env。'
     }
 }
 
@@ -477,12 +500,18 @@ if ($WithLangfuse) {
 
 if ($Containers) {
     Write-Host '==> [5/8] -Containers：全栈 compose 起应用层（含 parse/vector worker 容器）'
+    # compose 侧该开关默认 false，而非容器分支在 [7/8] 会显式设为 true。
+    # 不在容器分支对齐的话，管理页的模型连接能力会被静默关掉，问答只会走离线抽取式 planner。
+    $env:DOCQA_AI_MODEL_CONNECTIONS_ENABLED = 'true'
     docker compose -f (Join-Path $root 'ops/docker-compose.infra.yml') `
                    -f (Join-Path $root 'ops/docker-compose.app.yml') up -d
     if ($LASTEXITCODE -ne 0) { throw 'compose 应用层启动失败；查看上面的输出。' }
     $gwPort = Get-Conf 'DOCQA_GATEWAY_PORT'; if (-not $gwPort) { $gwPort = '18080' }
     $webPort = Get-Conf 'DOCQA_WEB_PORT'; if (-not $webPort) { $webPort = '18090' }
     Write-Host ("  网关 http://127.0.0.1:{0} / 前端 http://127.0.0.1:{1}" -f $gwPort, $webPort)
+    if ($llmDerivedFromEnv) {
+        Write-Host ("  生成模型      {0}（密钥从 DASHSCOPE_API_KEY 派生，未写 local.env）" -f (Get-Conf 'DOCQA_AI_LLM_MODEL'))
+    }
     Write-Host '  推迟授权由 compose 的 grants-finalize 在 document-service 就绪后补齐。'
     return
 }
@@ -680,8 +709,10 @@ Write-Host ("  基础设施      MySQL {0} / PG {1} / Redis {2} / RMQ {3},{4},{5
     (Get-Conf 'DOCQA_ROCKETMQ_VIP_PORT'))
 Write-Host '  停止          scripts/stop-dev.ps1         （只停应用进程）'
 Write-Host '                scripts/stop-dev.ps1 -Infra （连容器一起停，卷保留）'
-if ($llmOfflineFallback) {
-    Write-Host '  生成模型      offline-extractive（LLM key 是占位符，本次不调外部模型）'
+if ($llmDerivedFromEnv) {
+    Write-Host ("  生成模型      {0}（密钥从 DASHSCOPE_API_KEY 派生，未写 local.env）" -f (Get-Conf 'DOCQA_AI_LLM_MODEL'))
+} elseif ($llmOfflineFallback) {
+    Write-Host '  生成模型      offline-extractive（LLM key 是占位符且本机无 DASHSCOPE_API_KEY，本次不调外部模型）'
 }
 Write-Host '  解析 / 向量 Worker 依赖 librocketmq 的 Linux 绑定，不在 Windows 侧启动；'
 Write-Host '                因此本步之后新上传的文档不会写入向量，检索命中数为 0。'

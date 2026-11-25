@@ -1,29 +1,29 @@
 # DocQA 本地基础设施（Docker Desktop / bridge）
 #
 # 用法（必须经 scripts/start-dev.ps1 启动，它会从 ops/env/local.env 注入插值变量）：
-#   docker compose -f ops/docker-compose.infra.yml up -d
+# docker compose -f ops/docker-compose.infra.yml up -d
 # 停止：scripts/stop-dev.ps1 -Infra（down 保留卷）或 docker compose ... stop
 #
 # 设计约束：
-#  1. 全部端口映射到 127.0.0.1 且采用 DocQA 专属段，与其他本地项目及 Windows 原生服务
-#     完全错开 —— 可同时启动，不再需要互斥切换。
-#  2. 端点固定为 127.0.0.1，不再依赖 WSL2 eth0 IP，因此不需要开机刷环境变量。
-#  3. RocketMQ broker 必须向 NameServer 注册「客户端可达」地址：bridge 模式下容器
-#     默认注册内网 IP，Windows 侧连不上。故 broker.conf 显式设 brokerIP1=127.0.0.1
-#     与 listenPort=20911，并把 listenPort / VIP(listenPort-2) 一并映射出去。
-#     NameServer 端口由 namesrv.properties 的 listenPort=19876 显式指定。
-#  4. MySQL 迁移仍由 document-service 启动时跑 Flyway（迁移单归主约定不变），
-#     此文件不引入 flyway 容器；账号授权由 start-dev.ps1 幂等重放。
-#  5. ${...} 变量来自 start-dev.ps1 注入的进程环境，compose 不读取凭据文件本身。
+# 1. 全部端口映射到 127.0.0.1 且采用 DocQA 专属段，与其他本地项目及 Windows 原生服务
+# 完全错开 —— 可同时启动，不再需要互斥切换。
+# 2. 端点固定为 127.0.0.1，不再依赖 WSL2 eth0 IP，因此不需要开机刷环境变量。
+# 3. RocketMQ broker 必须向 NameServer 注册「客户端可达」地址：bridge 模式下容器
+# 默认注册内网 IP，Windows 侧连不上。故 broker.conf 显式设 brokerIP1=127.0.0.1
+# 与 listenPort=20911，并把 listenPort / VIP(listenPort-2) 一并映射出去。
+# NameServer 端口由 namesrv.properties 的 listenPort=19876 显式指定。
+# 4. MySQL 迁移仍由 document-service 启动时跑 Flyway（迁移单归主约定不变），
+# 此文件不引入 flyway 容器；账号授权由 start-dev.ps1 幂等重放。
+# 5. ${...} 变量来自 start-dev.ps1 注入的进程环境，compose 不读取凭据文件本身。
 #
 # 镜像按 digest 固定：digest 取自主机
-#   docker image inspect --format '{{json .RepoDigests}}' <repo:tag>
+# docker image inspect --format '{{json .RepoDigests}}' <repo:tag>
 # 与 docker images --digests 的真实值，写成 repo:tag@sha256:...，
 # 并在行尾以注释保留原 tag，便于人工升级时核对。升级镜像须重新取 digest
 # 并同步本文件；docker 目录已纳入 dependabot 的 docker 生态跟踪。
 
 # 与 app.yml 统一项目名：否则 start-dev.ps1 分两步启动时 infra 落在
-# "docqa-infra"、app 落在 "docqa"，容器名冲突且网络隔离（P0-3 修复）。
+# "docqa-infra"、app 落在 "docqa"，容器名冲突且网络隔离。
 name: docqa
 
 # LangFuse web 与 worker 共用的存储/队列连接面；锚点避免两份 env 各自漂移。
@@ -58,7 +58,7 @@ x-langfuse-shared-env: &langfuse-shared-env
 
 services:
   mysql:
-    image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902  # 原 tag: mysql:8.4
+    image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902 # 原 tag: mysql:8.4
     container_name: docqa-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${DOCQA_DB_PASSWORD}
@@ -79,7 +79,7 @@ services:
       retries: 30
 
   postgres-vector:
-    image: pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a  # 原 tag: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a # 原 tag: pgvector/pgvector:pg16
     container_name: docqa-pg
     environment:
       POSTGRES_USER: docqa
@@ -97,7 +97,7 @@ services:
       retries: 30
 
   redis:
-    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499  # 原 tag: redis:7-alpine
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499 # 原 tag: redis:7-alpine
     container_name: docqa-redis
     ports:
       - "127.0.0.1:${DOCQA_REDIS_PORT}:${DOCQA_REDIS_CONTAINER_PORT}"
@@ -111,7 +111,7 @@ services:
       retries: 30
 
   minio:
-    image: milvusdb/minio:RELEASE.2024-12-18T13-15-44Z@sha256:1dce27c494a16bae114774f1cec295493f3613142713130c2d22dd5696be6ad3  # 原 tag: milvusdb/minio:RELEASE.2024-12-18T13-15-44Z
+    image: milvusdb/minio:RELEASE.2024-12-18T13-15-44Z@sha256:1dce27c494a16bae114774f1cec295493f3613142713130c2d22dd5696be6ad3 # 原 tag: milvusdb/minio:RELEASE.2024-12-18T13-15-44Z
     container_name: docqa-minio
     command: server /data --address ":${DOCQA_MINIO_CONTAINER_PORT}" --console-address ":${DOCQA_MINIO_CONTAINER_CONSOLE_PORT}"
     environment:
@@ -124,7 +124,7 @@ services:
       - minio-data:/data
 
   rocketmq-namesrv:
-    image: apache/rocketmq:5.3.1@sha256:d2b231c1b9204129e4f4dd65ec1521c81b8d6826e5f1fe8daa521dab0db5bf16  # 原 tag: apache/rocketmq:5.3.1
+    image: apache/rocketmq:5.3.1@sha256:d2b231c1b9204129e4f4dd65ec1521c81b8d6826e5f1fe8daa521dab0db5bf16 # 原 tag: apache/rocketmq:5.3.1
     container_name: docqa-rmq-namesrv
     ports:
       - "127.0.0.1:${DOCQA_ROCKETMQ_NAMESRV_PORT}:${DOCQA_ROCKETMQ_NAMESRV_PORT}"
@@ -141,7 +141,7 @@ services:
       retries: 30
 
   rocketmq-broker:
-    image: apache/rocketmq:5.3.1@sha256:d2b231c1b9204129e4f4dd65ec1521c81b8d6826e5f1fe8daa521dab0db5bf16  # 原 tag: apache/rocketmq:5.3.1
+    image: apache/rocketmq:5.3.1@sha256:d2b231c1b9204129e4f4dd65ec1521c81b8d6826e5f1fe8daa521dab0db5bf16 # 原 tag: apache/rocketmq:5.3.1
     container_name: docqa-rmq-broker
     depends_on:
       rocketmq-namesrv:
@@ -167,7 +167,7 @@ services:
   # 复用 postgres-vector（独立库 langfuse，start-dev 幂等建库）与 minio（bucket langfuse）。
   # ---------------------------------------------------------------------------
   langfuse-web:
-    image: langfuse/langfuse:3@sha256:314f4d79d6761299e4299dc646943f01bfabbc1daff286ab818245549aa5e9d6  # 原 tag: langfuse/langfuse:3
+    image: langfuse/langfuse:3@sha256:314f4d79d6761299e4299dc646943f01bfabbc1daff286ab818245549aa5e9d6 # 原 tag: langfuse/langfuse:3
     container_name: docqa-langfuse-web
     profiles: ["langfuse"]
     depends_on:
@@ -205,7 +205,7 @@ services:
       retries: 30
 
   langfuse-worker:
-    image: langfuse/langfuse-worker:3@sha256:02c87eda9a9c6be5b3bf9a78041db86f06bad568d9dd434be3b3c1159f8d0579  # 原 tag: langfuse/langfuse-worker:3
+    image: langfuse/langfuse-worker:3@sha256:02c87eda9a9c6be5b3bf9a78041db86f06bad568d9dd434be3b3c1159f8d0579 # 原 tag: langfuse/langfuse-worker:3
     container_name: docqa-langfuse-worker
     profiles: ["langfuse"]
     depends_on:
@@ -227,7 +227,7 @@ services:
       retries: 30
 
   langfuse-clickhouse:
-    image: clickhouse/clickhouse-server:24.3@sha256:85b97f63dcfff47790d26bb5d5801637aaddb2b93e5e9aee27a686c2fb2b9916  # 原 tag: clickhouse/clickhouse-server:24.3
+    image: clickhouse/clickhouse-server:24.3@sha256:85b97f63dcfff47790d26bb5d5801637aaddb2b93e5e9aee27a686c2fb2b9916 # 原 tag: clickhouse/clickhouse-server:24.3
     container_name: docqa-langfuse-clickhouse
     profiles: ["langfuse"]
     ports:
@@ -250,7 +250,7 @@ services:
       retries: 30
 
   langfuse-redis:
-    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499  # 原 tag: redis:7-alpine
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499 # 原 tag: redis:7-alpine
     container_name: docqa-langfuse-redis
     profiles: ["langfuse"]
     ports:

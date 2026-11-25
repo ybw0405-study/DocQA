@@ -189,7 +189,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("DOCQA_LLM_ALLOW_PRIVATE"),
     )
 
-    # rerank 的能力面与 embedding / 生成不同：E46 实测它不在 OpenAI 兼容面上，
+    # rerank 的能力面与 embedding / 生成不同：实测它不在 OpenAI 兼容面上，
     # 请求与响应都是原生形态，因此取值命名为 dashscope 而不是 openai。
     rerank_provider: Literal["offline", "dashscope"] = "offline"
     rerank_model: str = Field(default="offline-noop", min_length=1, max_length=64)
@@ -340,7 +340,7 @@ class Settings(BaseSettings):
         # 向量空间守卫。放在额度守卫之后——先问「这次能不能花钱」，再问「花完写到哪张表」。
         # 真实 embedding 写进 offline 表是**无信号**的（`metadata->>'embedding_model'` 没有任何读取点，
         # HNSW 按 vector_cosine_ops 算距离、不知道向量来自哪个模型），所以只能在启动期拦住。
-        # 名字与模型是否匹配归运维面（S9），本守卫只消掉最容易踩的那一种组合。
+        # 名字与模型是否匹配归运维面，本守卫只消掉最容易踩的那一种组合。
         if self.embedding_provider != "offline" and self.pg_table == OFFLINE_VECTOR_TABLE:
             raise ValueError(
                 "pg_table must point at a dedicated vector space when embedding_provider is not offline; "

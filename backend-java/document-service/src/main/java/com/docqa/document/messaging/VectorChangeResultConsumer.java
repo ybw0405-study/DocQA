@@ -71,7 +71,7 @@ public class VectorChangeResultConsumer implements MessageListenerConcurrently {
                         message.getTopic(),
                         message.getMsgId(),
                         ex);
-                // P1-8：释放原子占位，允许重投重新处理
+                // 失败时释放原子占位，允许重投重新处理
                 idempotencyMarker.release(message.getTopic(), message.getMsgId());
                 return ConsumeConcurrentlyStatus.RECONSUME_LATER;
             }

@@ -51,7 +51,7 @@ class ActuatorManagementConfigTest {
         assertThat(health.getGroup().get("liveness").getInclude())
                 .as("liveness 只看进程自身，不因下游抖动被杀")
                 .containsExactlyInAnyOrder("livenessState", "ping");
-        // DQ-3 后半：readiness 追加 mq / minio 两个真实依赖探针，与 Python /health/ready 同口径。
+        // readiness 追加 mq / minio 两个真实依赖探针，与 Python /health/ready 同口径。
         assertThat(health.getGroup().get("readiness").getInclude())
                 .as("readiness 探真实依赖（db / redis / mq / minio），下游不可用时如实摘流")
                 .containsExactlyInAnyOrder("readinessState", "db", "redis", "mq", "minio");

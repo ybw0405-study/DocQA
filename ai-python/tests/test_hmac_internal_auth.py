@@ -93,7 +93,7 @@ def test_signature_covers_method_and_path() -> None:
 
 
 def test_verify_rejects_replayed_nonce() -> None:
-    """P1-6 回归：nonce 一次性——同一签名请求第二次校验必须拒绝（防重放）。"""
+    """nonce 一次性——同一签名请求第二次校验必须拒绝（防重放）。"""
     headers = sign(SECRET, "POST", "/agent/ask", b'{"q":1}')
     args = (
         SECRET,
@@ -184,3 +184,22 @@ def test_metrics_defaults_are_loopback_distinct_and_disabled() -> None:
     assert settings.metrics_exposed is False  # 生产默认不暴露，语义不变
     assert settings.metrics_host == "127.0.0.1"
     assert settings.metrics_port != settings.api_port
+
+
+def test_cross_validate_java_vector() -> None:
+    """与 Java HmacSignerTest 同向量交叉验证。
+
+    任一侧改动规范串或哈希算法，本测试与
+    backend-java/.../security/HmacSignerTest.java 会同时失败。
+    """
+    headers = sign(
+        secret="cross-validate-secret",
+        method="POST",
+        path="/agent/ask",
+        body=b'{"question":"hi"}',
+        timestamp=1_700_000_000,
+        nonce="nonce-fixed-001",
+    )
+    assert headers[TIMESTAMP_HEADER] == "1700000000"
+    assert headers[NONCE_HEADER] == "nonce-fixed-001"
+    assert headers[SIGNATURE_HEADER] == ("472e26a3a1140e812d3f6d39eca02a8ceee8beb22727dccf83313bce2f49e44f")

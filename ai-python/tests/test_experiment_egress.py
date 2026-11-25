@@ -50,7 +50,7 @@ class RecordingReranker:
 
 
 class ExplodingLedger:
-    """账本自身读写失败：装饰器必须把 BudgetUnavailable 原样交给调用点翻译（的竞态形态之一）。"""
+    """账本自身读写失败：装饰器必须把 BudgetUnavailable 原样交给调用点翻译（竞态形态之一）。"""
 
     async def snapshot(self):  # pragma: no cover - must not be reached
         raise AssertionError("the decorators must not read a snapshot")

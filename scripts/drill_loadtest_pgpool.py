@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""批次 4 / 性能压测脚本骨架 — 重点：DocQA PG 连接池（B2）。
+"""阶段四：性能压测脚本骨架 — 重点：DocQA PG 连接池。
 
 背景：修复前 `open_pool()` 全仓零调用，每次问答新建 2 条 PG 连接，
-几十 QPS 即打满 max_connections（方案 B2 / 修复执行报告 1.2）。
+几十 QPS 即打满 max_connections（见修复执行报告 1.2）。
 本压测要验证「单一组装根接线后，并发上升时 PG 连接数由池封顶、不随请求线性增长」。
 
 观测指标：
@@ -148,7 +148,7 @@ def run_level(level: int, args: argparse.Namespace) -> dict:
 def run(args: argparse.Namespace) -> int:
     r = LoadResult(execute=args.execute)
     print("=" * 72)
-    print("批次4 PG 连接池压测骨架 | execute =", args.execute)
+    print("阶段四 PG 连接池压测骨架 | execute =", args.execute)
     print("并发梯度:", args.concurrency, "| 每级时长:", args.duration, "s")
     print("观测指标:", ", ".join(METRICS))
     print("=" * 72)
@@ -175,7 +175,7 @@ def run(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="DocQA 批次4 PG 连接池压测骨架（默认 dry-run）")
+    p = argparse.ArgumentParser(description="DocQA 阶段四：PG 连接池压测骨架（默认 dry-run）")
     p.add_argument("--execute", action="store_true")
     p.add_argument("--ask-url", default="http://127.0.0.1:8000/agent/ask")
     p.add_argument("--dsn", default="")

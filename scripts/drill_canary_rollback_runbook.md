@@ -1,4 +1,4 @@
-# 批次 4 / 灰度与回滚演练 runbook — DocQA（可执行步骤骨架）
+# 阶段四：灰度与回滚演练 runbook — DocQA（可执行步骤骨架）
 
 > **诚实边界**：本机**没有真实生产环境、没有真实业务数据、没有真实凭据**，
 > **未做真实灰度 / 真实回滚演练**，没有产生可归档的演练记录。本文件只交付
@@ -11,7 +11,7 @@
 
 | # | 检查 | 命令 / 依据 |
 | --- | --- | --- |
-| P1 | 制品按 **digest** 可部署（G17），版本单一来源 | `docker inspect --format '{{index .RepoDigests 0}}' <image>`；`pom.xml`/`package.json`/`pyproject.toml` 版本与 CHANGELOG/tag 一致 |
+| P1 | 制品按 **digest** 可部署，版本单一来源 | `docker inspect --format '{{index .RepoDigests 0}}' <image>`；`pom.xml`/`package.json`/`pyproject.toml` 版本与 CHANGELOG/tag 一致 |
 | P2 | 本轮修复已按报告第 5 节顺序发布（**写侧强制 tenant_id 的代码先上线**） | `修复执行报告.md` 第 5 节 |
 | P3 | 回填已完成且 `unresolvedDocuments` / `emptyTenantRows` 均为 0 | `python -m docqa_ai.maintenance.backfill_tenant_id --mapping ...`（回填后复跑） |
 | P4 | `DOCQA_ENV=prod` + `DOCQA_AI_INTERNAL_TOKEN` 已注入，`api_host` / `/metrics` 暴露面符合拓扑 | 生产守卫 fail-fast；`CONTRIBUTING.md` |

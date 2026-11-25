@@ -138,7 +138,7 @@ def lexical_coverage(content: str, surfaces: Sequence[str]) -> float:
     """查询切分片段在块正文中的覆盖比例，即 lexical-coverage-v1 的重排键。
 
     与词法召回通道是否实际执行无关：重排用的是同一套切分口径。子串判定两侧都折叠大小写，
-    与 PG 的 simple 配置一致（E38）。它只能整理次序，修不掉跨词邻接造成的假阳性（的 E5）。
+    与 PG 的 simple 配置一致。它只能整理次序，修不掉跨词邻接造成的假阳性。
     """
 
     if not surfaces:
@@ -279,10 +279,16 @@ class RetrievalService:
             with self._tracer.start_as_current_span("rag.rerank") as rerank_span:
                 rerank_span.set_attribute("reranker", RERANKER_NAME)
                 ranked = sorted(candidates, key=lambda item: -lexical_coverage(item.content, lexical.surfaces))
-                kept = ranked[:output_limit]
+                # rerank 前先留一个比 output_limit 更大的候选池，让 rerank 能从更大范围
+                # 捞回被向量/词法排序误杀的块；rerank provider 的 top_n=len(pool) 全量返回。
+                # 池大小取 output_limit 的 3 倍且不少于 12，受候选总数与 rerank 批量上限约束。
+                pool_size = min(len(ranked), max(output_limit * 3, 12))
+                kept = ranked[:pool_size]
+                rerank_span.set_attribute("retrieval.rerank_pool", len(kept))
                 rerank_span.set_attribute("retrieval.kept", len(kept))
+                rerank_span.set_attribute("retrieval.output_limit", output_limit)
                 rerank_span.set_attribute("retrieval.dropped", len(ranked) - len(kept))
-                # 掩码提到名次决定之前发生。它本来就要对 kept 逐篇做，换的只是时机，
+                # 掩码提到名次决定之前发生。它本来就要对候选逐篇做，换的只是时机，
                 # 因此外发给第三方的每一串正文都已经过 `pii-v2`；落库与对外的 content 仍是掩码后的同一份。
                 masked_items = [mask_text(candidate.content) for candidate in kept]
                 order, rerank_fallback = await self._rerank(question, masked_items, rerank_span, deadline)
@@ -293,7 +299,9 @@ class RetrievalService:
             chunks: list[RetrievedChunk] = []
             categories: set[str] = set()
             masked_chunks = 0
-            for position, source in enumerate(order):
+            # rerank 正常返回时按 rerank 次序取前 output_limit；降级时 order 为 0..len-1，
+            # 取前 output_limit 即融合次序的 top_k（与 final 一致）。
+            for position, source in enumerate(order[:output_limit]):
                 candidate = kept[source]
                 masked = masked_items[source]
                 if masked.count:
@@ -374,7 +382,7 @@ class RetrievalService:
         phrases = extract_phrases(question)
         surfaces = tuple(phrase.surface for phrase in phrases)
         with self._tracer.start_as_current_span("lexical.query") as span:
-            # 实际发出的词位数必须可观测，否则事后无法区分「没召回」与「没参与」（(c)）
+            # 实际发出的词位数必须可观测，否则事后无法区分「没召回」与「没参与」
             span.set_attribute("lexical.phrase_count", len(phrases))
             lexical_query = build_lexical_query(question)
             effective_chars = sum(len(phrase.surface) for phrase in phrases)
@@ -443,7 +451,7 @@ class RetrievalService:
         if timeout <= 0.05:
             return self._rerank_degrade(span, size, "deadline expired before rerank")
         # 查询侧的掩码由调用方完成（`agent/service.py` 传入的就是掩码后的问题），但外发红线不能依赖调用方自觉：
-        # `mask_text` 幂等（E66 的探针断言），重掩一次对已掩码文本是恒等的，对未掩码文本则堵死最后的缺口。
+        # `mask_text` 幂等（有探针断言），重掩一次对已掩码文本是恒等的，对未掩码文本则堵死最后的缺口。
         query = mask_text(question).masked
         span.set_attribute("rerank.model", provider.model)
         span.set_attribute("rerank.document_count", size)
@@ -473,7 +481,7 @@ class RetrievalService:
 
     @staticmethod
     def _rerank_degrade(span: Span, size: int, reason: str) -> tuple[list[int], bool]:
-        """与  同形：rerank 是增量能力，它挂掉等于退回融合次序，对外响应体一个字段都不变。"""
+        """rerank 是增量能力：它挂掉等于退回融合次序，对外响应体一个字段都不变。"""
 
         span.set_attribute("rerank_fallback", True)
         log_event(LOGGER, logging.WARNING, reason, step="retrieval", operation="rerank", status="degraded")
@@ -555,6 +563,6 @@ class RetrievalService:
         return vectors[0]
 
     async def aclose(self) -> None:
-        """关闭共享 httpx client（CON-2）；offline / noop 替身没有 aclose，安全跳过。"""
+        """关闭共享 httpx client；offline / noop 替身没有 aclose，安全跳过。"""
         await _maybe_aclose(self._embedder)
         await _maybe_aclose(self._reranker)

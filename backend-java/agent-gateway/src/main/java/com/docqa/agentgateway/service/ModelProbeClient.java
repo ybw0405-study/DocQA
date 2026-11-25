@@ -77,7 +77,7 @@ public class ModelProbeClient {
     }
 
     /**
-     * P1-5 DNS rebinding 防护：用校验期固定的 IP 建连，而不是让 Reactor Netty 在连接时
+     * DNS rebinding 防护：用校验期固定的 IP 建连，而不是让 Reactor Netty 在连接时
      * 重新解析域名（那样校验后域名可改指内网）。resolver 把该 host 永远解析到 pinnedIp。
      */
     private WebClient pinnedClient(String pinnedIp) {
@@ -132,7 +132,7 @@ public class ModelProbeClient {
             return ModelProbeData.failure(ModelProbeFailure.CREDENTIAL_MISSING, "这条连接还没有保存 API Key");
         }
         String url = endpoint.baseUrl() + "/models";
-        // P1-5：配置了 pins 校验时，用固定 IP 的 client 出网；allowPrivate=true 时 pinnedIp 为空，
+        // 配置了 pins 校验时，用固定 IP 的 client 出网；allowPrivate=true 时 pinnedIp 为空，
         // 沿用默认 client（本地开发场景，host 已显式放行）。
         WebClient probeClient = endpoint.pinnedIp() == null || endpoint.pinnedIp().isBlank()
                 ? client : pinnedClient(endpoint.pinnedIp());

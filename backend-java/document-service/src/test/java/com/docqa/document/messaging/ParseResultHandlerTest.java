@@ -91,7 +91,7 @@ class ParseResultHandlerTest {
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(0)).get());
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        // P1-8：原子占位默认成功（首次处理），与原 hasKey=false 语义一致
+        // 原子占位默认成功（首次处理），与原 hasKey=false 语义一致
         lenient().when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class)))
                 .thenReturn(true);
     }
@@ -159,7 +159,7 @@ class ParseResultHandlerTest {
         assertThat(event.getValue().indexVersion()).isEqualTo("v1");
         assertThat(event.getValue().documentId()).isEqualTo(DOCUMENT_ID);
         assertThat(event.getValue().userId()).isEqualTo(USER_ID);
-        // DQ-1：发布前必须先把待确认删除落进 outbox，发布失败才有重投依据。
+        // 发布前必须先把待确认删除落进 outbox，发布失败才有重投依据。
         verify(cleanupTasks).enqueue(TENANT_ID, DOCUMENT_ID, USER_ID, "v1", "DELETE_VERSION", NOW);
     }
 
@@ -269,7 +269,7 @@ class ParseResultHandlerTest {
 
     @Test
     void aRedeliveredMessageIsSkippedBeforeAnyDatabaseRead() throws Exception {
-        // P1-8：重投时原子占位失败（返回 false）表示已处理，应在读库前跳过
+        // 重投时原子占位失败（返回 false）表示已处理，应在读库前跳过
         when(valueOperations.setIfAbsent(eq("mq:idem:parse.completed:" + MESSAGE_ID),
                 eq("1"), eq(Duration.ofDays(7)))).thenReturn(false);
 

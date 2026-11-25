@@ -239,7 +239,7 @@ class ParseWorker:
             raise ParseJobError(INVALID_DOCUMENT, _CHECKSUM_FAILED, retryable=False)
 
         # 解析是 CPU/IO 密集的同步调用，直接放在事件循环里会冻结信号与超时控制；
-        # 与上面的 _read 保持一致，交给线程池执行（C-6）。
+        # 与上面的 _read 保持一致，交给线程池执行。
         document = await asyncio.to_thread(self._parser.parse, data, event.content_type, event.file_name)
         text_chunks = chunk_document(
             document.pages,
@@ -306,7 +306,7 @@ class ParseWorker:
         # 落库的 content 与 content_hash 仍是原文：读侧掩码在召回之后（`rag/service.py`），本条只管离开本机的字节。
         payload = [mask_text(text).masked for text in texts]
         # 配置值表达「一次愿意提交多少行」，Provider 自报值表达「端点最多收多少行」，
-        # 取二者较小值：E45 实测真实端点 11 行即 400，而默认配置是 32。
+        # 取二者较小值：实测真实端点 11 行即 400，而默认配置是 32。
         batch_size = min(self._settings.embedding_batch_size, self._embedder.max_batch_rows)
         vectors: list[tuple[float, ...]] = []
         for start in range(0, len(payload), batch_size):
@@ -349,7 +349,7 @@ class ParseWorker:
 
 
 def _build_embedder(settings: Settings, redis_client: Redis) -> EmbeddingProvider:
-    """写侧只有一个外呼点：离线分支原样返回（不构造账本、一个 Redis 键都不写，），切真即套额度门禁。"""
+    """写侧只有一个外呼点：离线分支原样返回（不构造账本、一个 Redis 键都不写），切真即套额度门禁。"""
 
     if settings.embedding_provider == "offline":
         from docqa_ai.providers.embeddings import OfflineEmbeddingProvider
@@ -469,7 +469,7 @@ def main() -> int:
     except KeyboardInterrupt:
         pass
     finally:
-        # DQ-4：loop.stop() 只停调度；mq.py 用 run_coroutine_threadsafe 投递的解析任务可能仍在途。
+        # loop.stop() 只停调度；mq.py 用 run_coroutine_threadsafe 投递的解析任务可能仍在途。
         # 先给在途任务一个收口窗口（带超时），再按序关闭共享资源，避免幽灵任务访问已关闭的
         # publisher/redis 并打出 "Task was destroyed but it is pending!"。
         consumer.shutdown()

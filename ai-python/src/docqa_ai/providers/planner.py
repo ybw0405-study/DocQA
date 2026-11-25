@@ -282,7 +282,7 @@ _JSON_SIMPLE_ESCAPES = {
 
 
 class _AnswerDeltaReader:
-    """从流式 JSON 文本里增量抽取 `answer` 字段的可见字符（的逐 token 形态）。
+    """从流式 JSON 文本里增量抽取 `answer` 字段的可见字符（逐 token 形态）。
 
     为什么不把每个 chunk 直接吐给前端：模型输出是 JSON，`{"action":"final",` 这些结构
     字符不是答案。另有一条安全理由——**确认 `action == "final"` 之后才开始吐**，工具

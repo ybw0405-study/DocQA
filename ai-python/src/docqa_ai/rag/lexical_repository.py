@@ -47,12 +47,12 @@ def build_lexical_search_sql(table: str, scope_count: int, *, tenant_scoped: boo
 
     两个常量各出现两次：`to_tsvector(...)` 在 `WHERE` 与 `ORDER BY` 的 `ts_rank` 里必须同形，
     `to_tsquery(...)` 在同样两处引用同一个绑定值。理由不是风格——只按 `vector_id` 排时密集命中
-    会被规划成不使用 GIN 的主键顺序扫描（E30），而这一形态在零命中、窄授权、密集命中三种分布下
-    都稳定走 `BitmapAnd(docver, lexical)`（E31）。授权谓词与向量通道逐字同形，词法通道不单独
+    会被规划成不使用 GIN 的主键顺序扫描，而这一形态在零命中、窄授权、密集命中三种分布下
+    都稳定走 `BitmapAnd(docver, lexical)`。授权谓词与向量通道逐字同形，词法通道不单独
     构造范围。
 
     `tenant_scoped=True` 时在 WHERE 最前追加 `tenant_id = %s`，与 `lexical_params` 的同名开关
-    必须成对传入，否则占位符与参数错位（由 MAINT-1 的 SQL 契约测试对账）。
+    必须成对传入，否则占位符与参数错位（由 SQL 契约测试对账）。
     """
     if not _TABLE_NAME.fullmatch(table):
         raise ValueError("invalid lexical table name")
@@ -161,7 +161,7 @@ _QUOTED_LEXEME = re.compile(r"'([^']*)'")
 def phrase_surfaces(lexical_query: str) -> tuple[str, ...]:
     """把已编译的 tsquery 还原成词组原文片段：`'a' <-> 'b'` → `ab`、`'config.py'` → `config.py`。
 
-    引号内不可能再出现引号（`build_lexical_query` 的发出口径，E23），所以按引号对提取是确定的。
+    引号内不可能再出现引号（`build_lexical_query` 的发出口径），所以按引号对提取是确定的。
     融合层与覆盖度（`lexical-coverage-v1`）都用它，不再各自解析一遍。
     """
     surfaces: list[str] = []

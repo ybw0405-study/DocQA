@@ -584,7 +584,7 @@ document-service，复用源码解析范式）一次性钉死双端字段集合�
 
 验证：`mvn -o test -pl document-service -am -Dtest=ParseWorkerProtocolContractTest` → 2 tests 全绿。
 
-### 5.18 真实第二租户仓储级验收（2026-11-19，收官批次）
+### 5.18 真实第二租户仓储级验收（2026-11-19，收官）
 
 此前所有隔离测试都是单服务 mock：仓库契约测试只比对 SQL **文本**，
 `TenantIsolationContractTest` 也只检查「源码里出现 tenant_id 字符串」。文本对了不代表 MySQL
@@ -776,7 +776,7 @@ e2e 不属 CI」，但 `mvn verify` 实际会跑 `MigrationOnRealMysqlTest`：Gi
 D4 全链 HTTP e2e 不引入；P2 / P3 / P4 与 §6 商业层 4 条仍属路线图与业务拍板。
 Branch Protection 因私有仓库免费套餐 403 无法启用，非代码缺口。
 
-> **状态更新（2026-11-19 后续批次）**：仓库已转 **public** 并启用 Branch Protection
+> **状态更新（2026-11-19 后续更新）**：仓库已转 **public** 并启用 Branch Protection
 > （PR + 三端 CI required checks + `enforce_admins`），上述 403 限制已消解；另补做了
 > 本地全套双租户 HTTP 演练（不进 CI、不改产品版本），报告见
 > `docs/00-infra/dual-tenant-e2e-drill.md`。本节保留 2.1.0 当时的原始判断，不改写历史叙述。

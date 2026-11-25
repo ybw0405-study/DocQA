@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""批次 4 / 跨进程全链 e2e 脚本骨架 — DocQA。
+"""阶段四：跨进程全链 e2e 脚本骨架 — DocQA。
 
 目标链路（真实环境才有意义）：
   Java 控制面上传文档 -> RocketMQ parse-requested(带 tenantId 信封) ->
@@ -101,7 +101,7 @@ def http_json(method: str, url: str, body: dict | None, headers: dict, timeout: 
 def run(args: argparse.Namespace) -> int:
     r = Result(execute=args.execute)
     print("=" * 72)
-    print("批次4 跨进程全链 e2e 骨架 | execute =", args.execute)
+    print("阶段四 跨进程全链 e2e 骨架 | execute =", args.execute)
     if not args.execute:
         print("DRY-RUN：仅列出阶段与断言，不发起任何请求。加 --execute 才会连真实服务。")
     print("=" * 72)
@@ -152,7 +152,7 @@ def run(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="DocQA 批次4 跨进程全链 e2e 骨架（默认 dry-run）")
+    p = argparse.ArgumentParser(description="DocQA 阶段四：跨进程全链 e2e 骨架（默认 dry-run）")
     p.add_argument("--execute", action="store_true", help="真正连服务；默认 dry-run")
     p.add_argument("--java-base-url", default="http://127.0.0.1:8080")
     p.add_argument("--ai-base-url", default="http://127.0.0.1:8000")

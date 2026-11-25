@@ -16,11 +16,11 @@ import org.springframework.stereotype.Component;
  * 注册接口的固定窗口限流。必须跨实例共享，所以走 Redis。
  *
  * <p>key 由「解析后客户端 IP 指纹 + 用户名指纹 + 窗口起点」三段组成：所有流量经网关转发时
- * remoteAddr 会塌缩成同一个网关地址，只按 IP 会让全站共享一份配额（P1-1）；第二维保证任何
+ * remoteAddr 会塌缩成同一个网关地址，只按 IP 会让全站共享一份配额；第二维保证任何
  * 单一维度塌缩都不会把配额退化成全局。原始地址与用户名都不进 Redis，只写 SHA-256 前缀。
  *
  * <p>INCR 与 EXPIRE 放在同一段 Lua 里：非原子的「首次 INCR 成功、随后 EXPIRE 失败」会让
- * key 永远没有 TTL，注册配额被永久耗尽（C-1）。
+ * key 永远没有 TTL，注册配额被永久耗尽。
  */
 @Component
 public class RegistrationRateLimiter {

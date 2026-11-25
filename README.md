@@ -18,27 +18,33 @@ LangGraph 决策循环 + pgvector 混合检索（向量 + 词法）+ rerank + �
 工具调用协议支持 json / native tool_calls 双通道（`DOCQA_AI_TOOL_PROTOCOL`，默认 json）。
 附带课表导入与提醒等学习工作台功能（见[产品指南](docs/product-guide.md)）。
 
-## 真实模型评测（2026-11-24，DashScope）
+## 真实模型评测（2026-11-25，DashScope，跨文档）
 
 | 指标 | 数值 | 口径 |
 |---|---|---|
-| recall@1 | 0.976 | **自建 21 题标注集**（合成 8 主题 + 劳动法 6 细粒度块 + 真实法条 8 块），`text-embedding-v3` + `gte-rerank-v2`；样本小，不代表泛化能力 |
+| recall@1 | 0.929 | **自建 21 题标注集 + 2 份跨文档干扰文档 + 3 条负例**，`text-embedding-v3` + `gte-rerank-v2`；样本小，不代表泛化能力 |
 | recall@3 / @5 | 1.0 / 1.0 | 同上 |
-| MRR / nDCG@5 | 1.0 / 0.996 | 同上；含同法条「饮酒 vs 醉酒」「补偿 vs 双倍赔偿」细粒度排序压力对 |
+| MRR / nDCG@5 | 0.976 / 0.979 | 同上；跨文档 hard negative 下 `labor-q2`「经济补偿」被干扰块挤下 R@1（正确块落 top2） |
 | faithfulness 均分 | 1.0（门禁 ≥ 0.8） | LLM judge，生成 + 引用核对（nightly 真模型） |
-| recall@1（离线基线） | 0.833 | 特征哈希向量（`eval/baselines/retrieval.json`），与语义检索不同空间，仅作链路回归基线 |
+| recall@1（离线基线） | 0.786 | 特征哈希向量（`eval/baselines/retrieval.json`），与语义检索不同空间，仅作链路回归基线 |
 
 复现：`python -m docqa_ai.eval --suite all`（真实 provider 环境变量见下）；
-2026-11-24 本地真实复现与 nightly 同口径一致。
-**数据集仍是内置标注集、样本量不足以证明泛化能力**；评测目前是每查询在单文档 scope 内检索，
-候选池无干扰文档，测不到跨文档召回这一 RAG 难点。真实 PDF 课件黄金集（30~50 条含「文档无答案」
-负例）与跨文档 hard negative 扩充中，负例误判率与 offline/real 对照表会更新到
+2026-11-25 本地真实复现与 nightly 同口径一致。
+**数据集仍是内置标注集、样本量不足以证明泛化能力**；评测已覆盖跨文档召回（候选池混入
+干扰文档）与「文档无答案」负例（3 条，观察误召回率与 top_score 分布）。真实 PDF 课件
+黄金集（30~50 条）扩充中，offline/real 对照表见
 [docs/02-design/retrieval-eval.md](docs/02-design/retrieval-eval.md)。
+
+> 口径说明：recall 系列在全语料 scope（含跨文档干扰文档）下测得，未启用词法通道（纯向量 + rerank）；
+> faithfulness 的 judge 与生成模型当前同源（qwen-plus），self-judging 存在系统性宽容偏差，
+> 独立 judge 模型的对照结果将随黄金集扩充一并更新。
 
 > **开箱默认离线**：`offline` provider 为特征哈希向量 + 抽取式回答 + noop rerank，
 > 零外呼、零成本，但**不是语义检索**。切真需设 `DOCQA_AI_EMBEDDING_PROVIDER` /
 > `DOCQA_AI_LLM_PROVIDER` / `DOCQA_AI_RERANK_PROVIDER`（前缀是 `DOCQA_AI_`）并配
 > `DOCQA_AI_EXPERIMENT_BUDGET > 0`，键集合见 [`ops/env/local.env.example`](ops/env/local.env.example)；
+> 生成模型也可只设机器环境的 `DASHSCOPE_API_KEY`，启动脚本会在进程作用域派生
+> `DOCQA_AI_LLM_*`（容器模式同样生效），无需把 key 写进 local.env。
 > 切真后对已有文档**重建索引**（哈希向量与语义向量不在同一空间）。
 > 三套变量面（服务 `DOCQA_AI_*` / 评测 `DOCQA_EVAL_*` + 无前缀 / nightly secrets）不要混用。
 
@@ -117,7 +123,7 @@ Docker 多阶段 + GHCR / GitHub Actions 三端门禁 + 真库契约测试。
 ## 已知限制与取舍
 
 - **扫描件 / 图片型 PDF 暂不支持**：解析器覆盖文本型 PDF / Word / PPTX / TXT，无 OCR 引擎，扫描件需先经 OCR 转文本再导入。
-- **分片上传支持并发分片合并，暂不支持断点续传**（断网重连需重新开始）。
+- **断点续传依赖分片会话有效期**：上传中断后重连可续传（复用未过期分片会话、自动补签缺失分片）；会话过期后需重新发起。
 - 默认离线占位、LangGraph 两节点循环的依赖取舍、RAG 正文纯文本渲染（零 XSS 面）等逐条说明见
 [产品指南](docs/product-guide.md)与 [docs/02-design/](docs/02-design/)。
 迁移注释中的历史阶段代号见 [索引](docs/02-design/migration-comment-codes.md)。

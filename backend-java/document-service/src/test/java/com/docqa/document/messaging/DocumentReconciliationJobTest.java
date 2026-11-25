@@ -165,7 +165,7 @@ class DocumentReconciliationJobTest {
 
         job.abortStaleReindex();
 
-        // DQ-1：先落 outbox 再发消息，发布失败不会让旧版本向量永久残留。
+        // 先落 outbox 再发消息，发布失败不会让旧版本向量永久残留。
         verify(cleanupTasks).enqueue(TENANT_ID, DOCUMENT_ID, USER_ID, "v2", "DELETE_VERSION", NOW);
     }
 

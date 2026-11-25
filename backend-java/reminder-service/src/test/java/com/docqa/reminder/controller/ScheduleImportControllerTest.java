@@ -194,7 +194,7 @@ class ScheduleImportControllerTest {
         // 文本 Part 是表单字段，容器把它暴露成请求参数，所以缺失形态与 query 参数同判据（400）。
         // 415 有两种来源：「声称是 multipart 但信封解析不开」（MultipartException → REM-VALIDATION-003，
         // 本地 advice）与「顶层 Content-Type 根本不是 multipart」（全局 advice → COM-UNSUPPORTED_MEDIA-001，
-        // R-02 修复后不再落 500），后者在本类末尾钉住。
+        // 修复后不再落 500），后者在本类末尾钉住。
         mockMvc.perform(multipart(IMPORT_PATH)
                         .file(new MockMultipartFile("file", "schedule.ics", "text/calendar", ICS))
                         .part(part("fallbackTimezone", ZONE))
@@ -281,7 +281,7 @@ class ScheduleImportControllerTest {
 
     @Test
     void nonMultipartRequestContentTypeIsRejectedAsUnsupportedMedia() throws Exception {
-        // R-02 已修复：顶层 Content-Type 非 multipart 时，HttpMediaTypeNotSupportedException
+        // 已修复：顶层 Content-Type 非 multipart 时，HttpMediaTypeNotSupportedException
         // 由 GlobalExceptionHandler 的专用 handler 接住，返回 415 COM-UNSUPPORTED_MEDIA-001，
         // 不再落 Exception.class 兜底成 500。与信封解析不开的 REM-VALIDATION-003 分属两条路径。
         mockMvc.perform(post(PREVIEW_PATH)

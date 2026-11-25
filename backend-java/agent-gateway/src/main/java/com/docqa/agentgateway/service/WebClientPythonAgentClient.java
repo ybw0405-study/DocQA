@@ -8,6 +8,7 @@ import com.docqa.agentgateway.config.PythonProperties;
 import com.docqa.agentgateway.dto.PythonAskRequest;
 import com.docqa.agentgateway.dto.PythonAskResponse;
 import com.docqa.agentgateway.dto.PythonAuditEvent;
+import com.docqa.agentgateway.security.HmacRequestSigner;
 import com.docqa.common.error.ErrorCode;
 import com.docqa.common.metrics.BusinessMetrics;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -113,11 +114,14 @@ public class WebClientPythonAgentClient implements PythonAgentClient {
         long startedAt = System.nanoTime();
         try {
             Flux<ServerSentEvent<String>> events = webClient.post()
-                    .uri("/agent/ask/stream")
+                    .uri(STREAM_ENDPOINT)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM_VALUE)
                     .header("X-Trace-Id", traceId)
                     .header("traceparent", traceparent(traceId))
+                    .headers(h -> HmacRequestSigner.apply(h, properties.getInternalHmacSecret(),
+                            "POST", STREAM_ENDPOINT,
+                            HmacRequestSigner.bodyBytes(objectMapper, request)))
                     .bodyValue(request)
                     .exchangeToMono(response -> {
                         if (response.statusCode().isError()) {
@@ -152,7 +156,7 @@ public class WebClientPythonAgentClient implements PythonAgentClient {
     /**
      * 把 SSE body 的订阅搬进 exchange 回调**内部**。
      *
-     * <p>缺陷复现（，真实链路）：原实现 {@code return Mono.just(response.bodyToFlux(...))}
+     * <p>缺陷复现（真实链路）：原实现 {@code return Mono.just(response.bodyToFlux(...))}
      * 把 body 的 Flux 带出了 exchange 回调，而 {@code exchangeToMono} 的契约是「回调完成即释放
      * body」。结果：Python 侧的图真的跑完了（Redis 预算键 {@code roundsUsed=1}、
      * {@code tokensUsed≈3.8k}），网关却收到 0 个 delta、0 个 done，最终以 AGT-UPSTREAM-004
@@ -165,7 +169,7 @@ public class WebClientPythonAgentClient implements PythonAgentClient {
      * 先发与首字节前的 JSON 错误语义都不受影响。
      *
      * <p>取消要向上游传播：客户端断开时 {@code StreamSession} 取消的是 sink 的 Flux，
-     * 若不处置上游订阅，Python 的图会继续跑到 deadline，白烧 token（的相反面）。
+     * 若不处置上游订阅，Python 的图会继续跑到 deadline，白烧 token（相反面：订阅逃逸则既不消费也不取消）。
      */
     private static Mono<Flux<ServerSentEvent<String>>> relayBody(Flux<ServerSentEvent<String>> body) {
         Sinks.Many<ServerSentEvent<String>> relay = Sinks.many().unicast().onBackpressureBuffer();
@@ -210,11 +214,14 @@ public class WebClientPythonAgentClient implements PythonAgentClient {
     private PythonAskResponse execute(PythonAskRequest request, String traceId) {
         try {
             JsonNode body = webClient.post()
-                    .uri("/agent/ask")
+                    .uri(SYNC_ENDPOINT)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                     .header("X-Trace-Id", traceId)
                     .header("traceparent", traceparent(traceId))
+                    .headers(h -> HmacRequestSigner.apply(h, properties.getInternalHmacSecret(),
+                            "POST", SYNC_ENDPOINT,
+                            HmacRequestSigner.bodyBytes(objectMapper, request)))
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(JsonNode.class)

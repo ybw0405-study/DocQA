@@ -39,7 +39,7 @@ def test_real_embedding_provider_must_leave_the_offline_space() -> None:
 def test_real_embedding_provider_with_the_split_table_starts_fine() -> None:
     settings = make_settings(pg_table=REAL_MODEL_TABLE, **REAL_EMBEDDING)
     assert settings.pg_table == REAL_MODEL_TABLE
-    # 启动日志要读得出写向哪个空间，否则混空间只在事后由人工对账才发现（的同一课）。
+    # 启动日志要读得出写向哪个空间，否则混空间只在事后由人工对账才发现（与维度默认值是同一课）。
     assert settings.redacted_summary()["pg_table"] == REAL_MODEL_TABLE
 
 

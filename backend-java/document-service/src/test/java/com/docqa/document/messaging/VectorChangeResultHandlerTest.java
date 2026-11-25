@@ -68,7 +68,7 @@ class VectorChangeResultHandlerTest {
                 cleanupTasks);
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        // P1-8：原子占位默认成功（首次处理）
+        // 原子占位默认成功（首次处理）
         lenient().when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class)))
                 .thenReturn(true);
     }
@@ -140,7 +140,7 @@ class VectorChangeResultHandlerTest {
         handler.handle(MESSAGE_ID, bytes("DELETE_VERSION", "v1", "COMPLETED", 0L, null));
 
         verify(documentRepository, never()).recordVectorConfirmation(eq(TENANT_ID), any(), anyLong(), any());
-        // DQ-1：只有成功确认才出队，之后不再重投。
+        // 只有成功确认才出队，之后不再重投。
         verify(cleanupTasks).remove(TENANT_ID, DOCUMENT_ID, "v1", "DELETE_VERSION");
     }
 
@@ -174,7 +174,7 @@ class VectorChangeResultHandlerTest {
 
     @Test
     void aRedeliveredConfirmationIsSkipped() throws Exception {
-        // P1-8：重投时原子占位失败（false）表示已处理
+        // 重投时原子占位失败（false）表示已处理
         when(valueOperations.setIfAbsent(eq(IDEMPOTENCY_KEY), eq("1"), eq(Duration.ofDays(7))))
                 .thenReturn(false);
 

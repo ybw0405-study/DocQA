@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""配置对账（G11）：断言 application*.yml 里的 ${VAR} ⊆ env.example 键集合。
+"""配置对账：断言 application*.yml 里的 ${VAR} ⊆ env.example 键集合。
 
 只用标准库，任何 Python 3 都能直接运行（不需要 pyyaml）。
 

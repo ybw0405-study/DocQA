@@ -380,7 +380,7 @@ class RecordingEmbedder:
 
 
 async def test_embedding_batch_size_is_capped_by_the_provider_limit() -> None:
-    """E45 实测真实端点 11 行即 400，而 embedding_batch_size 默认 32：
+    """实测真实端点 11 行即 400，而 embedding_batch_size 默认 32：
     批大小必须取 min(配置, 自报上限)，否则 ≥11 chunk 的文档第一批就失败，
     且 worker.py 的 retryable 会把这笔花费再付一次。"""
 

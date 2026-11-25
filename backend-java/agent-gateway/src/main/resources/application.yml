@@ -95,6 +95,9 @@ docqa:
     max-rounds: 3
     prompt-version: p1
     masking-version: pii-v2
+    # HMAC 共享密钥（与 ai-python DOCQA_AI_INTERNAL_HMAC_SECRET 同值）。非空时按
+    # HmacSigner 规范签名，Python 侧以签名为唯一凭据；空 = 静态 token 兼容期（dev/local）。
+    internal-hmac-secret: ${DOCQA_AI_INTERNAL_HMAC_SECRET:}
     allowed-tools:
       - document_search
       - calculator

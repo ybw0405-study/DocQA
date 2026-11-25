@@ -115,7 +115,7 @@ info:
       `REM-VALIDATION-003`，`errors[].field` 为 `request`。缺字段与媒体类型不接受是两回事，
       同一个「少传一个 Part」的失误不应因 Part 类型不同而得到两种状态码。
       而**顶层 `Content-Type` 不是 `multipart/form-data`** 的情形由全局 advice 的专用 handler
-      映射为 415 `COM-UNSUPPORTED_MEDIA-001`（R-02 已落地，不再落 `Exception.class` 兜底 500）；
+      映射为 415 `COM-UNSUPPORTED_MEDIA-001`；
       「HTTP 方法不支持」同批修复为 405 `COM-METHOD_NOT_ALLOWED-001`，响应带 `Allow` 头。
       两者与 `REM-VALIDATION-003`（信封解析不开）分属不同路径，控制器测试逐条钉住。
     - **两个文本 Part 按请求参数绑定，不按消息转换器绑定**：客户端以 `Content-Disposition: form-data`
@@ -892,7 +892,7 @@ paths:
 
         标题按原样回显给属主本人，不做 PII 掩码（消息正文才需要掩码，因为它进入 Prompt 与审计）；
         但标题**不进入任何 MQ 事件、审计载荷与日志**，只有 MySQL 的 `document.title` 列和响应体携带它。
-        纯空白或空串非法（返回 400），不做静默 trim 后落库——`"  "` 与 `""` 都应当是「没填」而不是「填了个空格」。
+        纯空白或空串非法（返回 400），不做静默 trim 后落库——`" "` 与 `""` 都应当是「没填」而不是「填了个空格」。
 
         本操作纯同步落 MySQL，不触碰索引、不投递任何 MQ 消息。
       parameters:
@@ -3155,7 +3155,7 @@ paths:
 
         `name` 在租户内唯一，同名重复提交收敛到同一行并更新 `presetId` / `baseUrl` / `model` /
         `enabled`，**不改变生效状态**（`is_active` 不被 upsert 触碰）。因此本操作按值幂等，
-        沿用管理面  裁决：不声明 `Idempotency-Key`。
+        沿用管理面 裁决：不声明 `Idempotency-Key`。
 
         `baseUrl` 必须是 `http` / `https`，且出网前过主机白名单与私网判定：回环、私网、
         链路本地（含云元数据 169.254.169.254）、保留地址默认拒绝，本地自托管端点需要服务端

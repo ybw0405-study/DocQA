@@ -237,7 +237,7 @@ class AgentGraph:
             raise PiiLeakError(gate.categories, gate.count)
         reserved = self._estimate_prompt(context) + self._max_output_tokens
         if self._experiment is not None and not await self._experiment.authorize_call(reserved):
-            #  ②：全局额度先于每轮预算判定，拒绝即零字节离开本机；反过来要先为没发生的调用回补账本。
+            # 全局额度先于每轮预算判定，拒绝即零字节离开本机；反过来要先为没发生的调用回补账本。
             return self._budget_stop(state, round_number)
         if not await self._budget.reserve_tokens(self._trace_id, reserved):
             if self._experiment is not None:
