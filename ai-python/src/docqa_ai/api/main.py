@@ -27,7 +27,7 @@ from redis.asyncio import Redis
 
 from docqa_ai.agent.checkpoint import build_checkpointer, setup_checkpointer
 from docqa_ai.agent.service import AgentAskService
-from docqa_ai.api.internal_auth import NONCE_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER
+from docqa_ai.api.internal_auth import NONCE_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER, RedisNonceStore
 from docqa_ai.api.internal_auth import verify as verify_internal_signature
 from docqa_ai.business_metrics import BusinessMetrics
 from docqa_ai.config import Settings
@@ -339,6 +339,7 @@ def build_default_service(
             settings.llm_api_key.get_secret_value(),
             settings.llm_model,
             tool_protocol=settings.tool_protocol,
+            max_citations=settings.max_citations,
         )
     # 单一组装根：进程内只建一次连接池，读侧两路仓库与 AgentAskService 的关闭钩子共用它。
     pg_provider = pg_provider or (
@@ -398,6 +399,7 @@ def build_default_service(
             allowed_hosts=settings.llm_allowed_host_entries,
             allow_private=settings.llm_allow_private,
             tool_protocol=settings.tool_protocol,
+            max_citations=settings.max_citations,
         )
     service = AgentAskService(
         settings,
@@ -596,6 +598,9 @@ def create_app(
                         status_code=413,
                         content={"code": "AGT-AUTH-002", "detail": "signed body too large"},
                     )
+                # 多副本防重放：nonce 占位走 Redis（lifespan 启动后可用）；显式注入 settings 的
+                # 测试/嵌入式场景没有 redis 时回退进程内实现。
+                redis_client = getattr(request.app.state, "redis_client", None)
                 if not verify_internal_signature(
                     hmac_secret,
                     request.method,
@@ -604,6 +609,7 @@ def create_app(
                     request.headers.get(TIMESTAMP_HEADER, ""),
                     request.headers.get(SIGNATURE_HEADER, ""),
                     request.headers.get(NONCE_HEADER, ""),
+                    nonce_store=RedisNonceStore(redis_client) if redis_client is not None else None,
                 ):
                     return JSONResponse(
                         status_code=401,
@@ -873,10 +879,12 @@ app = create_app()
 def main() -> None:
     settings = Settings()
     configure_logging(settings.log_level, settings.service_name)
-    if _runs_in_production() and not settings.internal_token.get_secret_value():
+    if _runs_in_production() and not (
+        settings.internal_token.get_secret_value() or settings.internal_hmac_secret.get_secret_value()
+    ):
         raise RuntimeError(
-            "DOCQA_AI_INTERNAL_TOKEN must be configured in production: "
-            "the data plane otherwise accepts unauthenticated identity fields"
+            "DOCQA_AI_INTERNAL_TOKEN or DOCQA_AI_INTERNAL_HMAC_SECRET must be configured "
+            "in production: the data plane otherwise accepts unauthenticated identity fields"
         )
     if sys.platform == "win32":
         # uvicorn 在 Windows 上硬编码 ProactorEventLoop 并绕过全局策略，而 psycopg 异步连接

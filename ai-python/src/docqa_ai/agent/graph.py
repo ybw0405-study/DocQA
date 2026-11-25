@@ -107,6 +107,7 @@ class AgentGraph:
         tenant_id: object | None = None,
         checkpointer: BaseCheckpointSaver | None = None,
         approval_check: Callable[[str], bool] | None = None,
+        max_citations: int = 3,
     ) -> None:
         self._planner = planner
         self._tools = tools
@@ -120,6 +121,7 @@ class AgentGraph:
         self._tracer = tracer or trace.get_tracer("docqa_ai")
         self._experiment = experiment
         self._max_observation_chars = max(0, max_observation_chars)
+        self._max_citations = max(1, max_citations)
         self._user_id = user_id
         self._rate_limiter = rate_limiter
         self._metrics = metrics
@@ -343,7 +345,7 @@ class AgentGraph:
             index
             for index in dict.fromkeys(output.citation_indexes)
             if any(block.index == index for block in context.context_blocks)
-        )[:3]
+        )[: self._max_citations]
         updates.update(
             answer=output.answer,
             citation_indexes=indexes,
@@ -437,7 +439,11 @@ class AgentGraph:
             },
         )
         observations = tuple(state.get("observations", ())) + (observation,)
-        signatures = tuple(state.get("tool_signatures", ())) + (_tool_signature(tool_name, argument),)
+        signatures = tuple(state.get("tool_signatures", ()))
+        if outcome != "rate_limited":
+            # 限流拒绝不计入重复签名：RATE_LIMITED_OBSERVATION 告知"稍后重试"，
+            # 若原参重试反而触发重复调用终止，语义自相矛盾。其余失败仍记录，防真死循环。
+            signatures = signatures + (_tool_signature(tool_name, argument),)
         return {
             "observations": observations,
             "pending_tool": None,

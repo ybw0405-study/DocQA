@@ -562,6 +562,7 @@ class AgentAskService:
             tenant_id=request.tenant_id,
             checkpointer=self._checkpointer,
             approval_check=_approval_predicate(self._settings),
+            max_citations=self._settings.max_citations,
         )
 
     @asynccontextmanager

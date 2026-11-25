@@ -33,7 +33,7 @@ SYSTEM_PROMPT = """你是智能学习助手的问答 Agent。规则：
 3. 回答不超过 8000 字，不包含手机号、身份证号、邮箱等个人信息。
 4. 只输出一个 JSON 对象，不要 Markdown 代码块。
 5. 结束回答时：{"action":"final","answer":"...","citations":[0,2]}
-   citations 是 <context> 中方块的序号，最多 3 个；没有引用时返回空数组。
+   citations 是 <context> 中方块的序号，最多 __MAX_CITATIONS__ 个；没有引用时返回空数组。
 6. 需要工具时：{"action":"tool","tool":"<工具名>","input":"<参数>"}
    工具名与参数格式见 <tools>；source=mcp 的工具 input 必须是 JSON 对象字符串。
    只允许使用本次请求 allowed_tools 中的工具；不需要工具时不要返回 tool。
@@ -51,8 +51,14 @@ SYSTEM_PROMPT_NATIVE = """你是智能学习助手的问答 Agent。规则：
    不要用相同参数重复调用同一个工具。
 5. 结束回答时在回复正文只输出一个 JSON 对象（不要 Markdown 代码块）：
    {"action":"final","answer":"...","citations":[0,2]}
-   citations 是 <context> 中方块的序号，最多 3 个；没有引用时返回空数组。
+   citations 是 <context> 中方块的序号，最多 __MAX_CITATIONS__ 个；没有引用时返回空数组。
 """
+
+
+def system_prompt_with(max_citations: int, *, native: bool = False) -> str:
+    """按引用上限渲染系统提示词；用哨兵替换而非 format——提示词里的 JSON 花括号不可触碰。"""
+    template = SYSTEM_PROMPT_NATIVE if native else SYSTEM_PROMPT
+    return template.replace("__MAX_CITATIONS__", str(max(1, max_citations)))
 
 
 class PlannerError(Exception):
@@ -207,8 +213,9 @@ def _extractive_answer(context: PlanContext) -> tuple[str, tuple[int, ...]]:
 class OfflinePlanner:
     """Deterministic planner used for offline demos and tests; it never performs network calls."""
 
-    def __init__(self, model: str = "offline-extractive") -> None:
+    def __init__(self, model: str = "offline-extractive", *, max_citations: int = 3) -> None:
         self.model = model
+        self._max_citations = max(1, max_citations)
 
     async def plan(self, context: PlanContext, timeout_s: float) -> PlannerOutput:
         if context.round_number == 1 and not context.observations:
@@ -259,11 +266,10 @@ class OfflinePlanner:
             return None
         return candidate
 
-    @staticmethod
-    def _input_tokens(context: PlanContext) -> int:
+    def _input_tokens(self, context: PlanContext) -> int:
         return estimate_messages_tokens(
             [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt_with(self._max_citations)},
                 {"role": "user", "content": build_user_prompt(context)},
             ]
         )
@@ -463,9 +469,12 @@ class OpenAIPlanner:
         model: str,
         client: httpx.AsyncClient | None = None,
         tool_protocol: str = "json",
+        *,
+        max_citations: int = 3,
     ) -> None:
         self.model = model
         self._tool_protocol = tool_protocol
+        self._max_citations = max(1, max_citations)
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         # CON-2：plan/astream 共用同一个 client；注入的由调用方所有、自建的由 aclose() 释放。
@@ -477,7 +486,7 @@ class OpenAIPlanner:
         self._owns_client = client is None
 
     def _system_prompt(self) -> str:
-        return SYSTEM_PROMPT_NATIVE if self._tool_protocol == "native" else SYSTEM_PROMPT
+        return system_prompt_with(self._max_citations, native=self._tool_protocol == "native")
 
     def _tools_payload(self, context: PlanContext) -> list[dict] | None:
         if self._tool_protocol != "native":
