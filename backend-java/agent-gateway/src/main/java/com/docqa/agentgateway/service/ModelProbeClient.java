@@ -6,8 +6,16 @@ import com.docqa.agentgateway.dto.ModelProbeFailure;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.channel.ChannelOption;
+import io.netty.resolver.AddressResolver;
+import io.netty.resolver.AddressResolverGroup;
+import io.netty.resolver.AbstractAddressResolver;
+import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.Promise;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
@@ -45,6 +53,7 @@ public class ModelProbeClient {
     private final ModelConnectionProperties properties;
     private final ObjectMapper objectMapper;
     private final WebClient client;
+    private final WebClient.Builder clientBuilder;
 
     public ModelProbeClient(
             LlmEgressPolicy egressPolicy,
@@ -54,13 +63,61 @@ public class ModelProbeClient {
         this.egressPolicy = egressPolicy;
         this.properties = properties;
         this.objectMapper = objectMapper;
-        HttpClient httpClient = HttpClient.create()
+        this.clientBuilder = builder.codecs(configurer ->
+                configurer.defaultCodecs().maxInMemorySize(properties.getProbeMaxBytes()));
+        this.client = clientBuilder
+                .clientConnector(new ReactorClientHttpConnector(defaultHttpClient()))
+                .build();
+    }
+
+    private HttpClient defaultHttpClient() {
+        return HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, Math.toIntExact(CONNECT_TIMEOUT.toMillis()))
                 .responseTimeout(properties.getProbeTimeout());
-        this.client = builder
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(properties.getProbeMaxBytes()))
-                .build();
+    }
+
+    /**
+     * P1-5 DNS rebinding 防护：用校验期固定的 IP 建连，而不是让 Reactor Netty 在连接时
+     * 重新解析域名（那样校验后域名可改指内网）。resolver 把该 host 永远解析到 pinnedIp。
+     */
+    private WebClient pinnedClient(String pinnedIp) {
+        // pinnedIp 来自 InetAddress.getHostAddress()，一定是字面量 IP。
+        // 用 getByAddress(字节数组) 构造，避免任何再次触发 DNS 的调用。
+        byte[] raw = io.netty.util.NetUtil.createByteArrayFromIpAddressString(pinnedIp);
+        if (raw == null) {
+            throw new IllegalStateException("invalid pinned IP: " + pinnedIp);
+        }
+        final InetAddress address;
+        try {
+            address = InetAddress.getByAddress(raw);
+        } catch (java.net.UnknownHostException ex) {
+            throw new IllegalStateException("invalid pinned IP: " + pinnedIp, ex);
+        }
+        AddressResolverGroup<InetSocketAddress> resolver = new AddressResolverGroup<>() {
+            @Override
+            protected AddressResolver<InetSocketAddress> newResolver(EventExecutor executor) {
+                return new AbstractAddressResolver<InetSocketAddress>(executor) {
+                    @Override
+                    protected boolean doIsResolved(InetSocketAddress target) {
+                        return true;
+                    }
+
+                    @Override
+                    protected void doResolve(InetSocketAddress target, Promise<InetSocketAddress> promise) {
+                        promise.setSuccess(new InetSocketAddress(address, target.getPort()));
+                    }
+
+                    @Override
+                    protected void doResolveAll(InetSocketAddress target,
+                                                Promise<List<InetSocketAddress>> promise) {
+                        promise.setSuccess(Collections.singletonList(
+                                new InetSocketAddress(address, target.getPort())));
+                    }
+                };
+            }
+        };
+        HttpClient httpClient = defaultHttpClient().resolver(resolver);
+        return clientBuilder.clientConnector(new ReactorClientHttpConnector(httpClient)).build();
     }
 
     /** apiKey 为 null 或空表示这条连接还没录入凭据；本地无 Key 端点由调用方决定是否允许跳过探测。 */
@@ -75,8 +132,12 @@ public class ModelProbeClient {
             return ModelProbeData.failure(ModelProbeFailure.CREDENTIAL_MISSING, "这条连接还没有保存 API Key");
         }
         String url = endpoint.baseUrl() + "/models";
+        // P1-5：配置了 pins 校验时，用固定 IP 的 client 出网；allowPrivate=true 时 pinnedIp 为空，
+        // 沿用默认 client（本地开发场景，host 已显式放行）。
+        WebClient probeClient = endpoint.pinnedIp() == null || endpoint.pinnedIp().isBlank()
+                ? client : pinnedClient(endpoint.pinnedIp());
         try {
-            ModelProbeData result = client.get()
+            ModelProbeData result = probeClient.get()
                     .uri(url)
                     .header("Authorization", "Bearer " + apiKey)
                     .header("Accept", "application/json")

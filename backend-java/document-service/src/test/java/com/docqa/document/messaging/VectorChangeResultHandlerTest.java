@@ -68,6 +68,9 @@ class VectorChangeResultHandlerTest {
                 cleanupTasks);
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        // P1-8：原子占位默认成功（首次处理）
+        lenient().when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class)))
+                .thenReturn(true);
     }
 
     @Test
@@ -171,11 +174,14 @@ class VectorChangeResultHandlerTest {
 
     @Test
     void aRedeliveredConfirmationIsSkipped() throws Exception {
-        when(redisTemplate.hasKey(IDEMPOTENCY_KEY)).thenReturn(true);
+        // P1-8：重投时原子占位失败（false）表示已处理
+        when(valueOperations.setIfAbsent(eq(IDEMPOTENCY_KEY), eq("1"), eq(Duration.ofDays(7))))
+                .thenReturn(false);
 
         handler.handle(MESSAGE_ID, bytes("DELETE_DOCUMENT", null, "COMPLETED", 0L, null));
 
-        verifyNoInteractions(documentRepository, valueOperations);
+        verify(valueOperations).setIfAbsent(eq(IDEMPOTENCY_KEY), eq("1"), eq(Duration.ofDays(7)));
+        verifyNoInteractions(documentRepository);
     }
 
     @Test

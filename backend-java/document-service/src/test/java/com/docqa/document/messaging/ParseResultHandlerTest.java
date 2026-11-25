@@ -91,6 +91,9 @@ class ParseResultHandlerTest {
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(0)).get());
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        // P1-8：原子占位默认成功（首次处理），与原 hasKey=false 语义一致
+        lenient().when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class)))
+                .thenReturn(true);
     }
 
     @Test
@@ -266,11 +269,16 @@ class ParseResultHandlerTest {
 
     @Test
     void aRedeliveredMessageIsSkippedBeforeAnyDatabaseRead() throws Exception {
-        when(redisTemplate.hasKey("mq:idem:parse.completed:" + MESSAGE_ID)).thenReturn(true);
+        // P1-8：重投时原子占位失败（返回 false）表示已处理，应在读库前跳过
+        when(valueOperations.setIfAbsent(eq("mq:idem:parse.completed:" + MESSAGE_ID),
+                eq("1"), eq(Duration.ofDays(7)))).thenReturn(false);
 
         handler.handleCompleted(MESSAGE_ID, bytes(completed("v1", null, chunk(0))));
 
-        verifyNoInteractions(documentRepository, chunkRepository, documentEventPublisher, valueOperations);
+        // 原子占位被调用（判定为重复），但没有任何业务读库
+        verify(valueOperations).setIfAbsent(eq("mq:idem:parse.completed:" + MESSAGE_ID),
+                eq("1"), eq(Duration.ofDays(7)));
+        verifyNoInteractions(documentRepository, chunkRepository, documentEventPublisher);
     }
 
     @Test

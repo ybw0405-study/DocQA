@@ -27,7 +27,7 @@ from redis.asyncio import Redis
 
 from docqa_ai.agent.checkpoint import build_checkpointer, setup_checkpointer
 from docqa_ai.agent.service import AgentAskService
-from docqa_ai.api.internal_auth import SIGNATURE_HEADER, TIMESTAMP_HEADER
+from docqa_ai.api.internal_auth import NONCE_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER
 from docqa_ai.api.internal_auth import verify as verify_internal_signature
 from docqa_ai.business_metrics import BusinessMetrics
 from docqa_ai.config import Settings
@@ -477,10 +477,10 @@ def create_app(
     expected_token = settings.internal_token.get_secret_value()
     hmac_secret = settings.internal_hmac_secret.get_secret_value()
     startup_guard_error: str | None = None
-    if not explicit_settings and _runs_in_production() and not expected_token:
+    if not explicit_settings and _runs_in_production() and not (expected_token or hmac_secret):
         startup_guard_error = (
-            "DOCQA_AI_INTERNAL_TOKEN must be configured in production: "
-            "the data plane otherwise accepts unauthenticated identity fields"
+            "DOCQA_AI_INTERNAL_TOKEN or DOCQA_AI_INTERNAL_HMAC_SECRET must be configured "
+            "in production: the data plane otherwise accepts unauthenticated identity fields"
         )
     # dev 模式默认只监听 loopback；若有人显式放宽到 0.0.0.0 又不配任何凭据，
     # 数据面就会把请求体里的 userId/tenantId 当成可信身份——必须在启动期挡住，
@@ -603,6 +603,7 @@ def create_app(
                     body,
                     request.headers.get(TIMESTAMP_HEADER, ""),
                     request.headers.get(SIGNATURE_HEADER, ""),
+                    request.headers.get(NONCE_HEADER, ""),
                 ):
                     return JSONResponse(
                         status_code=401,

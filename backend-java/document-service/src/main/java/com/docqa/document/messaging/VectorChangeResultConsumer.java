@@ -23,11 +23,14 @@ public class VectorChangeResultConsumer implements MessageListenerConcurrently {
 
     private final RocketMqProperties properties;
     private final VectorChangeResultHandler handler;
+    private final MqIdempotencyMarker idempotencyMarker;
     private final DefaultMQPushConsumer consumer;
 
-    public VectorChangeResultConsumer(RocketMqProperties properties, VectorChangeResultHandler handler) {
+    public VectorChangeResultConsumer(RocketMqProperties properties, VectorChangeResultHandler handler,
+                                      MqIdempotencyMarker idempotencyMarker) {
         this.properties = properties;
         this.handler = handler;
+        this.idempotencyMarker = idempotencyMarker;
         this.consumer = new DefaultMQPushConsumer(properties.getVectorResultConsumerGroup());
         this.consumer.setNamesrvAddr(properties.getNamesrv());
         this.consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET);
@@ -68,6 +71,8 @@ public class VectorChangeResultConsumer implements MessageListenerConcurrently {
                         message.getTopic(),
                         message.getMsgId(),
                         ex);
+                // P1-8：释放原子占位，允许重投重新处理
+                idempotencyMarker.release(message.getTopic(), message.getMsgId());
                 return ConsumeConcurrentlyStatus.RECONSUME_LATER;
             }
         }
