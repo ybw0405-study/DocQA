@@ -2,6 +2,7 @@ package com.docqa.agentgateway.service;
 
 import com.docqa.agentgateway.config.PythonProperties;
 import com.docqa.agentgateway.dto.MemoryListData;
+import com.docqa.agentgateway.security.HmacRequestSigner;
 import com.docqa.common.error.BusinessException;
 import com.docqa.common.error.ErrorCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -40,6 +41,8 @@ public class PythonMemoryClient {
                     .uri("/internal/memories?tenantId={tenantId}&userId={userId}", tenantId, userId)
                     .header("X-Trace-Id", traceId)
                     .header("traceparent", traceparent(traceId))
+                    .headers(h -> HmacRequestSigner.apply(h, properties.getInternalHmacSecret(),
+                            "GET", "/internal/memories", new byte[0]))
                     .retrieve()
                     .bodyToMono(JsonNode.class)
                     .block(properties.getResponseTimeout().plusMillis(500));
@@ -65,6 +68,8 @@ public class PythonMemoryClient {
                     .uri("/internal/memories/{key}?tenantId={tenantId}&userId={userId}", memoryKey, tenantId, userId)
                     .header("X-Trace-Id", traceId)
                     .header("traceparent", traceparent(traceId))
+                    .headers(h -> HmacRequestSigner.apply(h, properties.getInternalHmacSecret(),
+                            "DELETE", "/internal/memories/" + memoryKey, new byte[0]))
                     .exchangeToMono(response -> response.releaseBody().thenReturn(response.statusCode().value()))
                     .block(properties.getResponseTimeout().plusMillis(500));
             if (status == null) {

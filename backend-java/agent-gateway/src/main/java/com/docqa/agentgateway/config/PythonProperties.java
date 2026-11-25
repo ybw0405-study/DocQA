@@ -53,6 +53,15 @@ public class PythonProperties {
     @Valid
     private CircuitBreaker circuitBreaker = new CircuitBreaker();
 
+    /**
+     * 网关 → Python 数据面 HMAC 共享密钥。非空时，每次请求按
+     * {@code com.docqa.agentgateway.security.HmacSigner} 规范签名（与
+     * {@code ai-python/src/docqa_ai/api/internal_auth.py} 同口径），Python 侧
+     * 以签名为唯一凭据、静态 {@code X-Internal-Token} 不再单独放行。
+     * 空（默认）= 保留静态 token 兼容期，仅用于 dev / local / test。
+     */
+    private String internalHmacSecret = "";
+
     public String getBaseUrl() {
         return baseUrl;
     }
@@ -139,6 +148,14 @@ public class PythonProperties {
 
     public void setCircuitBreaker(CircuitBreaker circuitBreaker) {
         this.circuitBreaker = circuitBreaker;
+    }
+
+    public String getInternalHmacSecret() {
+        return internalHmacSecret;
+    }
+
+    public void setInternalHmacSecret(String internalHmacSecret) {
+        this.internalHmacSecret = internalHmacSecret;
     }
 
     public static class CircuitBreaker {

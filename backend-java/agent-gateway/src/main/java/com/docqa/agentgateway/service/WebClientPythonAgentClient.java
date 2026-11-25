@@ -8,6 +8,7 @@ import com.docqa.agentgateway.config.PythonProperties;
 import com.docqa.agentgateway.dto.PythonAskRequest;
 import com.docqa.agentgateway.dto.PythonAskResponse;
 import com.docqa.agentgateway.dto.PythonAuditEvent;
+import com.docqa.agentgateway.security.HmacRequestSigner;
 import com.docqa.common.error.ErrorCode;
 import com.docqa.common.metrics.BusinessMetrics;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -113,11 +114,14 @@ public class WebClientPythonAgentClient implements PythonAgentClient {
         long startedAt = System.nanoTime();
         try {
             Flux<ServerSentEvent<String>> events = webClient.post()
-                    .uri("/agent/ask/stream")
+                    .uri(STREAM_ENDPOINT)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM_VALUE)
                     .header("X-Trace-Id", traceId)
                     .header("traceparent", traceparent(traceId))
+                    .headers(h -> HmacRequestSigner.apply(h, properties.getInternalHmacSecret(),
+                            "POST", STREAM_ENDPOINT,
+                            HmacRequestSigner.bodyBytes(objectMapper, request)))
                     .bodyValue(request)
                     .exchangeToMono(response -> {
                         if (response.statusCode().isError()) {
@@ -210,11 +214,14 @@ public class WebClientPythonAgentClient implements PythonAgentClient {
     private PythonAskResponse execute(PythonAskRequest request, String traceId) {
         try {
             JsonNode body = webClient.post()
-                    .uri("/agent/ask")
+                    .uri(SYNC_ENDPOINT)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                     .header("X-Trace-Id", traceId)
                     .header("traceparent", traceparent(traceId))
+                    .headers(h -> HmacRequestSigner.apply(h, properties.getInternalHmacSecret(),
+                            "POST", SYNC_ENDPOINT,
+                            HmacRequestSigner.bodyBytes(objectMapper, request)))
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(JsonNode.class)
