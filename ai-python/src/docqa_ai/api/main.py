@@ -659,7 +659,7 @@ def create_app(
             try:
                 await asyncio.wait_for(redis_client.ping(), timeout=0.5)
                 checks["redis"] = "ok"
-            except Exception:  # noqa: BLE001 - 探针只关心可达性，异常细节不进响应
+            except Exception: # noqa: BLE001 - 探针只关心可达性，异常细节不进响应
                 checks["redis"] = "down"
         service = getattr(app.state, "agent_service", None)
         pg_provider = getattr(service, "pg_provider", None)
@@ -671,7 +671,7 @@ def create_app(
                     async with connection.cursor() as cursor:
                         await asyncio.wait_for(cursor.execute("SELECT 1"), timeout=0.5)
                 checks["pg"] = "ok"
-            except Exception:  # noqa: BLE001 - 同上，不把驱动细节暴露给 LB
+            except Exception: # noqa: BLE001 - 同上，不把驱动细节暴露给 LB
                 checks["pg"] = "down"
         degraded = any(value == "down" for value in checks.values())
         return JSONResponse(

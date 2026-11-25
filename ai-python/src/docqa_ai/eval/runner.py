@@ -9,8 +9,8 @@ DOCQA_EMBEDDING_BASE_URL / DOCQA_EMBEDDING_API_KEY / DOCQA_EMBEDDING_MODEL 后�
 
 套件与基线：
     python -m docqa_ai.eval --suite retrieval|agent|all
-    python -m docqa_ai.eval --suite all --check-baseline   # 对照 baselines/*.json 门禁
-    python -m docqa_ai.eval --suite all --update-baseline  # 有意变更后重录基线
+    python -m docqa_ai.eval --suite all --check-baseline # 对照 baselines/*.json 门禁
+    python -m docqa_ai.eval --suite all --update-baseline # 有意变更后重录基线
 """
 
 from __future__ import annotations
@@ -212,7 +212,7 @@ def _render_table(payload: dict[str, Any]) -> str:
     lines.append("=" * 72)
     lines.append("语料: 合成(跨主题 8 + 同主题细粒度 1×5) + 真实条文 4")
     lines.append(f"查询数: {payload['query_count']}")
-    lines.append(f"embedding: {payload['embedding']}   rerank: {payload['reranker']}")
+    lines.append(f"embedding: {payload['embedding']} rerank: {payload['reranker']}")
     lines.append("-" * 72)
     lines.append(f"{'指标':<18}{'Recall@1':>10}{'Recall@3':>10}{'Recall@5':>10}")
     r = payload["recall_at_k"]
@@ -225,7 +225,7 @@ def _render_table(payload: dict[str, Any]) -> str:
     for q in payload["per_query"]:
         hit1 = "✓" if q["recall_at_k"].get("1", 0) >= 1.0 else "✗"
         lines.append(
-            f"  {hit1}  {q['query_id']:<14} R@1={q['recall_at_k'].get('1', 0):.2f} MRR={q['mrr']:.2f}  {q['question']}"
+            f" {hit1} {q['query_id']:<14} R@1={q['recall_at_k'].get('1', 0):.2f} MRR={q['mrr']:.2f} {q['question']}"
         )
     lines.append("=" * 72)
     return "\n".join(lines)
@@ -295,12 +295,12 @@ def _render_agent(payload: dict[str, Any]) -> str:
     lines.append("=" * 72)
     lines.append("DocQA agent 级确定性回归报告")
     lines.append("=" * 72)
-    lines.append(f"用例数: {payload['case_count']}   通过率: {payload['pass_rate']:.3f}")
+    lines.append(f"用例数: {payload['case_count']} 通过率: {payload['pass_rate']:.3f}")
     lines.append("-" * 72)
     for case in payload["cases"]:
         mark = "✓" if case["passed"] else "✗"
         detail = case.get("detail", "")
-        lines.append(f"  {mark}  {case['case_id']:<28} {detail}")
+        lines.append(f" {mark} {case['case_id']:<28} {detail}")
     lines.append("=" * 72)
     return "\n".join(lines)
 

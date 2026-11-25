@@ -46,7 +46,7 @@ class KeysetCursorTest {
     void rejectsBlankGarbageAndForeignTokens() {
         assertThat(KeysetCursor.decode(null)).isEmpty();
         assertThat(KeysetCursor.decode("")).isEmpty();
-        assertThat(KeysetCursor.decode("   ")).isEmpty();
+        assertThat(KeysetCursor.decode(" ")).isEmpty();
         assertThat(KeysetCursor.decode("not-a-cursor")).isEmpty();
         assertThat(KeysetCursor.decode(java.util.Base64.getUrlEncoder().withoutPadding()
                 .encodeToString("no-separator".getBytes(java.nio.charset.StandardCharsets.UTF_8)))).isEmpty();

@@ -668,7 +668,7 @@ public class DocumentService {
             List<PresignedPart> parts = new ArrayList<>(plan.partCount());
             for (int partNumber = 1; partNumber <= plan.partCount(); partNumber++) {
                 if (uploaded.contains(partNumber)) {
-                    continue;  // 已上传分片：断点续传不再重复签发
+                    continue; // 已上传分片：断点续传不再重复签发
                 }
                 String url = objectStorage.presignPart(
                         document.objectKey(),

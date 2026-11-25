@@ -50,7 +50,7 @@ const CONTRACT_TARGET_IDENTITY = [
     shapes: [/userId\??: string/, /userId: query\.userId/, /\$\{encodeURIComponent\(userId\)\}/],
   },
   /**
-   *  的用户管理面（`PUT /users/{…}/roles`、`PATCH /users/{…}/status`）携带的也是**被管理对象**：
+   * 的用户管理面（`PUT /users/{…}/roles`、`PATCH /users/{…}/status`）携带的也是**被管理对象**：
    * 契约把标识放在路径上，Java 侧仍以 JWT `sub` 判调用者，因此放行形态与配额页同构，只是没有查询键那条。
    */
   {
@@ -120,7 +120,7 @@ function hits(files: string[], needles: string[]): string[] {
 }
 
 /**
- *  的判据来源：dev 服务器只按 `BACKENDS` 的 context 前缀匹配请求，少一条不报错、
+ * 的判据来源：dev 服务器只按 `BACKENDS` 的 context 前缀匹配请求，少一条不报错、
  * 而是走 SPA fallback 返回 `index.html`，页面于是拿到 HTML 却只表现为「请求失败」。
  * 所以这里要的不是「代理里有哪些前缀」，而是「前端调用过哪些前缀」——后者只能从调用点导出。
  */

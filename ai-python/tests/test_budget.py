@@ -118,7 +118,7 @@ async def test_redis_errors_are_mapped_to_budget_unavailable() -> None:
         async def hgetall(self, key: str) -> dict[str, str]:
             raise RedisError("down")
 
-    store = RedisBudgetStore(FailingRedis())  # type: ignore[arg-type]
+    store = RedisBudgetStore(FailingRedis()) # type: ignore[arg-type]
     with pytest.raises(BudgetUnavailable):
         await store.snapshot(TRACE)
 

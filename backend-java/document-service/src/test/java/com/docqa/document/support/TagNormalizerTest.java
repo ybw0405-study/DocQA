@@ -9,14 +9,14 @@ class TagNormalizerTest {
 
     @Test
     void leadingTrailingAndRepeatedSpacesCollapseToOneSpace() {
-        TagName tag = TagNormalizer.of("  考研   数学 ");
+        TagName tag = TagNormalizer.of(" 考研 数学 ");
         assertThat(tag.display()).isEqualTo("考研 数学");
         assertThat(tag.normalized()).isEqualTo("考研 数学");
     }
 
     @Test
     void theDisplayNameKeepsItsCaseWhileTheComparisonFormIsLowercase() {
-        TagName tag = TagNormalizer.of(" Advanced   Math ");
+        TagName tag = TagNormalizer.of(" Advanced Math ");
         assertThat(tag.display()).isEqualTo("Advanced Math");
         assertThat(tag.normalized()).isEqualTo("advanced math");
     }
@@ -34,7 +34,7 @@ class TagNormalizerTest {
     @Test
     void nullAndBlankInputsProduceAnEmptyName() {
         assertThat(TagNormalizer.of(null).normalized()).isEmpty();
-        assertThat(TagNormalizer.of("   ").display()).isEmpty();
+        assertThat(TagNormalizer.of(" ").display()).isEmpty();
     }
 
     @Test

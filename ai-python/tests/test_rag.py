@@ -186,7 +186,7 @@ async def test_vector_store_error_is_wrapped() -> None:
         async def search(self, embedding: object, scopes: object, top_k: int) -> list[object]:
             raise VectorStoreUnavailable("broken")
 
-    service = RetrievalService(BrokenRepository(), OfflineEmbeddingProvider())  # type: ignore[arg-type]
+    service = RetrievalService(BrokenRepository(), OfflineEmbeddingProvider()) # type: ignore[arg-type]
     with pytest.raises(RetrievalUnavailable):
         await service.retrieve("alpha", [scope()])
 

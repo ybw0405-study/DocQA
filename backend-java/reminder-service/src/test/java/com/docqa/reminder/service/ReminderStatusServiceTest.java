@@ -194,7 +194,7 @@ class ReminderStatusServiceTest {
 
     @Test
     void resumeLeavesThePausedRowUntouchedWhenTheRuleHasNoOccurrenceLeft() {
-        //  选 ③：算不出下一时刻时既不写「ACTIVE + 空游标」的永不触发行，也不替用户改成已完成。
+        // 选 ③：算不出下一时刻时既不写「ACTIVE + 空游标」的永不触发行，也不替用户改成已完成。
         given(row(ReminderStatus.PAUSED, "FREQ=DAILY;COUNT=1", NOW.minusSeconds(86400), 0, PAUSED_CURSOR, 4L));
 
         assertThatThrownBy(() -> service.update(

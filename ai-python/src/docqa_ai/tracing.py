@@ -108,7 +108,7 @@ class TraceContextMiddleware:
 
     async def __call__(self, scope: dict, receive: object, send: object) -> None:
         if scope.get("type") != "http":
-            await self.app(scope, receive, send)  # type: ignore[misc]
+            await self.app(scope, receive, send) # type: ignore[misc]
             return
 
         headers = {key.decode("latin-1").lower(): value.decode("latin-1") for key, value in scope.get("headers", [])}
@@ -135,11 +135,11 @@ class TraceContextMiddleware:
                 span.set_attribute("http.response.status_code", status)
                 if status and status >= 500:
                     span.set_status(Status(StatusCode.ERROR))
-            await send(message)  # type: ignore[misc]
+            await send(message) # type: ignore[misc]
 
         try:
-            await self.app(scope, receive, wrapped_send)  # type: ignore[misc]
-        except Exception as exc:  # noqa: BLE001 - re-raised after marking the span
+            await self.app(scope, receive, wrapped_send) # type: ignore[misc]
+        except Exception as exc: # noqa: BLE001 - re-raised after marking the span
             span.set_attribute("error.type", type(exc).__name__)
             span.set_status(Status(StatusCode.ERROR))
             raise

@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-ChunkRef = tuple[str, int]  # (document_id, chunk_index)
+ChunkRef = tuple[str, int] # (document_id, chunk_index)
 
 
 @dataclass(frozen=True)

@@ -154,7 +154,7 @@ async def test_redis_read_failure_maps_to_budget_unavailable() -> None:
         def pipeline(self):
             raise AssertionError("snapshot must not open a transaction")
 
-    store = RedisExperimentBudgetStore(FailingRedis(), 10, 1000)  # type: ignore[arg-type]
+    store = RedisExperimentBudgetStore(FailingRedis(), 10, 1000) # type: ignore[arg-type]
     with pytest.raises(BudgetUnavailable):
         await store.snapshot()
 
@@ -180,7 +180,7 @@ async def test_redis_write_failure_maps_to_budget_unavailable() -> None:
         async def hgetall(self, key: str) -> dict[str, str]:
             raise RedisError("down")
 
-    store = RedisExperimentBudgetStore(FailingRedis(), 10, 1000)  # type: ignore[arg-type]
+    store = RedisExperimentBudgetStore(FailingRedis(), 10, 1000) # type: ignore[arg-type]
     with pytest.raises(BudgetUnavailable):
         await store.authorize_call(1)
 
@@ -282,7 +282,7 @@ async def test_publish_limits_failure_maps_to_budget_unavailable() -> None:
         async def hset(self, key: str, mapping: dict[str, str]) -> None:
             raise RedisError("down")
 
-    store = RedisExperimentBudgetStore(FailingRedis(), 10, 1000)  # type: ignore[arg-type]
+    store = RedisExperimentBudgetStore(FailingRedis(), 10, 1000) # type: ignore[arg-type]
     with pytest.raises(BudgetUnavailable):
         await store.publish_limits()
 

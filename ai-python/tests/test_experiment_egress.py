@@ -52,13 +52,13 @@ class RecordingReranker:
 class ExplodingLedger:
     """账本自身读写失败：装饰器必须把 BudgetUnavailable 原样交给调用点翻译（的竞态形态之一）。"""
 
-    async def snapshot(self):  # pragma: no cover - must not be reached
+    async def snapshot(self): # pragma: no cover - must not be reached
         raise AssertionError("the decorators must not read a snapshot")
 
     async def authorize_call(self, estimated_tokens: int) -> bool:
         raise BudgetUnavailable("redis experiment budget write failed")
 
-    async def settle_call(self, reserved: int, actual: int):  # pragma: no cover - must not be reached
+    async def settle_call(self, reserved: int, actual: int): # pragma: no cover - must not be reached
         raise AssertionError("no settlement may follow a refused reservation")
 
 

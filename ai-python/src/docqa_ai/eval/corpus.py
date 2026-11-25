@@ -29,7 +29,7 @@ class CorpusDocument:
 class Query:
     query_id: str
     question: str
-    relevant: tuple[int, ...]  # 相关 chunk_index 列表
+    relevant: tuple[int, ...] # 相关 chunk_index 列表
 
 
 # ---------------------------------------------------------------------------

@@ -42,7 +42,7 @@ class LlmEgressPolicyTest {
     @Test
     void rejectsEmptyOverlongAndNonHttpUrls() {
         assertThatThrownBy(() -> policy().validate(null)).isInstanceOf(LlmEgressPolicy.EgressRejected.class);
-        assertThatThrownBy(() -> policy().validate("   ")).isInstanceOf(LlmEgressPolicy.EgressRejected.class);
+        assertThatThrownBy(() -> policy().validate(" ")).isInstanceOf(LlmEgressPolicy.EgressRejected.class);
         assertThatThrownBy(() -> policy().validate("https://93.184.216.34/" + "a".repeat(2100)))
                 .isInstanceOf(LlmEgressPolicy.EgressRejected.class)
                 .hasMessageContaining("too long");

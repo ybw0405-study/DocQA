@@ -37,7 +37,7 @@ def _property(message: Any, name: str) -> str | None:
     if callable(getter):
         try:
             value = getter(name)
-        except Exception:  # noqa: BLE001 - optional client binding
+        except Exception: # noqa: BLE001 - optional client binding
             value = None
         if value is not None:
             return str(value)
@@ -74,7 +74,7 @@ class WorkerPushConsumer:
         self._status: Any = None
 
     def start(self) -> None:
-        from rocketmq.client import ConsumeStatus, PushConsumer  # optional extra
+        from rocketmq.client import ConsumeStatus, PushConsumer # optional extra
 
         self._status = ConsumeStatus
         consumer = PushConsumer(self._consumer_group)
@@ -106,7 +106,7 @@ class WorkerPushConsumer:
                 self._loop,
             )
             outcome = future.result(timeout=self._handle_timeout_s)
-        except Exception:  # noqa: BLE001 - any failure must return the message to the broker
+        except Exception: # noqa: BLE001 - any failure must return the message to the broker
             log_event(LOGGER, logging.ERROR, "Message handling failed", step=self._step)
             return self._status.RECONSUME_LATER
         if outcome is HandleOutcome.RETRY:

@@ -19,9 +19,9 @@ interface Block {
   body: string[];
 }
 
-/** 取 `  <section>:` 到下一个二级键之间的行。 */
+/** 取 ` <section>:` 到下一个二级键之间的行。 */
 function sectionLines(startKey: string): string[] {
-  const start = contractLines.findIndex((line) => line === `  ${startKey}:`);
+  const start = contractLines.findIndex((line) => line === ` ${startKey}:`);
   if (start < 0) {
     throw new Error(`契约缺少区段 ${startKey}`);
   }
@@ -70,7 +70,7 @@ const PATHS_LINES = (() => {
  * 不等于每个接口都引用了它。
  */
 function operationBody(operationId: string): string[] {
-  const start = PATHS_LINES.findIndex((line) => line === `      operationId: ${operationId}`);
+  const start = PATHS_LINES.findIndex((line) => line === ` operationId: ${operationId}`);
   if (start < 0) {
     throw new Error(`契约缺少操作 ${operationId}`);
   }
@@ -88,7 +88,7 @@ function operationParameterRefs(body: string[]): string[] {
 
 /** 恰好缩进 8 空格、位于顶层 `properties:` 之后的键，即该 schema 的字段名。 */
 function contractFields(body: string[]): string[] {
-  const start = body.findIndex((line) => line === '      properties:');
+  const start = body.findIndex((line) => line === ' properties:');
   if (start < 0) {
     return [];
   }
@@ -107,11 +107,11 @@ function contractFields(body: string[]): string[] {
 }
 
 function contractRequired(body: string[]): string[] {
-  return contractList(body, '      required:');
+  return contractList(body, ' required:');
 }
 
 function contractEnum(body: string[]): string[] {
-  return contractList(body, '      enum:').map((value) => value.replace(/^['"]|['"]$/g, ''));
+  return contractList(body, ' enum:').map((value) => value.replace(/^['"]|['"]$/g, ''));
 }
 
 /** 收集某个 6 空格列表键下的 8 空格条目。 */
@@ -140,7 +140,7 @@ function contractFieldEnum(schema: string, field: string): string[] {
   if (body === undefined) {
     throw new Error(`契约缺少 schema ${schema}`);
   }
-  const start = body.findIndex((line) => line === `        ${field}:`);
+  const start = body.findIndex((line) => line === ` ${field}:`);
   if (start < 0) {
     throw new Error(`契约 ${schema} 缺少字段 ${field}`);
   }
@@ -149,7 +149,7 @@ function contractFieldEnum(schema: string, field: string): string[] {
     if (/^ {0,8}\S/.test(body[i])) {
       break;
     }
-    if (body[i] === '          enum:') {
+    if (body[i] === ' enum:') {
       enumStart = i;
       break;
     }
@@ -178,7 +178,7 @@ function frameDataBody(schema: string): string[] {
   if (body === undefined) {
     throw new Error(`契约缺少 schema ${schema}`);
   }
-  const start = body.findIndex((line) => line === '        data:');
+  const start = body.findIndex((line) => line === ' data:');
   if (start < 0) {
     throw new Error(`契约 ${schema} 缺少 data 字段`);
   }
@@ -189,7 +189,7 @@ function frameDataBody(schema: string): string[] {
 
 /** `data` 子树里 10 空格 `properties:` 下的 12 空格字段名。 */
 function frameDataFields(dataBody: string[]): string[] {
-  const start = dataBody.findIndex((line) => line === '          properties:');
+  const start = dataBody.findIndex((line) => line === ' properties:');
   if (start < 0) {
     return [];
   }
@@ -208,7 +208,7 @@ function frameDataFields(dataBody: string[]): string[] {
 
 /** `data` 子树里 10 空格 `required:` 下的 12 空格条目。 */
 function frameDataRequired(dataBody: string[]): string[] {
-  const start = dataBody.findIndex((line) => line === '          required:');
+  const start = dataBody.findIndex((line) => line === ' required:');
   if (start < 0) {
     return [];
   }
@@ -229,12 +229,12 @@ function frameEventEnum(schema: string): string[] {
   if (body === undefined) {
     throw new Error(`契约缺少 schema ${schema}`);
   }
-  const start = body.findIndex((line) => line === '        event:');
+  const start = body.findIndex((line) => line === ' event:');
   if (start < 0) {
     throw new Error(`契约 ${schema} 缺少 event 字段`);
   }
   const rest = body.slice(start + 1);
-  const enumStart = rest.findIndex((line) => line === '          enum:');
+  const enumStart = rest.findIndex((line) => line === ' enum:');
   if (enumStart < 0) {
     return [];
   }
@@ -251,7 +251,7 @@ function frameEventEnum(schema: string): string[] {
 
 /** `discriminator.mapping` 下的 10 空格键，即该请求实际接受类型的全集。 */
 function contractDiscriminator(body: string[]): string[] {
-  const start = body.findIndex((line) => line === '        mapping:');
+  const start = body.findIndex((line) => line === ' mapping:');
   if (start < 0) {
     throw new Error('契约缺少 discriminator.mapping');
   }
@@ -272,7 +272,7 @@ function contractConstraint(schema: string, field: string, keyword: string): str
   if (body === undefined) {
     throw new Error(`契约缺少 schema ${schema}`);
   }
-  const start = body.findIndex((line) => line === `        ${field}:`);
+  const start = body.findIndex((line) => line === ` ${field}:`);
   if (start < 0) {
     throw new Error(`契约 ${schema} 缺少字段 ${field}`);
   }
@@ -298,11 +298,11 @@ function contractItemConstraint(schema: string, field: string, keyword: string):
   if (body === undefined) {
     throw new Error(`契约缺少 schema ${schema}`);
   }
-  const fieldStart = body.findIndex((line) => line === `        ${field}:`);
+  const fieldStart = body.findIndex((line) => line === ` ${field}:`);
   if (fieldStart < 0) {
     throw new Error(`契约 ${schema} 缺少字段 ${field}`);
   }
-  const itemsStart = body.findIndex((line) => line === '          items:', fieldStart);
+  const itemsStart = body.findIndex((line) => line === ' items:', fieldStart);
   if (itemsStart < 0) {
     throw new Error(`契约 ${schema}.${field} 没有 items 子树`);
   }
@@ -486,7 +486,7 @@ const MIRRORED_OBJECTS: { schema: string; file: string; iface: string }[] = [
   { schema: 'NotificationListData', file: TYPES.notifications, iface: 'NotificationListData' },
   { schema: 'NotificationReadRequest', file: TYPES.notifications, iface: 'NotificationReadRequest' },
   { schema: 'NotificationReadData', file: TYPES.notifications, iface: 'NotificationReadData' },
-  //  管理面：治理开关 → 配额 → 审计 → 用量 → 两个 keyset 列表体。
+  // 管理面：治理开关 → 配额 → 审计 → 用量 → 两个 keyset 列表体。
   { schema: 'AdminAiControls', file: TYPES.admin, iface: 'AdminAiControls' },
   { schema: 'KillSwitchState', file: TYPES.admin, iface: 'KillSwitchState' },
   { schema: 'ExperimentBudgetState', file: TYPES.admin, iface: 'ExperimentBudgetState' },
@@ -503,7 +503,7 @@ const MIRRORED_OBJECTS: { schema: string; file: string; iface: string }[] = [
   { schema: 'AuditEventListData', file: TYPES.admin, iface: 'AuditEventListData' },
   // 契约 2.8.0 可观测性入口：只有一个基地址字段，空串 = 禁用。
   { schema: 'ObservabilityData', file: TYPES.admin, iface: 'ObservabilityData' },
-  //  用户管理面：改密请求 → 列表行 → 两个写请求 → keyset 列表体。
+  // 用户管理面：改密请求 → 列表行 → 两个写请求 → keyset 列表体。
   { schema: 'ChangePasswordRequest', file: TYPES.users, iface: 'ChangePasswordRequest' },
   { schema: 'UserSummaryData', file: TYPES.users, iface: 'UserSummary' },
   { schema: 'UserRolesUpdateRequest', file: TYPES.users, iface: 'UpdateUserRolesRequest' },
@@ -575,11 +575,11 @@ const NOT_MIRRORED: { schema: string; reason: string }[] = [
   {
     schema: 'AskStreamMeta',
     reason:
-      '事件帧顶层只有 event/data，载荷缩在 data 之下，进不了按顶层字段比对的镜像表；event 取值与 data 字段集合/required 由下方「四帧载荷」专项断言当场锁定，前端 AskStreamMetaPayload 已在  交付。',
+      '事件帧顶层只有 event/data，载荷缩在 data 之下，进不了按顶层字段比对的镜像表；event 取值与 data 字段集合/required 由下方「四帧载荷」专项断言当场锁定，前端 AskStreamMetaPayload 已在 交付。',
   },
   {
     schema: 'AskStreamDelta',
-    reason: '同 AskStreamMeta：嵌套载荷由下方专项断言锁定，前端 AskStreamDeltaPayload 已在  交付。',
+    reason: '同 AskStreamMeta：嵌套载荷由下方专项断言锁定，前端 AskStreamDeltaPayload 已在 交付。',
   },
   {
     schema: 'AskStreamDone',
@@ -762,9 +762,9 @@ const FIELD_SET_EXCEPTIONS: { schema: string; extraInFrontend: string[]; reason:
  *
  * 两类：
  * 1. `nextCursor` / `*At` / `errorCode` 等「契约允许整个键缺省、值可为 null」的响应字段。
- *    后端这些 DTO 一律是 Java record，且仓库内没有任何 Jackson 排除 null 的装配
- *    （`@JsonInclude` / `default-property-inclusion` 命中 0，由下方专项断言机器化守住），
- *    因此实际线上形态是「键恒在、值可为 null」，前端按这个形态镜像，消费方不必到处写可选链。
+ * 后端这些 DTO 一律是 Java record，且仓库内没有任何 Jackson 排除 null 的装配
+ * （`@JsonInclude` / `default-property-inclusion` 命中 0，由下方专项断言机器化守住），
+ * 因此实际线上形态是「键恒在、值可为 null」，前端按这个形态镜像，消费方不必到处写可选链。
  * 2. `ApiEnvelope.data`：契约的通用信封只有 `code/msg/traceId`，`data` 的必填交给各 Envelope 的 `allOf`。
  *
  * 契约一旦把这些字段列入 `required`，或后端引入了 null 排除配置，这两处都会变红——这正是登记的意义。
@@ -1060,7 +1060,7 @@ describe('契约 ↔ 前端类型对账', () => {
     // 两个读侧 kind 都复用三值 ReminderKind；契约若把它们改成内联枚举，上面的差集断言就失去依据。
     for (const schema of ['ReminderCreateData', 'NotificationData']) {
       const body = SCHEMAS.get(schema) ?? [];
-      const at = body.findIndex((line) => line === '        kind:');
+      const at = body.findIndex((line) => line === ' kind:');
       expect(at, `契约 ${schema} 缺少 kind 字段`).toBeGreaterThanOrEqual(0);
       expect(body[at + 1]?.trim(), `契约 ${schema}.kind 应复用三值 ReminderKind`).toBe(
         "$ref: '#/components/schemas/ReminderKind'",
@@ -1106,7 +1106,7 @@ describe('契约 ↔ 前端类型对账', () => {
   });
 
   /**
-   *  的四帧协议（`meta`/`delta`/`done`/`error`）载荷是 `{event, data}` 嵌套形态，
+   * 的四帧协议（`meta`/`delta`/`done`/`error`）载荷是 `{event, data}` 嵌套形态，
    * 顶层字段只有两个，进不了按顶层字段比对的 `MIRRORED_OBJECTS`；这里当场从契约解析出
    * 事件名、顶层 required 与 `data` 载荷，逐帧比对前端 `AskStream*Payload`。
    */
@@ -1198,7 +1198,7 @@ describe('契约 ↔ 前端类型对账', () => {
 
     expect(readNumber('default')).toBe(20);
     // PAGE_LIMIT 已收敛到 failureFields.ts 单一来源；逐个 store 只校验确实从该模块导入，
-    // 避免常量漂移时 6 份副本各改一半（P1-3 竞态修复同时抽掉了样板）。
+    // 避免常量漂移时 6 份副本各改一半。
     const sharedPageLimit = tsNumberConst('src/stores/failureFields.ts', 'PAGE_LIMIT');
     expect(sharedPageLimit).toBe(readNumber('default'));
     expect(sharedPageLimit).toBeGreaterThanOrEqual(readNumber('minimum'));
@@ -1266,7 +1266,7 @@ describe('契约 ↔ 前端类型对账', () => {
   });
 
   /**
-   *  的机器化。设计期注释曾假设管理端写入带 `version` 乐观锁与幂等键头，交付的契约两样都没有：
+   * 的机器化。设计期注释曾假设管理端写入带 `version` 乐观锁与幂等键头，交付的契约两样都没有：
    * 两个管理面 PUT 的请求体各只有契约列出的字段，管理面八个操作也都不引用任何幂等键参数。
    * 「不加任何头」与「按值幂等、并发覆盖为 last-write-wins」这两条界面表述就站在这条断言上；
    * 契约一旦引入幂等键或给管理端加上 429，这里先红，界面文案与 store 字段都要重新裁决。
@@ -1327,7 +1327,7 @@ describe('契约 ↔ 前端类型对账', () => {
   });
 
   /**
-   *  的机器化，方向与上面那条**相反**：用户管理面的两个写操作与改密在契约里都正式声明了
+   * 的机器化，方向与上面那条**相反**：用户管理面的两个写操作与改密在契约里都正式声明了
    * `IdempotencyKey`（Java 侧 `@RequestHeader` 必填），所以这里断言的是「参数集合**含**该参数」。
    * 这一条存在的理由是把两个面隔开：`api/admin.ts` 那条「不加任何头」的裁决一旦被复制到用户面，
    * 三个写请求会直接 400；反过来契约若把该参数删掉，拦截器补的头就成了无契约依据的额外请求头。
@@ -1409,7 +1409,7 @@ describe('契约 ↔ 前端类型对账', () => {
     if (body === undefined) {
       return false;
     }
-    const start = body.findIndex((line) => line === `        ${field}:`);
+    const start = body.findIndex((line) => line === ` ${field}:`);
     if (start < 0) {
       return false;
     }

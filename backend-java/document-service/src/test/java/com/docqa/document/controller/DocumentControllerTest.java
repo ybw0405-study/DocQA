@@ -218,7 +218,7 @@ class DocumentControllerTest {
                         .header("Idempotency-Key", IDEMPOTENCY_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"   "}
+                                {"title":" "}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COM-VALIDATION-001"))

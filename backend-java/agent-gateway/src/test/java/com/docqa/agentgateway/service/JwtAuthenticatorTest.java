@@ -157,7 +157,7 @@ class JwtAuthenticatorTest {
 
     @Test
     void rejectsEmptyToken() {
-        assertUnauthorized("Bearer   ");
+        assertUnauthorized("Bearer ");
     }
 
     @Test

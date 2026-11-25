@@ -111,7 +111,7 @@ class PgVectorRepository:
         tenant_value = str(tenant_id) if tenant_id is not None else None
         # 纵深防御：租户谓词与授权 IN 谓词同时成立，不能只靠 document scope。
         # 绑定参数必须严格按 SQL 里 %s 出现的顺序排列：
-        #   SELECT 的相似度向量 → WHERE tenant_id → IN 的各 (id, version) → ORDER BY 向量 → LIMIT。
+        # SELECT 的相似度向量 → WHERE tenant_id → IN 的各 (id, version) → ORDER BY 向量 → LIMIT。
         # 旧实现把 tenant_value 放在列表首位，真实 PG 会把 UUID 字符串当 vector 解析
         # （InvalidTextRepresentation）；内存替身不解析 SQL，所以 736 个单测全绿也没发现。
         tenant_prefix = "tenant_id = %s AND " if tenant_value is not None else ""

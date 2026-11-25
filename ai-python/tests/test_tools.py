@@ -109,7 +109,7 @@ async def test_document_search_masks_query_and_chunk_content() -> None:
 async def test_document_search_rejects_invalid_input() -> None:
     tool = DocumentSearchTool()
     with pytest.raises(ToolError):
-        await tool.run("   ", context())
+        await tool.run(" ", context())
     with pytest.raises(ToolError):
         await tool.run("x" * 201, context())
 
@@ -119,7 +119,7 @@ async def test_document_search_maps_retrieval_deadline() -> None:
         async def search(self, embedding: object, scopes: object, top_k: int) -> list[object]:
             raise RetrievalDeadlineExceeded("late")
 
-    service = RetrievalService(DeadlineRepository(), OfflineEmbeddingProvider())  # type: ignore[arg-type]
+    service = RetrievalService(DeadlineRepository(), OfflineEmbeddingProvider()) # type: ignore[arg-type]
     with pytest.raises(DeadlineExceeded):
         await DocumentSearchTool().run("alpha", context(service))
 
@@ -129,7 +129,7 @@ async def test_document_search_maps_unavailable_retrieval() -> None:
         async def search(self, embedding: object, scopes: object, top_k: int) -> list[object]:
             raise VectorStoreUnavailable("down")
 
-    service = RetrievalService(BrokenRepository(), OfflineEmbeddingProvider())  # type: ignore[arg-type]
+    service = RetrievalService(BrokenRepository(), OfflineEmbeddingProvider()) # type: ignore[arg-type]
     with pytest.raises(ToolError):
         await DocumentSearchTool().run("alpha", context(service))
 

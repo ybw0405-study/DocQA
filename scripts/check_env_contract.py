@@ -30,7 +30,7 @@ PROJECT_PREFIXES = ("AF_", "DOCQA_")
 
 # 非部署环境变量的占位符（Spring Boot / OS 注入），显式允许并打印。
 FRAMEWORK_PLACEHOLDERS = frozenset({
-    "PID",          # Spring Boot 进程 ID，如 ${PID:- }
+    "PID", # Spring Boot 进程 ID，如 ${PID:- }
     "HOSTNAME",
     "HOME",
     "TMPDIR",
@@ -88,7 +88,7 @@ def main() -> int:
     env_arg = Path(args.env)
     env_path = env_arg if env_arg.is_absolute() else (root / env_arg)
 
-    print(f"[check_env_contract] root        : {root}")
+    print(f"[check_env_contract] root : {root}")
     print(f"[check_env_contract] env.example : {env_path}")
 
     if not env_path.is_file():
@@ -98,7 +98,7 @@ def main() -> int:
     if not yml_files:
         print(f"::error:: {root} 下未找到 application*.yml", file=sys.stderr)
         return 1
-    print(f"[check_env_contract] yml files   : {len(yml_files)}")
+    print(f"[check_env_contract] yml files : {len(yml_files)}")
 
     env_keys = parse_env_keys(env_path)
     placeholders = collect_placeholders(yml_files)
@@ -115,7 +115,7 @@ def main() -> int:
     print(f"[check_env_contract] 框架/OS 占位符（显式排除）: {len(framework)}")
     for n in sorted(framework):
         status = "allowlisted" if n in FRAMEWORK_PLACEHOLDERS else "UNKNOWN"
-        print(f"    [{status}] {n}")
+        print(f" [{status}] {n}")
     print(f"[check_env_contract] env.example 中额外模板键（信息项，不判失败）: {len(extras)}")
 
     if unknown_framework:
@@ -127,7 +127,7 @@ def main() -> int:
     if missing:
         print(f"::error:: {len(missing)} 个 application.yml 变量未出现在 env.example：", file=sys.stderr)
         for n in missing:
-            print(f"    - {n}   (来自 {sorted(project_vars[n])})", file=sys.stderr)
+            print(f" - {n} (来自 {sorted(project_vars[n])})", file=sys.stderr)
         return 1
 
     print(f"PASS: {len(project_vars)} 个 {PROJECT_PREFIXES} 变量全部被 env.example 覆盖；"

@@ -329,7 +329,7 @@ class AgentAskService:
             )
         except AgentError:
             raise
-        except Exception as exc:  # noqa: BLE001 - 统一映射到脱敏 ProblemDetail
+        except Exception as exc: # noqa: BLE001 - 统一映射到脱敏 ProblemDetail
             raise _map_agent_error(collector, request, exc, deadline) from exc
 
     async def _prepare(
@@ -380,7 +380,7 @@ class AgentAskService:
         if self._experiment is not None:
             gate = await self._experiment.snapshot()
             if gate.calls_used >= gate.call_limit or gate.tokens_used >= gate.token_limit:
-                #  ②：额度用尽即在检索前软降级，形态与图内的 `_budget_stop` 逐字段相同——
+                # ②：额度用尽即在检索前软降级，形态与图内的 `_budget_stop` 逐字段相同——
                 # 零外呼、零引用、零新错误码，也不新增审计事件类型（Java 白名单不动）。
                 # 账本读不到时不软降级：让 BudgetError 走既有 503 分支，宁可少花也不裸奔。
                 log_event(
@@ -430,7 +430,7 @@ class AgentAskService:
                 raise upstream_unavailable(audit_events=collector.events(), trace_id=request.trace_id) from exc
         blocks = self._context_blocks(retrieved, request, history, memory_notes)
         allowed_tools = tuple(request.deduplicated_tools())
-        #  三层交集的第三层：注册表里只放「启动允许表 ∩ 实际发现」，
+        # 三层交集的第三层：注册表里只放「启动允许表 ∩ 实际发现」，
         # 第二层（请求 allowedTools）由 graph 的同一处校验兜住。发现失败只让工具消失，不阻断问答。
         tools = self._tools
         mcp_tool_count = 0
@@ -774,12 +774,12 @@ class AgentAskService:
             raise
         except AgentError:
             raise
-        except Exception as exc:  # noqa: BLE001 - 与同步路径共用同一映射
+        except Exception as exc: # noqa: BLE001 - 与同步路径共用同一映射
             raise _map_agent_error(collector, request, exc, deadline) from exc
 
     def _validate_request_pii(self, request: AgentAskRequest, collector: AuditCollector) -> str:
         # 复检 Java 第一层结果必须按请求声明的契约版本：v1 客户端只承诺遮三类，
-        # 用 v2 规则去复检会把未遮的银行卡误判成「Java 漏脱敏」而 422（DQ-P2-3）。
+        # 用 v2 规则去复检会把未遮的银行卡误判成「Java 漏脱敏」而 422。
         declared = request.pii_masking_version
         original = mask_text(request.question, version=declared)
         masked_question = mask_text(request.pii_masked_question, version=declared)

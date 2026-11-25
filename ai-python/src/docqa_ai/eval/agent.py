@@ -355,7 +355,7 @@ async def run_agent_eval() -> dict[str, Any]:
             try:
                 detail = await case(indexed, retrieval)
                 cases.append({"case_id": case_id, "passed": True, "detail": detail})
-            except Exception as exc:  # noqa: BLE001 - 评测框架要记录一切失败形态
+            except Exception as exc: # noqa: BLE001 - 评测框架要记录一切失败形态
                 cases.append({"case_id": case_id, "passed": False, "detail": f"{type(exc).__name__}: {exc}"})
     finally:
         await retrieval.aclose()

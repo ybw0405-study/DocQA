@@ -435,7 +435,7 @@ class ReminderControllerTest {
 
     @Test
     void statusUpdateRejectsFieldsThatAreNotInTheWriteSurface() throws Exception {
-        //  的代价在这里有强制力：往本端点塞 title/rrule 不会被静默忽略，也不会悄悄扩大可改面。
+        // 的代价在这里有强制力：往本端点塞 title/rrule 不会被静默忽略，也不会悄悄扩大可改面。
         mockMvc.perform(patch("/api/v1/reminders/" + REMINDER_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, USER_ID)
                         .header("Idempotency-Key", IDEMPOTENCY_KEY)
@@ -516,7 +516,7 @@ class ReminderControllerTest {
 
     @Test
     void aCourseReminderCannotBeCreatedEvenThoughTheReadSideReturnsTheKind() throws Exception {
-        //  的实证：COURSE 进了共享枚举但没有进 @JsonSubTypes，手写创建走不通，
+        // 的实证：COURSE 进了共享枚举但没有进 @JsonSubTypes，手写创建走不通，
         // 因为 COURSE 行必须带 source_uid 与 source_sequence 才维持得住幂等导入语义。
         mockMvc.perform(post("/api/v1/reminders")
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, USER_ID)

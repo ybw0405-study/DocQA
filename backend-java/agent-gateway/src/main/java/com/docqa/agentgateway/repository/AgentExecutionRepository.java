@@ -25,7 +25,7 @@ public interface AgentExecutionRepository {
      * 租户边界由每行自带的 {@code tenant_id} 随消息下发，写侧仍逐行带租户谓词。
      *
      * @param afterRecordedAt 游标时间；null 表示从表头开始（尚未 relay 过任何一批）
-     * @param afterId         游标 id，与时间共同构成 keyset 位置
+     * @param afterId 游标 id，与时间共同构成 keyset 位置
      */
     OutboxBacklog outboxBacklog(Instant afterRecordedAt, UUID afterId);
 

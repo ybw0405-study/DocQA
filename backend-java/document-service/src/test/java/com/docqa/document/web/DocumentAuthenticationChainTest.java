@@ -127,7 +127,7 @@ class DocumentAuthenticationChainTest {
 
     /**
      * 门禁的优先序：写端点缺 Bearer 时先 401，轮不到「缺 {@code Idempotency-Key} 头」的 400。
-     * 这条与  的取舍不冲突——它断言的正是鉴权发生在参数校验之前。
+     * 这条与 的取舍不冲突——它断言的正是鉴权发生在参数校验之前。
      */
     @Test
     void uploadInitWithoutTokenIsRejectedBeforeHeaderValidation() throws Exception {

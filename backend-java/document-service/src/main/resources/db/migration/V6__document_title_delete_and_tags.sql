@@ -16,11 +16,11 @@ ALTER TABLE document
     COMMENT '对账扫描：已软删除但向量侧尚未确认的文档，补投 vector-change-requested';
 
 CREATE TABLE document_tag (
-  id              CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  user_id         CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  name            VARCHAR(24) NOT NULL,
+  id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  user_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  name VARCHAR(24) NOT NULL,
   normalized_name VARCHAR(24) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-  created_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
   UNIQUE KEY uk_document_tag_user_normalized (user_id, normalized_name)
     COMMENT '标签名在同一用户内唯一，是 PUT 全量替换的收敛依据',
@@ -30,8 +30,8 @@ CREATE TABLE document_tag (
 
 CREATE TABLE document_tag_link (
   document_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  tag_id      CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  created_at  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  tag_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (document_id, tag_id),
   KEY idx_document_tag_link_tag (tag_id, document_id)
     COMMENT '按标签过滤文档列表（搜索的 tag 参数）',

@@ -47,7 +47,7 @@ def make_client(
         "timeout_s": 2.0,
     }
     options.update(overrides)
-    return BoundedHttpClient(**options)  # type: ignore[arg-type]
+    return BoundedHttpClient(**options) # type: ignore[arg-type]
 
 
 def html_response(body: str, *, status: int = 200) -> httpx.Response:

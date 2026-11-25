@@ -374,7 +374,7 @@ class RetrievalService:
         phrases = extract_phrases(question)
         surfaces = tuple(phrase.surface for phrase in phrases)
         with self._tracer.start_as_current_span("lexical.query") as span:
-            # 实际发出的词位数必须可观测，否则事后无法区分「没召回」与「没参与」（(c)）
+            # 实际发出的词位数必须可观测，否则事后无法区分「没召回」与「没参与」
             span.set_attribute("lexical.phrase_count", len(phrases))
             lexical_query = build_lexical_query(question)
             effective_chars = sum(len(phrase.surface) for phrase in phrases)
@@ -473,7 +473,7 @@ class RetrievalService:
 
     @staticmethod
     def _rerank_degrade(span: Span, size: int, reason: str) -> tuple[list[int], bool]:
-        """与  同形：rerank 是增量能力，它挂掉等于退回融合次序，对外响应体一个字段都不变。"""
+        """rerank 是增量能力：它挂掉等于退回融合次序，对外响应体一个字段都不变。"""
 
         span.set_attribute("rerank_fallback", True)
         log_event(LOGGER, logging.WARNING, reason, step="retrieval", operation="rerank", status="degraded")

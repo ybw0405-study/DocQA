@@ -25,7 +25,7 @@ public class PiiMasker {
     private static final Pattern PHONE = Pattern.compile(
             "(?<!\\d)(?:\\+?86[\\s-]?)?1[3-9]\\d{9}(?!\\d)");
     // 16~19 位连续数字候选；真正判定在 isBankCard（前缀 + Luhn），
-    // 避免订单号/流水号这类长数字被一律当成卡号（DQ-P2-3 的主要误报风险点）。
+    // 避免订单号/流水号这类长数字被一律当成卡号。
     private static final Pattern BANK_CARD = Pattern.compile("(?<!\\d)\\d{16,19}(?!\\d)");
     // 中国护照：E/G/S/D/P + 8 位数字（2019 版及现行）。
     private static final Pattern PASSPORT = Pattern.compile("(?<![A-Za-z0-9])[EGSDP]\\d{8}(?![A-Za-z0-9])");

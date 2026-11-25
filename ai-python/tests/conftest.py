@@ -16,7 +16,7 @@ from docqa_ai.protocol.models import AgentAskRequest
 # "Psycopg cannot use the 'ProactorEventLoop' to run in async mode"）。
 # 在收集阶段就切到 Selector，保证 test_pg_contract.py 这类真库用例在
 # Windows 开发机上也能复现 CI（Linux 默认就是 Selector，行为一致）。
-if sys.platform == "win32":  # pragma: no cover - 平台相关
+if sys.platform == "win32": # pragma: no cover - 平台相关
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 TRACE_ID = "0123456789abcdef0123456789abcdef"

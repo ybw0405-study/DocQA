@@ -178,7 +178,7 @@ describe('LoginView', () => {
   });
 
   it('hands the account page’s fixed notice key over as a status line and still lets the user sign in', async () => {
-    //  的完整链路：改密 204 之后服务端已吊销该用户全部刷新家族，本地会话清空，
+    // 的完整链路：改密 204 之后服务端已吊销该用户全部刷新家族，本地会话清空，
     // 落到登录页时 URL 里只有键名，句子本体由 display.ts 单点持有。
     await useAuthStore().signIn('demo', 'right-password');
     await changePassword({ currentPassword: 'right-password', newPassword: 'brandnewpass1' });
@@ -209,7 +209,7 @@ describe('LoginView', () => {
    );
     const { wrapper } = await mountLogin();
 
-    await submit(wrapper, 'right-password', '  demo  ');
+    await submit(wrapper, 'right-password', ' demo ');
 
     // handler 里还有一层 await request.json()，flushPromises 未必等得到它落值，
     // 整文件并发跑时微任务队列更拥挤——用 waitFor 等断言成立而非赌时序。

@@ -8,11 +8,11 @@
 -- 后置过滤会破坏 `ORDER BY embedding <=> %s LIMIT k` 的 top-k 语义）。换模型的唯一诚实形态是换表。
 --
 -- 本表承载的向量空间由**两件事**共同定义，缺一个就不再是同一种空间：
---   1) 模型：DashScope `text-embedding-v4`，输出 1024 维（E42 / E43 实测「请求不带 dimensions 时默认 1024」，
---       保持硬绑：模型给不出 1024 维就不接，而不是松绑维度）；
---   2) 预处理口径：写侧在文本进入 embedding Provider **之前**执行 `mask_text`（②）。
+-- 1) 模型：DashScope `text-embedding-v4`，输出 1024 维（E42 / E43 实测「请求不带 dimensions 时默认 1024」，
+-- 保持硬绑：模型给不出 1024 维就不接，而不是松绑维度）；
+-- 2) 预处理口径：写侧在文本进入 embedding Provider **之前**执行 `mask_text`（②）。
 -- 第 2 条意味着本表与 `chunk_embedding_1024`（offline 空间，输入为原文）**不可互灌**：同一模型下掩码前后
--- 的向量不相等，混在一起就等于把  要消除的静默混合换个地方重演一次。既有 28 行继续留在原表，
+-- 的向量不相等，混在一起就等于把 要消除的静默混合换个地方重演一次。既有 28 行继续留在原表，
 -- 本文件不 INSERT、不搬运、不改写任何旧行（否定 ③「清空重灌」：那要重跑全部解析并破坏
 -- `vector_id` 的稳定派生与 MySQL `chunk.vector_id` 的镜像关系）。
 --
@@ -25,8 +25,8 @@
 -- 词法通道不能省（代价条目原话：少建一个是静默能力缺失）。下面这段表达式与
 -- `text/lexical.py` 的 `LEXICAL_TSVECTOR_SQL` 逐字一致，且与本文件同目录的 002 那份**逐字同形**，
 -- 由 `tests/test_migrations.py` 对账，不是口头约定。两个细节仍是语义的一部分，写错不报错、只是静默失去召回：
---   1) 方括号：'(一-鿿)' 作为 POSIX 正则匹配的是字面三字符序列，不是任何汉字；
---   2) 第 4 个参数 'g'：少写它就只替换首个匹配。
+-- 1) 方括号：'(一-鿿)' 作为 POSIX 正则匹配的是字面三字符序列，不是任何汉字；
+-- 2) 第 4 个参数 'g'：少写它就只替换首个匹配。
 -- 字符类只覆盖 U+4E00–U+9FFF；扩展 A 区与兼容表意区的汉字在本通道零召回（/ ``），本表不改变这一点。
 --
 -- 三个索引名与 001 / 002 的全部索引名互不重复（PG 的索引名在 schema 内全局唯一），由 `test_migrations.py`
@@ -34,24 +34,24 @@
 --
 -- 授权面与 001 相同：没有任何按用户过滤的列，授权范围仍由 Java 侧结论以 (document_id, index_version) 传入（红线）。
 --
---  ② 的混空间对账（**人工 / 运维脚本执行，不进请求路径、不进 CI**，结论只进文档并写明谓词）：
---   SELECT metadata->>'embedding_model' AS embedding_model, count(*)
---     FROM chunk_embedding_1024_text_embedding_v4
---    GROUP BY 1
---    ORDER BY 2 DESC;
--- 期望恰好一行；出现第二行即本表已被两个模型写入，按  的口径需要建新表重灌，而不是加过滤。
+-- ② 的混空间对账（**人工 / 运维脚本执行，不进请求路径、不进 CI**，结论只进文档并写明谓词）：
+-- SELECT metadata->>'embedding_model' AS embedding_model, count(*)
+-- FROM chunk_embedding_1024_text_embedding_v4
+-- GROUP BY 1
+-- ORDER BY 2 DESC;
+-- 期望恰好一行；出现第二行即本表已被两个模型写入，按 的口径需要建新表重灌，而不是加过滤。
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS chunk_embedding_1024_text_embedding_v4 (
-  vector_id      UUID PRIMARY KEY,
-  document_id    UUID NOT NULL,
-  chunk_index    INT NOT NULL CHECK (chunk_index >= 0),
-  content        TEXT NOT NULL,
-  embedding      vector(1024) NOT NULL,
-  metadata       JSONB NOT NULL DEFAULT '{}'::jsonb,
-  index_version  TEXT NOT NULL,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  vector_id UUID PRIMARY KEY,
+  document_id UUID NOT NULL,
+  chunk_index INT NOT NULL CHECK (chunk_index >= 0),
+  content TEXT NOT NULL,
+  embedding vector(1024) NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  index_version TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (document_id, index_version, chunk_index)
 );
 

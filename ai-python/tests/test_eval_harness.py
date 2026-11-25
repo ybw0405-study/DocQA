@@ -32,9 +32,9 @@ def test_metrics_are_self_consistent() -> None:
     relevant = [("doc", 0)]
     r = compute_metrics("q", "test", returned, relevant, ks=(1, 3))
 
-    assert r.recall_at_k[1] == 0.0  # 相关块不在第 1 位
-    assert r.recall_at_k[3] == 1.0  # 相关块在第 2 位，前 3 召回
-    assert r.mrr == 0.5  # 相关块排第 2 → 1/2
+    assert r.recall_at_k[1] == 0.0 # 相关块不在第 1 位
+    assert r.recall_at_k[3] == 1.0 # 相关块在第 2 位，前 3 召回
+    assert r.mrr == 0.5 # 相关块排第 2 → 1/2
 
 
 def test_empty_relevant_is_zero_not_error() -> None:
@@ -50,8 +50,8 @@ def test_evaluate_queries_averages_correctly() -> None:
     summary = evaluate_queries([a, b], ks=(1,))
 
     assert summary.query_count == 2
-    assert summary.recall_at_k[1] == 0.5  # (1.0 + 0.0) / 2
-    assert summary.mrr == 0.75  # (1.0 + 0.5) / 2
+    assert summary.recall_at_k[1] == 0.5 # (1.0 + 0.0) / 2
+    assert summary.mrr == 0.75 # (1.0 + 0.5) / 2
 
 
 def test_offline_baseline_meets_minimum_quality() -> None:

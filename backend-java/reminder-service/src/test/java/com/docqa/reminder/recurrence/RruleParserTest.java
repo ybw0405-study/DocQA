@@ -154,7 +154,7 @@ class RruleParserTest {
     @Test
     void rejectsMalformedSyntax() {
         assertInvalid("");
-        assertInvalid("   ");
+        assertInvalid(" ");
         assertInvalid("FREQ=DAILY;");
         assertInvalid("FREQ=DAILY;INTERVAL=");
         assertInvalid("=DAILY");

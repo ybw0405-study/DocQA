@@ -8,7 +8,7 @@ package com.docqa.reminder.service;
  * 而 2 MiB 的文件会被指纹与解析各读一次，复制两次只是白扔内存。
  *
  * @param contentType {@code file} 部分的 Content-Type，允许为 null（浏览器常常不给）
- * @param content     文件原始字节
+ * @param content 文件原始字节
  */
 public record IcsUpload(String contentType, byte[] content) {
 }

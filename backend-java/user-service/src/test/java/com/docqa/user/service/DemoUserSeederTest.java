@@ -122,7 +122,7 @@ class DemoUserSeederTest {
 
     @Test
     void refusesABlankUsername() {
-        properties.setUsername("   ");
+        properties.setUsername(" ");
 
         assertThatThrownBy(() -> seeder().run(arguments))
                 .isInstanceOf(IllegalStateException.class)

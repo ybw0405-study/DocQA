@@ -47,7 +47,7 @@ async def test_switch_fails_closed_when_redis_is_unavailable() -> None:
         async def get(self, key: str) -> bytes:
             raise RedisError("down")
 
-    switch = RedisKillSwitch(FailingRedis(), KEY, cache_ms=0)  # type: ignore[arg-type]
+    switch = RedisKillSwitch(FailingRedis(), KEY, cache_ms=0) # type: ignore[arg-type]
     assert await switch.is_active() is True
 
 

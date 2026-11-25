@@ -1,6 +1,6 @@
 # DocQA 应用层（全容器交付）。与 infra 叠加启动：
-#   .\scripts\start-dev.ps1 -Containers     # 推荐：注入 env + 授权 + topic + pg 结构后起容器
-#   docker compose -f ops/docker-compose.infra.yml -f ops/docker-compose.app.yml up -d
+# .\scripts\start-dev.ps1 -Containers # 推荐：注入 env + 授权 + topic + pg 结构后起容器
+# docker compose -f ops/docker-compose.infra.yml -f ops/docker-compose.app.yml up -d
 # 直接 compose 时进程环境需自带 ops/env/local.env 的键（start-dev.ps1 -InfraOnly 会在
 # 其进程内注入；脚本退出后消失，故推荐 -Containers 一条命令）。
 #
@@ -174,7 +174,7 @@ services:
       args:
         JAR_PATH: /out/user-service.jar
     container_name: docqa-user
-    # 覆盖 java-base 镜像内置的 8080 探针：本服务实际监听 8081（P0-1 修复）
+    # 覆盖 java-base 镜像内置的 8080 探针：本服务实际监听 8081
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/actuator/health/readiness || exit 1"]
       interval: 15s
@@ -200,7 +200,7 @@ services:
       args:
         JAR_PATH: /out/document-service.jar
     container_name: docqa-document
-    # 覆盖镜像内置 8080 探针：本服务实际监听 8082（P0-1 修复）
+    # 覆盖镜像内置 8080 探针：本服务实际监听 8082
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
       interval: 15s
@@ -228,7 +228,7 @@ services:
       args:
         JAR_PATH: /out/reminder-service.jar
     container_name: docqa-reminder
-    # 覆盖镜像内置 8080 探针：本服务实际监听 8083（P0-1 修复）
+    # 覆盖镜像内置 8080 探针：本服务实际监听 8083
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8083/actuator/health/readiness || exit 1"]
       interval: 15s

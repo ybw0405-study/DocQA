@@ -47,7 +47,7 @@ def test_the_guard_is_deliberately_one_sided() -> None:
     """已知边界：反向组合（offline Provider 写真实模型表）**不拦**。
 
     拦它等于关掉「不花额度也能验证 003 形态」这条运维路径——一次性库里用离线伪向量试建表、试索引形态是
-    本期唯一零成本的形态取证手段。反向污染的检测归  的有界对账查询：它按 `metadata->>'embedding_model'`
+    本期唯一零成本的形态取证手段。反向污染的检测归 的有界对账查询：它按 `metadata->>'embedding_model'`
     分组，两个方向的混写都会露出第二行。守卫只消掉最容易 accidental 的那一格（切了 Provider 忘了切表）。
     """
 

@@ -658,7 +658,7 @@ export const DEMO_REMINDER_ID = '00000000-0000-0000-0000-0000000000f1';
 export const DEMO_COURSE_REMINDER_ID = '00000000-0000-0000-0000-0000000000fa';
 
 /**
- * 第 2 行是**暂停**样本：契约  规定暂停只改状态、`nextTriggerAt` 保留原计划值，
+ * 第 2 行是**暂停**样本：契约 规定暂停只改状态、`nextTriggerAt` 保留原计划值，
  * 所以这一行带着一个未来的时刻却不会响——前端若按「时刻是否为空」分组就会把它说成待触发。
  * 第 3 行只在游标页出现。
  */
@@ -1241,7 +1241,7 @@ export const adminStubState = {
    * 关掉本租户键、有效状态仍为 true」这条最容易被界面撒谎掩盖的语义。
    */
   tenantKillSwitch: { active: false, updatedAt: null as string | null, updatedBy: null as string | null },
-  /** 摆出  的形态：平台级开关已写入 Redis，随后审计失败 → 500 且 detail 说明状态已变更。 */
+  /** 摆出 的形态：平台级开关已写入 Redis，随后审计失败 → 500 且 detail 说明状态已变更。 */
   controlsAuditFails: false,
   /** 租户级开关的同一形态：状态已变更、审计写入失败。 */
   tenantControlsAuditFails: false,

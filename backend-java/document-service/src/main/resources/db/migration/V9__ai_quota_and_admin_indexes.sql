@@ -12,12 +12,12 @@
 
 -- 按用户的 AI 日配额覆盖；缺行表示不设上限
 CREATE TABLE ai_quota (
-  user_id               CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  daily_question_limit  INT UNSIGNED NULL,
-  daily_token_limit     INT UNSIGNED NULL,
-  updated_at            DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+  user_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  daily_question_limit INT UNSIGNED NULL,
+  daily_token_limit INT UNSIGNED NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
                           ON UPDATE CURRENT_TIMESTAMP(3),
-  updated_by            CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  updated_by CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
   PRIMARY KEY (user_id),
   KEY idx_ai_quota_updated (updated_at, user_id)
     COMMENT '管理面按最近变更 keyset 分页',

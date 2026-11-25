@@ -143,7 +143,7 @@ class PgVectorWriter:
                         rows_written = await _read_count(cursor)
         except VectorWriteError:
             raise
-        except Exception as exc:  # noqa: BLE001 - driver/pool failures are sanitized below
+        except Exception as exc: # noqa: BLE001 - driver/pool failures are sanitized below
             raise VectorWriteError("vector write failed") from exc
         return rows_written
 
@@ -179,7 +179,7 @@ class PgVectorWriter:
                         remaining_rows = await _read_count(cursor)
         except VectorWriteError:
             raise
-        except Exception as exc:  # noqa: BLE001 - driver/pool failures are sanitized below
+        except Exception as exc: # noqa: BLE001 - driver/pool failures are sanitized below
             raise VectorWriteError("vector delete failed") from exc
         return remaining_rows
 

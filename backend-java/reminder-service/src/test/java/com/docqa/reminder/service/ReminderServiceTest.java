@@ -134,7 +134,7 @@ class ReminderServiceTest {
         CustomReminderCreateRequest request = new CustomReminderCreateRequest(
                 ReminderKind.CUSTOM,
                 "高等数学",
-                "   ",
+                " ",
                 "Asia/Shanghai",
                 "FREQ=WEEKLY;BYDAY=MO",
                 Instant.parse("2026-09-07T00:00:00Z"),

@@ -63,7 +63,7 @@ class MinioObjectStorage:
             if exc.code in {"NoSuchKey", "NoSuchObject"}:
                 raise ObjectNotFound("object does not exist") from exc
             raise StorageUnavailable("object storage read failed") from exc
-        except Exception as exc:  # noqa: BLE001 - urllib3/minio transport errors vary
+        except Exception as exc: # noqa: BLE001 - urllib3/minio transport errors vary
             raise StorageUnavailable("object storage read failed") from exc
         finally:
             if response is not None:

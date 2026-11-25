@@ -18,9 +18,9 @@ import java.util.Set;
  *
  * <p>判定的两个方向都必须管，只查一边会留下假阴性：</p>
  * <ul>
- *   <li><b>多了</b>：出现 {@code UPDATE} / {@code DELETE}，历史行从授权层就能被改写；</li>
- *   <li><b>少了</b>：缺 {@code SELECT} 或 {@code INSERT}，服务会在运行期以 500 的形式
- *       暴露，而不是在启动时就告诉你账号配错了。</li>
+ * <li><b>多了</b>：出现 {@code UPDATE} / {@code DELETE}，历史行从授权层就能被改写；</li>
+ * <li><b>少了</b>：缺 {@code SELECT} 或 {@code INSERT}，服务会在运行期以 500 的形式
+ * 暴露，而不是在启动时就告诉你账号配错了。</li>
  * </ul>
  */
 public final class AuditAppendOnlyAssessment {
@@ -144,10 +144,10 @@ public final class AuditAppendOnlyAssessment {
      * 判定主入口。
      *
      * @param account 形如 {@code 'ss_audit'@'localhost'} 的账号字面量；它会**原样**进入
-     *                {@link Result#remediationSql()}，所以必须是可执行 SQL 的形态而不是
-     *                {@code ss_audit@localhost}
-     * @param schema  当前连接的库名；为 null 或空表示连接串没带库名，判定降级为 UNKNOWN
-     * @param grants  三路查询的并集：全局授权、本库授权、本库 {@code audit_event} 的表级授权
+     * {@link Result#remediationSql()}，所以必须是可执行 SQL 的形态而不是
+     * {@code ss_audit@localhost}
+     * @param schema 当前连接的库名；为 null 或空表示连接串没带库名，判定降级为 UNKNOWN
+     * @param grants 三路查询的并集：全局授权、本库授权、本库 {@code audit_event} 的表级授权
      */
     public static Result assess(String account, String schema, List<Grant> grants) {
         if (schema == null || schema.isBlank()) {

@@ -31,7 +31,7 @@ const tone = computed(() => {
       class="governance__chip"
       :class="`governance__chip--${tone}`"
     >{{ headline }}</span>
-    <!-- 「证据不足」单看会被读成什么都没查到，这句是  补的界面口径，不是新字段。 -->
+    <!-- 「证据不足」单看会被读成什么都没查到，这句是 补的界面口径，不是新字段。 -->
     <span
       v-if="governance !== null && governance.budgetStatus === 'LOW_CONFIDENCE'"
       class="governance__item"

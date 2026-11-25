@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 解析「真实客户端 IP」。所有流量经 agent-gateway 转发时 {@code remoteAddr} 恒为网关地址，
- * 直接拿它做限流键会让全站共享同一份配额（P1-1）。
+ * 直接拿它做限流键会让全站共享同一份配额。
  *
  * <p>只在 {@code remoteAddr} 命中可信代理白名单时才读取 {@code X-Forwarded-For}：直接来自
  * 公网的请求可以任意伪造 XFF，不设白名单等于把限流键交给攻击者控制。XFF 从右向左跳过

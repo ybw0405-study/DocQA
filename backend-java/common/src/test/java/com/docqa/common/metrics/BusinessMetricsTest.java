@@ -72,7 +72,7 @@ class BusinessMetricsTest {
     @Test
     @DisplayName("空标签折叠成 NULL，避免同一指标裂成「无标签」与「空标签」两条序列")
     void blankTagsCollapseToNull() {
-        metrics.qaRequest(null, "  ", false);
+        metrics.qaRequest(null, " ", false);
 
         String scrape = registry.scrape();
         assertThat(scrape).contains("status=\"NULL\"");

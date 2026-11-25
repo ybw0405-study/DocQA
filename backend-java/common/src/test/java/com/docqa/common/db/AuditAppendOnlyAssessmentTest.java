@@ -159,7 +159,7 @@ class AuditAppendOnlyAssessmentTest {
     @Test
     @DisplayName("账号缺失时摘要里出现 unknown 而不是抛空指针")
     void blankAccountIsTolerated() {
-        Result result = AuditAppendOnlyAssessment.assess("  ", SCHEMA, List.of());
+        Result result = AuditAppendOnlyAssessment.assess(" ", SCHEMA, List.of());
 
         assertThat(result.account()).isEqualTo("unknown");
         assertThat(result.verdict()).isEqualTo(Verdict.VIOLATION);

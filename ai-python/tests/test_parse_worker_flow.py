@@ -81,12 +81,12 @@ def make_worker(
     config = settings or make_settings(chunk_size_chars=100, chunk_overlap_chars=20)
     return ParseWorker(
         config,
-        storage=storage or InMemoryObjectStorage({OBJECT_KEY: TEXT_BODY}),  # type: ignore[arg-type]
-        embedder=embedder or OfflineEmbeddingProvider(),  # type: ignore[arg-type]
-        writer=writer or InMemoryVectorWriter(),  # type: ignore[arg-type]
+        storage=storage or InMemoryObjectStorage({OBJECT_KEY: TEXT_BODY}), # type: ignore[arg-type]
+        embedder=embedder or OfflineEmbeddingProvider(), # type: ignore[arg-type]
+        writer=writer or InMemoryVectorWriter(), # type: ignore[arg-type]
         publisher=publisher or InMemoryParsePublisher(),
-        idempotency=idempotency or InMemoryIdempotencyStore(),  # type: ignore[arg-type]
-        tracer=tracer,  # type: ignore[arg-type]
+        idempotency=idempotency or InMemoryIdempotencyStore(), # type: ignore[arg-type]
+        tracer=tracer, # type: ignore[arg-type]
     )
 
 
@@ -198,7 +198,7 @@ async def test_minio_storage_maps_s3_errors_and_size_caps() -> None:
         storage.get("uploads/a.txt", max_bytes=10)
     except ObjectNotFound:
         pass
-    else:  # pragma: no cover - defensive
+    else: # pragma: no cover - defensive
         raise AssertionError("NoSuchKey must map to ObjectNotFound")
 
     response = FakeResponse(b"x" * 20)
@@ -207,7 +207,7 @@ async def test_minio_storage_maps_s3_errors_and_size_caps() -> None:
         storage.get("uploads/a.txt", max_bytes=10)
     except ObjectTooLarge:
         pass
-    else:  # pragma: no cover - defensive
+    else: # pragma: no cover - defensive
         raise AssertionError("oversized object must map to ObjectTooLarge")
     assert response.closed is True
 
@@ -300,11 +300,11 @@ async def test_publish_failure_releases_message_for_redelivery() -> None:
             super().__init__()
             self.failures = failures
 
-        async def publish_completed(self, event: object) -> None:  # type: ignore[override]
+        async def publish_completed(self, event: object) -> None: # type: ignore[override]
             if self.failures:
                 self.failures -= 1
                 raise PublishError("broker down")
-            await super().publish_completed(event)  # type: ignore[arg-type]
+            await super().publish_completed(event) # type: ignore[arg-type]
 
     publisher = FlakyPublisher(failures=1)
     writer = InMemoryVectorWriter()

@@ -29,12 +29,12 @@ import org.springframework.stereotype.Service;
  *
  * <p>安全边界：
  * <ul>
- *   <li>tenantId 一律来自已验签 JWT，不接受请求参数；每个仓库调用都带租户谓词。</li>
- *   <li>明文 Key 只在 {@link #authorize} 的入参与 {@link #probe} 的出网调用里出现，
- *       落库前封装成密文，日志与审计 payload 都不含它。</li>
- *   <li>审计 payload 只用跨语言白名单里的键（{@code model}），连接 id 只进结构化日志，
- *       避免为这个功能扩白名单而牵动三侧实现。</li>
- *   <li>每次写提交后同步 Redis 分发键；MySQL 是事实来源，分发失败不回滚库内变更。</li>
+ * <li>tenantId 一律来自已验签 JWT，不接受请求参数；每个仓库调用都带租户谓词。</li>
+ * <li>明文 Key 只在 {@link #authorize} 的入参与 {@link #probe} 的出网调用里出现，
+ * 落库前封装成密文，日志与审计 payload 都不含它。</li>
+ * <li>审计 payload 只用跨语言白名单里的键（{@code model}），连接 id 只进结构化日志，
+ * 避免为这个功能扩白名单而牵动三侧实现。</li>
+ * <li>每次写提交后同步 Redis 分发键；MySQL 是事实来源，分发失败不回滚库内变更。</li>
  * </ul>
  */
 @Service

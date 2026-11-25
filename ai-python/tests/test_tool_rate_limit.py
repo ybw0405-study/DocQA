@@ -53,7 +53,7 @@ async def test_redis_failure_is_fail_closed() -> None:
         def pipeline(self) -> object:
             raise RedisError("redis is down")
 
-    limiter = RedisToolRateLimiter(BrokenRedis(), 20, clock=lambda: NOW)  # type: ignore[arg-type]
+    limiter = RedisToolRateLimiter(BrokenRedis(), 20, clock=lambda: NOW) # type: ignore[arg-type]
     with pytest.raises(ToolRateLimitUnavailable):
         await limiter.allow("u1")
 

@@ -4,9 +4,9 @@
  *
  * 两条贯穿口径：
  * 1. 「键恒在、值可为 null」——后端 DTO 是 Java record 且不排除 null，因此契约里可空的字段
- *    在这里写成 TS 必填 `| null`，消费方不必到处写可选链。
+ * 在这里写成 TS 必填 `| null`，消费方不必到处写可选链。
  * 2. **凭据只进不出**：读侧只有 `hasCredential` 布尔，没有密文、keyId 或明文 Key 字段；
- *    明文 Key 只作为 `AuthorizeModelConnectionRequest.secret` 出现一次，且只存组件本地 state。
+ * 明文 Key 只作为 `AuthorizeModelConnectionRequest.secret` 出现一次，且只存组件本地 state。
  */
 
 /** 契约 `CreateModelConnectionRequest.name` 的 maxLength。 */

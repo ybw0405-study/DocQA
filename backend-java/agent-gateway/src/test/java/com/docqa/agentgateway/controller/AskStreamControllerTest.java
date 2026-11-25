@@ -168,7 +168,7 @@ class AskStreamControllerTest {
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, USER_ID)
                         .header("Idempotency-Key", KEY)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"question\":\"   \",\"documentIds\":[\"" + DOCUMENT_ID + "\"]}"))
+                        .content("{\"question\":\" \",\"documentIds\":[\"" + DOCUMENT_ID + "\"]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AGT-VALIDATION-001"));
     }

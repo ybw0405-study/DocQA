@@ -96,7 +96,7 @@ class DocumentParser:
         if reader.is_encrypted:
             try:
                 unlocked = reader.decrypt("")
-            except Exception as exc:  # noqa: BLE001 - cryptography backends raise many types
+            except Exception as exc: # noqa: BLE001 - cryptography backends raise many types
                 raise ParseJobError(ENCRYPTED, "无法解析加密的 PDF，请先解除密码保护。", retryable=False) from exc
             if getattr(unlocked, "value", unlocked) == 0:
                 raise ParseJobError(ENCRYPTED, "无法解析加密的 PDF，请先解除密码保护。", retryable=False)
@@ -107,7 +107,7 @@ class DocumentParser:
         for page_no, page in enumerate(reader.pages, start=1):
             try:
                 text = page.extract_text() or ""
-            except Exception as exc:  # noqa: BLE001 - malformed PDF internals vary by parser
+            except Exception as exc: # noqa: BLE001 - malformed PDF internals vary by parser
                 raise ParseJobError(INVALID_DOCUMENT, _CORRUPT, retryable=False) from exc
             total += len(text)
             self._check_size(total)
@@ -122,7 +122,7 @@ class DocumentParser:
         """文本层全空时，把整份 PDF 交给 OCR provider 识别，逐页重建 ParsedPage。"""
         try:
             recognized = self._ocr.recognize(data)
-        except Exception as exc:  # noqa: BLE001 - OCR 引擎异常不得外泄为解析契约
+        except Exception as exc: # noqa: BLE001 - OCR 引擎异常不得外泄为解析契约
             raise ParseJobError(INVALID_DOCUMENT, _EMPTY, retryable=False) from exc
         if not isinstance(recognized, list) or len(recognized) != page_count:
             # OCR 返回页数与 PDF 实际页数不一致视为识别失败，退回「无文本」。
@@ -140,7 +140,7 @@ class DocumentParser:
         self._check_zip(data)
         try:
             document = Document(io.BytesIO(data))
-        except Exception as exc:  # noqa: BLE001 - python-docx wraps zip/xml failures inconsistently
+        except Exception as exc: # noqa: BLE001 - python-docx wraps zip/xml failures inconsistently
             raise ParseJobError(INVALID_DOCUMENT, _CORRUPT, retryable=False) from exc
         lines = [paragraph.text for paragraph in document.paragraphs if paragraph.text.strip()]
         for table in document.tables:

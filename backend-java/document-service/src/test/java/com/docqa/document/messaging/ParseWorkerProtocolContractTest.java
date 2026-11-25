@@ -29,7 +29,7 @@ class ParseWorkerProtocolContractTest {
     private static final Path PYTHON_MODELS = Path.of(
             "ai-python/src/docqa_ai/parse_worker/models.py");
 
-    private static final Pattern FIELD_LINE = Pattern.compile("^    ([a-z][a-z0-9_]*):", Pattern.MULTILINE);
+    private static final Pattern FIELD_LINE = Pattern.compile("^ ([a-z][a-z0-9_]*):", Pattern.MULTILINE);
     private static final Pattern ALIAS = Pattern.compile("alias=\"([A-Za-z][A-Za-z0-9]*)\"");
 
     /** Java record 类 → Python StrictModel 类名，逐一对应 parse_worker 的 6 个消息。 */

@@ -27,7 +27,8 @@ class RerankOutputInvalid(RerankError):
 class RerankedItem:
     """名次载体：`index` 指回传入 `documents` 的原下标，`score` 是第三方相关性分。
 
-    按 ，`score` 不得对外冒充相似度，只用于决定名次。
+    `score` 不得对外冒充相似度，只用于决定名次：不同 rerank 厂商的分值域与归一化方式
+    各不相同，直接暴露会让调用方误以为是可比的相似度。
     """
 
     index: int

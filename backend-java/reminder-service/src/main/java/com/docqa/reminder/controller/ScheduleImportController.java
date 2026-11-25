@@ -41,7 +41,7 @@ import org.springframework.web.multipart.MultipartFile;
  * Part 级 Content-Type，没有任何转换器能把这种字段读成 {@code String} 或 {@code int}，
  * 于是每个请求都在绑定阶段抛出 {@code HttpMediaTypeNotSupportedException}——它表达的是
  * 「这个 Part 我读不了」，与调用方的错无关，全局策略会把它映射成 415
- * {@code COM-UNSUPPORTED_MEDIA-001}（R-02 修复前曾落兜底 500）。
+ * {@code COM-UNSUPPORTED_MEDIA-001}。
  * servlet 容器本来就把 multipart 里的文本字段暴露成请求参数，{@code @RequestParam} 才是对等的绑法。
  */
 @RestController

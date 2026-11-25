@@ -33,9 +33,9 @@ import reactor.netty.http.client.HttpClient;
  *
  * <p>三条边界：
  * <ul>
- *   <li>出网前过 {@link LlmEgressPolicy}，界面填进来的地址在这里仍是不受信输入；</li>
- *   <li>响应体有字节上限，模型清单有条数与长度上限，避免对端把网关撑爆；</li>
- *   <li>不跟随重定向（Reactor Netty 默认行为），否则白名单校验会被一次 302 绕过。</li>
+ * <li>出网前过 {@link LlmEgressPolicy}，界面填进来的地址在这里仍是不受信输入；</li>
+ * <li>响应体有字节上限，模型清单有条数与长度上限，避免对端把网关撑爆；</li>
+ * <li>不跟随重定向（Reactor Netty 默认行为），否则白名单校验会被一次 302 绕过。</li>
  * </ul>
  *
  * <p>任何失败都只回 {@link ModelProbeFailure} 与可读原因，**不回显密钥**，

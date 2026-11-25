@@ -95,7 +95,7 @@ jobs:
           if errors:
               print('配置守卫失败：', file=sys.stderr)
               for item in errors:
-                  print(f'  - {item}', file=sys.stderr)
+                  print(f' - {item}', file=sys.stderr)
               sys.exit(1)
           print(f'配置守卫通过：{len(workflows)} 个 workflow、compose 镜像全部按 digest 固定。')
           PY
@@ -155,7 +155,7 @@ jobs:
           if errors:
               print('弱凭据泄漏门禁失败：', file=sys.stderr)
               for item in errors:
-                  print(f'  - {item}', file=sys.stderr)
+                  print(f' - {item}', file=sys.stderr)
               sys.exit(1)
           print('弱凭据泄漏门禁通过：未发现可被直接利用的明文弱口令/弱令牌。')
           PY

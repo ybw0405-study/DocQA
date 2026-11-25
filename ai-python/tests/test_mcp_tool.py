@@ -102,7 +102,7 @@ async def test_run_parses_json_object_and_masks_before_truncating() -> None:
 
 async def test_empty_input_is_sent_as_an_empty_object() -> None:
     client = FakeMcpClient()
-    await tool(client, required=()).run("   ", context())
+    await tool(client, required=()).run(" ", context())
     assert client.calls[0][1] == {}
 
 

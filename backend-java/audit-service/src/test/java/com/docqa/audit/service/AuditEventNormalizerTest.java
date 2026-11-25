@@ -27,7 +27,7 @@ class AuditEventNormalizerTest {
         AuditEventMessage message = new AuditEventMessage(
                 EVENT_ID,
                 "RAG_RETRIEVED",
-                "  rag_retriever  ",
+                " rag_retriever ",
                 "python",
                 "info",
                 NOW.minusSeconds(1),

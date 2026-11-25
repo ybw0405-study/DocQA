@@ -5,14 +5,14 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS chunk_embedding_1024 (
-  vector_id      UUID PRIMARY KEY,
-  document_id    UUID NOT NULL,
-  chunk_index    INT NOT NULL CHECK (chunk_index >= 0),
-  content        TEXT NOT NULL,
-  embedding      vector(1024) NOT NULL,
-  metadata       JSONB NOT NULL DEFAULT '{}'::jsonb,
-  index_version  TEXT NOT NULL,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  vector_id UUID PRIMARY KEY,
+  document_id UUID NOT NULL,
+  chunk_index INT NOT NULL CHECK (chunk_index >= 0),
+  content TEXT NOT NULL,
+  embedding vector(1024) NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  index_version TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (document_id, index_version, chunk_index)
 );
 

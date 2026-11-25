@@ -5,16 +5,16 @@
 -- 1. 默认租户承载全部存量数据；id 固定为全 1 UUID，便于回滚与人工核对。
 -- 2. 所有业务表新增 tenant_id，用 DEFAULT 默认值加列，MySQL 8 对存量行为 instant DDL。
 -- 3. 唯一键改造为含 tenant_id 的复合键：username / md5 / 标签名 / 幂等键 / 配额主键
---    全部从「全局唯一」变为「租户内唯一」，这是多租户最直接的冲突点。
+-- 全部从「全局唯一」变为「租户内唯一」，这是多租户最直接的冲突点。
 -- 4. 直接引用 app_user 的表把外键升级为复合外键 (tenant_id, user_id)，
---    数据库层保证 tenant_id 不能被写错；追加写表（audit_event / agent_execution）
---    保持无外键的既有约定，靠租户谓词与审计约束保证。
+-- 数据库层保证 tenant_id 不能被写错；追加写表（audit_event / agent_execution）
+-- 保持无外键的既有约定，靠租户谓词与审计约束保证。
 -- 5. app_user.id 仍为主键，但另加 (tenant_id, id) 唯一键供复合外键引用。
 -- 6. 新的复合外键一律**另起名字**（fk_<表>_tenant_<目标>），不复用旧名。原因：
---    MySQL 在一条 ALTER 里先校验名字唯一性再应用 DROP，所以
---    「DROP FOREIGN KEY fk_x, ADD CONSTRAINT fk_x ...」会直接报
---    ERROR 1826 Duplicate foreign key constraint name。语义上也该换名——
---    约束从单列外键变成了带租户维度的复合外键。
+-- MySQL 在一条 ALTER 里先校验名字唯一性再应用 DROP，所以
+-- 「DROP FOREIGN KEY fk_x, ADD CONSTRAINT fk_x ...」会直接报
+-- ERROR 1826 Duplicate foreign key constraint name。语义上也该换名——
+-- 约束从单列外键变成了带租户维度的复合外键。
 --
 -- 本迁移包含 DROP INDEX / DROP FOREIGN KEY：只删「约束」不删「数据」，
 -- 且删除的旧约束均在本文件内以租户化版本重建。
@@ -26,15 +26,15 @@
 -- 任何把 DML 塞回迁移的改动。
 
 CREATE TABLE tenant (
-  id             CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  slug           VARCHAR(64)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  name           VARCHAR(120) NOT NULL,
-  tier           VARCHAR(24)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  isolation      VARCHAR(16)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  status         VARCHAR(16)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT 'ACTIVE',
-  owner_user_id  CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
-  created_at     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  updated_at     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+  id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  slug VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  tier VARCHAR(24) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  isolation VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  status VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT 'ACTIVE',
+  owner_user_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
                    ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
   UNIQUE KEY uk_tenant_slug (slug),

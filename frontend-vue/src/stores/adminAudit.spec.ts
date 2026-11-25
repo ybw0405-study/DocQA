@@ -51,7 +51,7 @@ describe('adminAudit store', () => {
   });
 
   it('trims a condition and omits a blank one instead of sending an empty filter', async () => {
-    await store.applyFilters({ traceId: '   ', userId: ` ${DEMO_TARGET_USER_ID} ` });
+    await store.applyFilters({ traceId: ' ', userId: ` ${DEMO_TARGET_USER_ID} ` });
 
     expect(callLog.adminOps.map((entry) => entry.search)).toEqual([`?userId=${DEMO_TARGET_USER_ID}&limit=100`]);
     expect(store.filterTraceId).toBeNull();

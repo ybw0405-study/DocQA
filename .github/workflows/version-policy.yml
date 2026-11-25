@@ -85,8 +85,8 @@ jobs:
           if declared.get(tool) != floor:
               print(f'矩阵下限 {tool}={floor} 与项目声明 {declared.get(tool)} 不一致', file=sys.stderr)
               sys.exit(1)
-          print(f'java  pinned={java_pinned} floor={java_floor}')
-          print(f'node  pinned={node_pinned} floor={node_floor}')
+          print(f'java pinned={java_pinned} floor={java_floor}')
+          print(f'node pinned={node_pinned} floor={node_floor}')
           print(f'python pinned={py_pinned} floor={py_floor}')
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as fh:
               fh.write(f'### 版本下限校验通过（{tool} {floor}）\n\n')
@@ -115,8 +115,8 @@ jobs:
       - name: 在声明的下限版本上冒烟
         run: |
           case "${{ matrix.tool }}" in
-            java)   java -version ;;
-            node)   node --version ;;
+            java) java -version ;;
+            node) node --version ;;
             python) python --version ;;
             *) echo "未知的 matrix.tool"; exit 1 ;;
           esac

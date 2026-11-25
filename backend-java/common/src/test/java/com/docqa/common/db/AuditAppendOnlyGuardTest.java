@@ -152,7 +152,7 @@ class AuditAppendOnlyGuardTest {
         assertThat(AuditAppendOnlyGuard.Mode.parse("enforce")).isEqualTo(AuditAppendOnlyGuard.Mode.ENFORCE);
         assertThat(AuditAppendOnlyGuard.Mode.parse(" OFF ")).isEqualTo(AuditAppendOnlyGuard.Mode.OFF);
         assertThat(AuditAppendOnlyGuard.Mode.parse(null)).isEqualTo(AuditAppendOnlyGuard.Mode.ENFORCE);
-        assertThat(AuditAppendOnlyGuard.Mode.parse("  ")).isEqualTo(AuditAppendOnlyGuard.Mode.ENFORCE);
+        assertThat(AuditAppendOnlyGuard.Mode.parse(" ")).isEqualTo(AuditAppendOnlyGuard.Mode.ENFORCE);
         assertThatThrownBy(() -> AuditAppendOnlyGuard.Mode.parse("enfroce"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("enfroce");
