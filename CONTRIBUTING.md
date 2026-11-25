@@ -147,7 +147,7 @@ Java 分层与依赖边界见 [docs/00-infra/maven-modules.md](docs/00-infra/mav
 - **本轮（2026-11-21）按授权启用了其余远端配置，但刻意未改这两项**：单人仓库设
   `required_approving_review_count=1` 后，PR 作者不能批准自己的 PR，会直接卡死合并；
   需要第二个 GitHub 账号才能安全启用。命令保留在下方备查。
-- 补强审批门槛（G3，需仓库管理员在远端执行，且需第二个账号）：
+- 补强审批门槛（需仓库管理员在远端执行，且需第二个账号）：
 
 ```bash
 gh api -X PATCH repos/ybw0405-study/DocQA/branches/main/protection/required_pull_request_reviews \
@@ -172,7 +172,7 @@ JSON
 - `secret_scanning_non_provider_patterns` 与 `secret_scanning_validity_checks` 经 API 提交后
   仍回 `disabled`，需到 Settings → Code security and analysis 网页确认是否受账户计划限制。
 - 本轮新增 `.github/workflows/security.yml`（CodeQL `java-kotlin` / `javascript-typescript` /
-  `python`、`dependency-review-action`、`npm audit --omit=dev --audit-level=high`，G9）；
+  `python`、`dependency-review-action`、`npm audit --omit=dev --audit-level=high`）；
   **合并推送到 `main` 后**才会在 PR 与 push 上运行，本轮本地改动本身不构成「已启用」。
 - PR #26 已打 `do-not-merge` 标签并附发布顺序说明（runbook 见 `修复执行报告.md` 第 5 节）。
 

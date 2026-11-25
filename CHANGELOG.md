@@ -16,7 +16,7 @@
 - 前端问答页审批卡片（批准并继续 / 拒绝）；契约 yaml 与类型镜像同步；4 条 interrupt 单元回归。
 - 开启审批强制 checkpoint_enabled=true（启动期 fail-fast）；默认关闭，行为与旧版逐字节一致。
 
-### 修复：深度体检第一轮（2026-11-24）
+### 修复：Docker 交付层、真实模型评测与文档重构（2026-11-24）
 
 - **启动链收敛**：删除旧 WSL 链全部 9 个文件（compose / 启动 / 自启 / worker 脚本 / broker 模板）；解析与向量 worker 改由容器承载；`start-dev.ps1 -Containers` 与新增 `ops/docker-compose.app.yml`（含 `mq-init` topic 预建与 `grants-finalize` 建表后补授权）一条命令起全栈；getting-started 改写为单启动路径。
 - **Docker 修复**：前端镜像 COPY nginx 样例配置到正确落点（SPA fallback + `/api` 反代 + 安全响应头），构建期固定绝对 base 修复深链接 assets 解析；audit-service 改用 `java-service-nonweb` target（无 HTTP 探针）；compose 凭据改进程环境透传，规避 env_file 二次插值吞掉 bcrypt 哈希的 `$` 段。
@@ -32,11 +32,11 @@
   `InvalidTextRepresentation`。736 个用内存替身的 Green 测试从未触发。已按占位符顺序重排并新增
   不依赖 PG 的 `test_pg_parameter_alignment.py` 护栏；本机 `pgvector/pgvector:pg16` 容器真跑
   `test_pg_contract.py` → 3 passed。
-- **DQ-1 持久化对账**：新增 `V11__vector_cleanup_outbox.sql` 与 `VectorCleanupTaskRepository`，
+- **持久化对账**：新增 `V11__vector_cleanup_outbox.sql` 与 `VectorCleanupTaskRepository`，
   旧版本向量删除在发布失败 / FAILED / 重启 / 消息丢失四种情况下不再永久残留；只有成功确认才出队。
 - **CI 真库门禁**：`ci.yml` 接 pgvector service + junit 断言（3 条用例必须是 passed 而非 skipped），
   不再让 P0 回归穿过全绿 CI。
-- **G6**：workflow action 固定到联网核实的 40 位 SHA；修掉不存在的
+- **Workflow 治理**：workflow action 固定到联网核实的 40 位 SHA；修掉不存在的
   `dependency-review-action@v4` 引用。远端 secret scanning / push protection / Dependabot 安全更新
   已启用；PR #26 打 `do-not-merge` 标注。
 - Windows 开发机在 `tests/conftest.py` 切 SelectorEventLoop，使 psycopg 异步真库用例可复现。
@@ -64,21 +64,21 @@
 
 - **工程化 / 治理文件校准（本轮，仅治理文件）**：
   - `.github/dependabot.yml` 补 `docker` 生态（仓库暂无 Dockerfile，以 `/` 占位并注明）；
-  - 新增 `.github/workflows/security.yml`（G9）：`dependency-review-action`、
+  - 新增 `.github/workflows/security.yml`：`dependency-review-action`、
     `npm audit --omit=dev --audit-level=high`（`frontend-vue/`）、CodeQL
     `java-kotlin` / `javascript-typescript` / `python` matrix；`ci.yml` / `release.yml`
-    最小 `permissions` 与 `timeout-minutes`（G7）；
-  - `release.yml`（G14）新增 `concurrency`、严格 tag 格式 / 存在性校验、
+    最小 `permissions` 与 `timeout-minutes`；
+  - `release.yml` 新增 `concurrency`、严格 tag 格式 / 存在性校验、
     `git merge-base --is-ancestor` 判定 tag 必须是 `main` 祖先、`workflow_dispatch` 输入校验；
   - `CONTRIBUTING.md` 新增第 10 节「治理现状与评审边界」，如实写明分支保护已启用但
     `required_approving_review_count=0` / `require_code_owner_reviews=false`、CODEOWNERS 不强制、
     单人仓库无法第二人复核；`SECURITY.md` 更正 Code Scanning 现状；`SUPPORT.md` 补单人维护说明；
-  - `ops/env/local.env.example`（G11）补 7 个缺失键（`DOCQA_REDIS_DATABASE` /
+  - `ops/env/local.env.example` 补 7 个缺失键（`DOCQA_REDIS_DATABASE` /
     `DOCQA_ROCKETMQ_ENABLED` / `DOCQA_AUDIT_ENABLED` / `DOCQA_DEMO_USERNAME` /
     `DOCQA_DEMO_USER_ID` / `DOCQA_SELF_REGISTRATION_ENABLED` / `DOCQA_MINIO_ENABLED`），
     并新增 `DOCQA_ENV`（生产判据，默认 prod）、`DOCQA_AI_ENVIRONMENT`、
     `DOCQA_AI_INTERNAL_TOKEN`（明显占位符）；
-  - 新增 `scripts/check_env_contract.py`（G11）：断言 `application*.yml` 的 `${VAR}` ⊆
+  - 新增 `scripts/check_env_contract.py`：断言 `application*.yml` 的 `${VAR}` ⊆
     env.example 键集合，显式区分 `${PID:- }` 等框架占位符，缺键即非零退出。
 - 本轮治理校准随 `2.2.0` 一并发布，版本号与 tag 已同步。
 
@@ -89,7 +89,7 @@
 
 ## [2.1.0] - 2026-11-19
 
-> 2.0.0 之后的工程闭环批次（租户控制面与前端对齐）。
+> 2.0.0 之后的工程闭环阶段（租户控制面与前端对齐）。
 > **无 BREAKING 变更**，从 2.0.0 直接升级即可，无需迁移步骤。
 > 落地记录见 [saas-kernel-upgrade.md](docs/02-design/saas-kernel-upgrade.md) §5.22。
 

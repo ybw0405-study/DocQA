@@ -20,9 +20,9 @@
 4. 反向启动：中间件 → ai-python / worker → Java 服务 → 网关。
 5. 冒烟：登录与刷新、文档列表、一次同步问答、一次 SSE 流式、`/health`、`/metrics`（仅内网）、审计写入。
 
-## 1.1 按 digest 部署上一版本（可执行，G17）
+## 1.1 按 digest 部署上一版本（可执行）
 
-前置事实（G14/G17 已落地，缺一不可）：
+前置事实（Release digest 归档与镜像 HEALTHCHECK 已落地，缺一不可）：
 
 - 每个 Release 的 `images` job 把本次全部镜像的
   `ghcr.io/<owner>/<repo>-<service>:<version>@sha256:<digest>` 写入 `digests.txt`，
