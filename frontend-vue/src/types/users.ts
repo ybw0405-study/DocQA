@@ -8,7 +8,7 @@
  *
  * 两条贯穿本片的口径：
  * 1. 用户列表是 **keyset**（`limit` + `cursor` → `{items, nextCursor, limit}`），契约有意不返回 `total`
- * （`UserListData.description` 原文），界面不得显示「共 N 人」，也不得用已加载行数冒充总数。
+ *    （`UserListData.description` 原文），界面不得显示「共 N 人」，也不得用已加载行数冒充总数。
  * 2. 口令字段在契约上是 `writeOnly`：只出现在请求体，任何响应、任何日志、任何浏览器存储都不该有它。
  */
 

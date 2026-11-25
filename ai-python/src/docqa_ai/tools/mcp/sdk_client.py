@@ -84,7 +84,7 @@ class _BoundedLog(io.TextIOBase):
     def writable(self) -> bool:
         return True
 
-    def write(self, text: str) -> int: # type: ignore[override]
+    def write(self, text: str) -> int:  # type: ignore[override]
         data = (text if isinstance(text, str) else str(text)).encode("utf-8", "replace")
         return self._sink.write(data)
 
@@ -229,7 +229,7 @@ class _SessionHost:
             asyncio.set_event_loop(loop)
             self.loop = loop
             loop.run_until_complete(self._run())
-        except BaseException as exc: # noqa: BLE001 - the thread must never die silently
+        except BaseException as exc:  # noqa: BLE001 - the thread must never die silently
             self._fail(exc)
         finally:
             if loop is not None:
@@ -258,7 +258,7 @@ class _SessionHost:
                     await stop.wait()
         except asyncio.CancelledError:
             raise
-        except Exception as exc: # noqa: BLE001 - any transport failure ends this session
+        except Exception as exc:  # noqa: BLE001 - any transport failure ends this session
             self._fail(exc)
             LOGGER.warning(
                 "MCP stdio session ended: server=%s error=%s",

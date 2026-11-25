@@ -178,7 +178,7 @@ class AdminModelConnectionControllerTest {
                         .requestAttr(TenantContext.REQUEST_ATTRIBUTE, TENANT_ID)
                         .requestAttr(JwtAuthenticationFilter.USER_ID_ATTRIBUTE, ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"secret\":\" \"}"))
+                        .content("{\"secret\":\"   \"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AGT-VALIDATION-001"));
     }

@@ -78,9 +78,9 @@ def make_worker(
     idempotency: object | None = None,
 ) -> VectorChangeWorker:
     return VectorChangeWorker(
-        writer=writer or RecordingWriter(), # type: ignore[arg-type]
+        writer=writer or RecordingWriter(),  # type: ignore[arg-type]
         publisher=publisher or InMemoryVectorChangePublisher(),
-        idempotency=idempotency or InMemoryIdempotencyStore(), # type: ignore[arg-type]
+        idempotency=idempotency or InMemoryIdempotencyStore(),  # type: ignore[arg-type]
     )
 
 
@@ -122,7 +122,7 @@ async def test_delete_version_is_scoped_to_that_version_and_echoed_back() -> Non
     assert ack.remaining_rows == 3, "leftover rows are reported as-is so Java can read DIVERGED"
 
 
-@pytest.mark.parametrize("index_version", [None, "", " "], ids=["null", "empty", "blank"])
+@pytest.mark.parametrize("index_version", [None, "", "   "], ids=["null", "empty", "blank"])
 async def test_a_version_delete_without_scope_never_widens(index_version: str | None) -> None:
     writer = RecordingWriter()
     publisher = InMemoryVectorChangePublisher()

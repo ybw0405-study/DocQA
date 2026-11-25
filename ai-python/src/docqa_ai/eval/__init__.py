@@ -6,9 +6,9 @@
 测生产语义模型的质量。
 
 入口：
-    python -m docqa_ai.eval # 离线检索基线
-    python -m docqa_ai.eval --suite all --check-baseline # 检索 + agent 治理套件门禁
-    python -m docqa_ai.eval --json # 输出机器可读 JSON
+    python -m docqa_ai.eval                          # 离线检索基线
+    python -m docqa_ai.eval --suite all --check-baseline   # 检索 + agent 治理套件门禁
+    python -m docqa_ai.eval --json                   # 输出机器可读 JSON
 """
 
 from docqa_ai.eval.metrics import compute_metrics, evaluate_queries

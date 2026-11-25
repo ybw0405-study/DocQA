@@ -128,7 +128,7 @@ describe('响应式三档断点', () => {
   });
 
   it('scrolls the eight wide tables instead of restacking their rows', () => {
-    // 窄屏把 td 竖排成卡片会丢掉 table/row/cell 角色， 不能用 换。
+    // 窄屏把 td 竖排成卡片会丢掉 table/row/cell 角色， 不能用  换。
     const text = read('src/styles/components.css');
 
     expect(text).toContain('.table-scroll');

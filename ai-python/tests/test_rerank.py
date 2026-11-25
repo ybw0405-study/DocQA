@@ -23,7 +23,7 @@ DOCUMENTS = ["相关段落", "无关段落甲", "无关段落乙"]
 
 def provider_returning(payload: object, status: int = 200) -> DashScopeRerankProvider:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(status, json=payload) # type: ignore[arg-type]
+        return httpx.Response(status, json=payload)  # type: ignore[arg-type]
 
     transport = httpx.MockTransport(handler)
     return DashScopeRerankProvider(

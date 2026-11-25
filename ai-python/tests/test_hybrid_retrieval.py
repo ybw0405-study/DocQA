@@ -178,10 +178,10 @@ def service(
     options: dict[str, object] = {"top_k": 6, "min_score": 0.0}
     options.update(overrides)
     return RetrievalService(
-        vector_repository, # type: ignore[arg-type]
+        vector_repository,  # type: ignore[arg-type]
         OfflineEmbeddingProvider(),
-        lexical_repository=lexical_repository, # type: ignore[arg-type]
-        **options, # type: ignore[arg-type]
+        lexical_repository=lexical_repository,  # type: ignore[arg-type]
+        **options,  # type: ignore[arg-type]
     )
 
 
@@ -418,16 +418,16 @@ async def test_healthy_hybrid_run_writes_the_documented_span_tree() -> None:
 
     spans = spans_by_name(exporter)
     assert set(spans) == {"rag.retrieve", "rag.embed", "vector.query", "lexical.query", "retrieval.fuse", "rag.rerank"}
-    assert spans["rag.retrieve"].parent is None # type: ignore[attr-defined]
-    assert spans["retrieval.fuse"].parent.span_id == spans["rag.retrieve"].context.span_id # type: ignore[attr-defined]
-    assert spans["lexical.query"].attributes["lexical.enabled"] == "true" # type: ignore[attr-defined]
-    assert spans["lexical.query"].attributes["lexical.phrase_count"] == 3 # type: ignore[attr-defined]
-    assert spans["retrieval.fuse"].attributes["fusion_rrf_k"] == 60 # type: ignore[attr-defined]
-    assert spans["retrieval.fuse"].attributes["vector.candidate_count"] == 1 # type: ignore[attr-defined]
-    assert spans["retrieval.fuse"].attributes["lexical.candidate_count"] == 1 # type: ignore[attr-defined]
-    assert spans["rag.rerank"].attributes["reranker"] == "lexical-coverage-v1" # type: ignore[attr-defined]
-    assert spans["rag.rerank"].attributes["retrieval.kept"] == 2 # type: ignore[attr-defined]
-    assert "lexical_fallback" not in spans["rag.retrieve"].attributes # type: ignore[attr-defined]
+    assert spans["rag.retrieve"].parent is None  # type: ignore[attr-defined]
+    assert spans["retrieval.fuse"].parent.span_id == spans["rag.retrieve"].context.span_id  # type: ignore[attr-defined]
+    assert spans["lexical.query"].attributes["lexical.enabled"] == "true"  # type: ignore[attr-defined]
+    assert spans["lexical.query"].attributes["lexical.phrase_count"] == 3  # type: ignore[attr-defined]
+    assert spans["retrieval.fuse"].attributes["fusion_rrf_k"] == 60  # type: ignore[attr-defined]
+    assert spans["retrieval.fuse"].attributes["vector.candidate_count"] == 1  # type: ignore[attr-defined]
+    assert spans["retrieval.fuse"].attributes["lexical.candidate_count"] == 1  # type: ignore[attr-defined]
+    assert spans["rag.rerank"].attributes["reranker"] == "lexical-coverage-v1"  # type: ignore[attr-defined]
+    assert spans["rag.rerank"].attributes["retrieval.kept"] == 2  # type: ignore[attr-defined]
+    assert "lexical_fallback" not in spans["rag.retrieve"].attributes  # type: ignore[attr-defined]
 
 
 async def test_degraded_lexical_run_marks_the_fallback_on_both_spans() -> None:
@@ -438,10 +438,10 @@ async def test_degraded_lexical_run_marks_the_fallback_on_both_spans() -> None:
 
     spans = spans_by_name(exporter)
     assert result.lexical_fallback is True
-    assert spans["lexical.query"].attributes["lexical_fallback"] is True # type: ignore[attr-defined]
+    assert spans["lexical.query"].attributes["lexical_fallback"] is True  # type: ignore[attr-defined]
     # 根 span 也要有：排查入口是 rag.retrieve，不是它下面的某一段
-    assert spans["rag.retrieve"].attributes["lexical_fallback"] is True # type: ignore[attr-defined]
-    assert spans["rag.retrieve"].attributes["retrieval.chunk_count"] == 1 # type: ignore[attr-defined]
+    assert spans["rag.retrieve"].attributes["lexical_fallback"] is True  # type: ignore[attr-defined]
+    assert spans["rag.retrieve"].attributes["retrieval.chunk_count"] == 1  # type: ignore[attr-defined]
 
 
 async def test_degraded_lexical_run_logs_structured_fields_without_the_question(caplog) -> None:
@@ -523,9 +523,9 @@ async def test_offline_assembly_only_adds_the_three_rerank_span_keys() -> None:
 
     rerank_span = spans_by_name(exporter)["rag.rerank"]
     kept = len(with_noop.chunks)
-    assert rerank_span.attributes["rerank.model"] == "offline-noop" # type: ignore[attr-defined]
-    assert rerank_span.attributes["rerank.document_count"] == kept # type: ignore[attr-defined]
-    assert rerank_span.attributes["rerank.returned"] == kept # type: ignore[attr-defined]
+    assert rerank_span.attributes["rerank.model"] == "offline-noop"  # type: ignore[attr-defined]
+    assert rerank_span.attributes["rerank.document_count"] == kept  # type: ignore[attr-defined]
+    assert rerank_span.attributes["rerank.returned"] == kept  # type: ignore[attr-defined]
 
 
 async def test_rerank_sends_masked_candidates_and_a_masked_query() -> None:
@@ -648,11 +648,11 @@ async def test_rerank_writes_its_own_span_attributes_and_degrades_on_both_spans(
 
     spans = spans_by_name(exporter)
     rerank_span = spans["rag.rerank"]
-    assert rerank_span.attributes["reranker"] == "lexical-coverage-v1" # type: ignore[attr-defined]
-    assert rerank_span.attributes["rerank.model"] == "scripted-rerank" # type: ignore[attr-defined]
-    assert rerank_span.attributes["rerank.document_count"] == 1 # type: ignore[attr-defined]
-    assert rerank_span.attributes["rerank_fallback"] is True # type: ignore[attr-defined]
-    assert spans["rag.retrieve"].attributes["rerank_fallback"] is True # type: ignore[attr-defined]
+    assert rerank_span.attributes["reranker"] == "lexical-coverage-v1"  # type: ignore[attr-defined]
+    assert rerank_span.attributes["rerank.model"] == "scripted-rerank"  # type: ignore[attr-defined]
+    assert rerank_span.attributes["rerank.document_count"] == 1  # type: ignore[attr-defined]
+    assert rerank_span.attributes["rerank_fallback"] is True  # type: ignore[attr-defined]
+    assert spans["rag.retrieve"].attributes["rerank_fallback"] is True  # type: ignore[attr-defined]
 
     healthy_exporter = InMemorySpanExporter()
     healthy_tracer, _healthy_provider = build_tracing(make_settings(), exporter=healthy_exporter)
@@ -663,8 +663,8 @@ async def test_rerank_writes_its_own_span_attributes_and_degrades_on_both_spans(
         tracer=healthy_tracer,
     ).retrieve("学习方法", [scope()])
     healthy = spans_by_name(healthy_exporter)
-    assert healthy["rag.rerank"].attributes["rerank.returned"] == 1 # type: ignore[attr-defined]
-    assert "rerank_fallback" not in healthy["rag.retrieve"].attributes # type: ignore[attr-defined]
+    assert healthy["rag.rerank"].attributes["rerank.returned"] == 1  # type: ignore[attr-defined]
+    assert "rerank_fallback" not in healthy["rag.retrieve"].attributes  # type: ignore[attr-defined]
 
 
 async def test_degraded_rerank_logs_structured_fields_without_the_question(caplog) -> None:

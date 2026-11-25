@@ -185,7 +185,7 @@ class AdminAuditQueryServiceTest {
     void treatsBlankFiltersAsAbsent() {
         when(auditRepository.findPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
 
-        service.list(TENANT_ID, "", " ", "", " ", null, 100, " ");
+        service.list(TENANT_ID, "", "  ", "", " ", null, 100, " ");
 
         AuditQueryFilter filter = capturedFilter();
         assertThat(filter.traceId()).isNull();

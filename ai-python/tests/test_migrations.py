@@ -124,10 +124,10 @@ def test_vector_column_and_table_match_the_shared_contract() -> None:
     sql = migration_sql(VECTOR_MIGRATION)
     assert "create extension if not exists vector;" in sql
     assert "create table if not exists chunk_embedding_1024" in sql
-    assert "vector_id uuid primary key" in sql or "vector_id uuid primary key" in sql
-    assert "embedding vector(1024) not null" in sql or "embedding vector(1024) not null" in sql
+    assert "vector_id      uuid primary key" in sql or "vector_id uuid primary key" in sql
+    assert "embedding      vector(1024) not null" in sql or "embedding vector(1024) not null" in sql
     assert "unique (document_id, index_version, chunk_index)" in sql
-    assert "chunk_index int not null check (chunk_index >= 0)" in sql
+    assert "chunk_index    int not null check (chunk_index >= 0)" in sql
 
 
 def test_migration_has_hnsw_cosine_index_with_required_parameters() -> None:

@@ -35,7 +35,7 @@ class TenantProvisioningServiceTest {
 
     @Test
     void createsTenantWithNormalizedSlugAndActiveStatus() {
-        TenantCreatedData created = service.create(TOKEN, request(" Acme-Corp "));
+        TenantCreatedData created = service.create(TOKEN, request("  Acme-Corp  "));
 
         assertThat(created.slug()).isEqualTo("acme-corp");
         assertThat(created.status()).isEqualTo("ACTIVE");
@@ -68,9 +68,9 @@ class TenantProvisioningServiceTest {
 
     @Test
     void disabledWhenTokenIsBlank() {
-        properties.setToken(" ");
+        properties.setToken("  ");
 
-        assertThatThrownBy(() -> service.create(" ", request("acme")))
+        assertThatThrownBy(() -> service.create("  ", request("acme")))
                 .isInstanceOfSatisfying(BusinessException.class, ex ->
                         assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.USR_FORBIDDEN_001));
         assertThat(repository.bySlug).isEmpty();

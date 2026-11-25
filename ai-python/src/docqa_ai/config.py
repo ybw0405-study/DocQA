@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# offline 空间的表名（迁移 001）。它同时是 启动守卫识别「真实向量被写进了 offline 空间」的判据。
+# offline 空间的表名（迁移 001）。它同时是  启动守卫识别「真实向量被写进了 offline 空间」的判据。
 OFFLINE_VECTOR_TABLE = "chunk_embedding_1024"
 
 McpToolName = Annotated[str, Field(pattern=r"^[a-z0-9_]{1,32}$")]
@@ -141,7 +141,7 @@ class Settings(BaseSettings):
     web_tool_max_results: int = Field(default=5, ge=1, le=10)
     web_robots_cache_seconds: int = Field(default=3600, ge=0, le=86400)
     academic_mailto: str = Field(default="", max_length=254)
-    # 只开放中英文两个语言面，避免把模型输入直接拼进任意子域。
+    #  只开放中英文两个语言面，避免把模型输入直接拼进任意子域。
     wikipedia_language: Literal["zh", "en"] = "zh"
 
     embedding_provider: Literal["offline", "openai"] = "offline"

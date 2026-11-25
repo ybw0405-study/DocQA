@@ -28,7 +28,7 @@ TOKEN = "unit-test-internal-token"
 
 def _clear_env_signals(monkeypatch: object) -> None:
     for name in _PRODUCTION_ENV_NAMES:
-        monkeypatch.delenv(name, raising=False) # type: ignore[attr-defined]
+        monkeypatch.delenv(name, raising=False)  # type: ignore[attr-defined]
 
 
 # ── 生产判据反转（B2）：旧实现「含 prod 才算生产」，全仓无人设置这四个变量 ──────
@@ -41,33 +41,33 @@ def test_production_is_the_default_when_no_env_signals_are_set(monkeypatch: obje
 
 def test_explicit_dev_signal_disables_the_production_guard(monkeypatch: object) -> None:
     _clear_env_signals(monkeypatch)
-    monkeypatch.setenv("DOCQA_ENV", "dev") # type: ignore[attr-defined]
+    monkeypatch.setenv("DOCQA_ENV", "dev")  # type: ignore[attr-defined]
     assert _runs_in_production() is False
-    monkeypatch.setenv("APP_ENV", "test") # type: ignore[attr-defined]
+    monkeypatch.setenv("APP_ENV", "test")  # type: ignore[attr-defined]
     assert _runs_in_production() is False
 
 
 def test_default_app_carries_a_startup_guard_without_an_internal_token(monkeypatch: object) -> None:
     _clear_env_signals(monkeypatch)
-    monkeypatch.delenv("DOCQA_AI_INTERNAL_TOKEN", raising=False) # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_INTERNAL_TOKEN", raising=False)  # type: ignore[attr-defined]
     app = create_app()
     assert app.state.startup_guard_error is not None
     assert "DOCQA_AI_INTERNAL_TOKEN" in app.state.startup_guard_error
 
 
 def test_explicit_settings_skip_the_startup_guard_for_embedded_callers() -> None:
-    app = create_app(make_settings(), agent_service=object()) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=object())  # type: ignore[arg-type]
     assert app.state.startup_guard_error is None
 
 
 def test_dev_on_non_loopback_without_credentials_is_rejected(monkeypatch: object) -> None:
     """dev + 0.0.0.0 且无任何凭据 = 数据面裸奔，必须在启动期挡住。"""
     _clear_env_signals(monkeypatch)
-    monkeypatch.setenv("DOCQA_ENV", "dev") # type: ignore[attr-defined]
-    monkeypatch.delenv("DOCQA_AI_INTERNAL_TOKEN", raising=False) # type: ignore[attr-defined]
-    monkeypatch.delenv("DOCQA_AI_INTERNAL_HMAC_SECRET", raising=False) # type: ignore[attr-defined]
-    monkeypatch.setenv("DOCQA_AI_API_HOST", "0.0.0.0") # type: ignore[attr-defined]
-    monkeypatch.delenv("DOCQA_AI_ALLOW_ANONYMOUS_API", raising=False) # type: ignore[attr-defined]
+    monkeypatch.setenv("DOCQA_ENV", "dev")  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_INTERNAL_TOKEN", raising=False)  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_INTERNAL_HMAC_SECRET", raising=False)  # type: ignore[attr-defined]
+    monkeypatch.setenv("DOCQA_AI_API_HOST", "0.0.0.0")  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_ALLOW_ANONYMOUS_API", raising=False)  # type: ignore[attr-defined]
     app = create_app()
     assert app.state.startup_guard_error is not None
     assert "non-loopback" in app.state.startup_guard_error
@@ -76,11 +76,11 @@ def test_dev_on_non_loopback_without_credentials_is_rejected(monkeypatch: object
 def test_dev_on_non_loopback_can_opt_in_anonymously(monkeypatch: object) -> None:
     """部署者显式 allow_anonymous_api=true 时放行这条本地联调路径。"""
     _clear_env_signals(monkeypatch)
-    monkeypatch.setenv("DOCQA_ENV", "dev") # type: ignore[attr-defined]
-    monkeypatch.delenv("DOCQA_AI_INTERNAL_TOKEN", raising=False) # type: ignore[attr-defined]
-    monkeypatch.delenv("DOCQA_AI_INTERNAL_HMAC_SECRET", raising=False) # type: ignore[attr-defined]
-    monkeypatch.setenv("DOCQA_AI_API_HOST", "0.0.0.0") # type: ignore[attr-defined]
-    monkeypatch.setenv("DOCQA_AI_ALLOW_ANONYMOUS_API", "true") # type: ignore[attr-defined]
+    monkeypatch.setenv("DOCQA_ENV", "dev")  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_INTERNAL_TOKEN", raising=False)  # type: ignore[attr-defined]
+    monkeypatch.delenv("DOCQA_AI_INTERNAL_HMAC_SECRET", raising=False)  # type: ignore[attr-defined]
+    monkeypatch.setenv("DOCQA_AI_API_HOST", "0.0.0.0")  # type: ignore[attr-defined]
+    monkeypatch.setenv("DOCQA_AI_ALLOW_ANONYMOUS_API", "true")  # type: ignore[attr-defined]
     app = create_app()
     assert app.state.startup_guard_error is None
 
@@ -88,7 +88,7 @@ def test_dev_on_non_loopback_can_opt_in_anonymously(monkeypatch: object) -> None
 async def test_internal_token_guard_uses_a_whitelist_not_a_blacklist() -> None:
     app = create_app(
         make_settings(internal_token=SecretStr(TOKEN)),
-        agent_service=object(), # type: ignore[arg-type]
+        agent_service=object(),  # type: ignore[arg-type]
     )
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
@@ -108,7 +108,7 @@ async def test_readiness_returns_503_when_redis_is_unreachable() -> None:
         async def ping(self) -> None:
             raise OSError("connection refused")
 
-    app = create_app(make_settings(), agent_service=object()) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=object())  # type: ignore[arg-type]
     app.state.redis_client = BrokenRedis()
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
@@ -120,7 +120,7 @@ async def test_readiness_returns_503_when_redis_is_unreachable() -> None:
 
 
 async def test_liveness_stays_up_when_dependencies_are_absent() -> None:
-    app = create_app(make_settings(), agent_service=object()) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=object())  # type: ignore[arg-type]
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
     ) as client:
@@ -133,7 +133,7 @@ async def test_liveness_stays_up_when_dependencies_are_absent() -> None:
 
 def test_repositories_share_one_connection_provider() -> None:
     vector, lexical = build_repositories(make_settings(pg_dsn="postgresql://study@127.0.0.1:5432/docqa"))
-    assert vector._connections is lexical._connections # type: ignore[attr-defined]
+    assert vector._connections is lexical._connections  # type: ignore[attr-defined]
 
 
 def test_pool_factory_is_wired_into_both_process_entrypoints() -> None:
@@ -166,7 +166,7 @@ def test_strict_mode_refuses_a_repository_that_is_not_tenant_aware() -> None:
 
     try:
         RetrievalService(
-            LegacyRepository(), # type: ignore[arg-type]
+            LegacyRepository(),  # type: ignore[arg-type]
             OfflineEmbeddingProvider(),
             require_tenant_id=True,
         )

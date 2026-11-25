@@ -90,7 +90,7 @@ def test_mcp_tool_names_follow_the_protocol_pattern() -> None:
         {"maxToolCalls": 4},
         {"deadlineMs": 50},
         {"deadlineMs": 15001},
-        {"question": " "},
+        {"question": "   "},
         {"piiMaskedQuestion": ""},
         {"documentScopes": []},
         {"documentScopes": [{"documentId": str(DOCUMENT_ID), "indexVersion": "v1"}] * 2},

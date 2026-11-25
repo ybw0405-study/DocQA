@@ -56,15 +56,15 @@ public final class RocketMqAdminOffsetReader implements ConsumerOffsetReader {
      * <p>两个容易写错的地方：
      *
      * <ul>
-     * <li><b>先 clamp 再求和</b>。某个队列的 consumerOffset 大于 brokerOffset（broker 侧数据被
-     * 重置、或位点被手工回拨）时差值是负数。若先求和再 clamp，一个位点超前的队列会把另一个
-     * 队列的真实积压抵掉，告警就永远不响。
-     * <li><b>不去重 topic</b>。同一 topic 的多个队列必须相加，这才是「还有多少条没消费」。
-     * <li><b>滤掉系统 topic</b>。真实 broker 上这个接口还会返回
-     * {@code %RETRY%<consumerGroup>}（重试队列），RocketMQ 的内部 topic 一律以 {@code %}
-     * 开头。放进指标会让 {@code topic} 标签的基数随消费组数量增长，且
-     * {@code consumer_lag > 1000} 这条告警会被「重试队列积压」触发——那是另一个故障
-     * 语义（毒消息），已由 {@code docqa_mq_dlq_total} 覆盖。
+     *   <li><b>先 clamp 再求和</b>。某个队列的 consumerOffset 大于 brokerOffset（broker 侧数据被
+     *       重置、或位点被手工回拨）时差值是负数。若先求和再 clamp，一个位点超前的队列会把另一个
+     *       队列的真实积压抵掉，告警就永远不响。
+     *   <li><b>不去重 topic</b>。同一 topic 的多个队列必须相加，这才是「还有多少条没消费」。
+     *   <li><b>滤掉系统 topic</b>。真实 broker 上这个接口还会返回
+     *       {@code %RETRY%<consumerGroup>}（重试队列），RocketMQ 的内部 topic 一律以 {@code %}
+     *       开头。放进指标会让 {@code topic} 标签的基数随消费组数量增长，且
+     *       {@code consumer_lag > 1000} 这条告警会被「重试队列积压」触发——那是另一个故障
+     *       语义（毒消息），已由 {@code docqa_mq_dlq_total} 覆盖。
      * </ul>
      */
     static Map<String, Long> aggregateByTopic(Map<MessageQueue, OffsetWrapper> offsetTable) {

@@ -159,7 +159,7 @@ class ReminderTriggerIngestServiceTest {
         Draft userId = new Draft();
         userId.userId = null;
         Draft rrule = new Draft();
-        rrule.rrule = " ";
+        rrule.rrule = "  ";
         Draft timezone = new Draft();
         timezone.timezone = null;
         Draft occurrence = new Draft();
@@ -167,7 +167,7 @@ class ReminderTriggerIngestServiceTest {
         Draft occurredAt = new Draft();
         occurredAt.occurredAt = null;
         Draft title = new Draft();
-        title.title = " ";
+        title.title = "   ";
 
         assertRejected(eventId.event(), "eventId");
         assertRejected(reminderId.event(), "reminderId");

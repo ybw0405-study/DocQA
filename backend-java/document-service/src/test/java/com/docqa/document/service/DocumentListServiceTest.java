@@ -166,7 +166,7 @@ class DocumentListServiceTest {
         when(documentRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), isNull(), isNull(), isNull(), eq(21)))
                 .thenReturn(List.of());
 
-        documentService.list(USER_ID, null, " ", " ", null, 20);
+        documentService.list(USER_ID, null, "   ", "  ", null, 20);
 
         verify(documentRepository).findUserPage(eq(TENANT_ID), 
                 eq(USER_ID), isNull(), isNull(), isNull(), isNull(), isNull(), eq(21));
@@ -174,12 +174,12 @@ class DocumentListServiceTest {
 
     @Test
     void tagFilterIsNormalizedBeforeItReachesTheRepository() {
-        String normalized = TagNormalizer.of(" 考研 数学 ").normalized();
+        String normalized = TagNormalizer.of("  考研   数学 ").normalized();
         when(documentRepository.findUserPage(eq(TENANT_ID), eq(USER_ID), isNull(), isNull(), eq(normalized),
                 isNull(), isNull(), eq(21)))
                 .thenReturn(List.of());
 
-        documentService.list(USER_ID, null, null, " 考研 数学 ", null, 20);
+        documentService.list(USER_ID, null, null, "  考研   数学 ", null, 20);
 
         verify(documentRepository).findUserPage(eq(TENANT_ID), 
                 eq(USER_ID), isNull(), isNull(), eq(normalized), isNull(), isNull(), eq(21));

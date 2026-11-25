@@ -75,7 +75,7 @@ async def retrieval_for(content: str, lexical_repository: object | None = None) 
         repository,
         embedder,
         min_score=0.0,
-        lexical_repository=lexical_repository, # type: ignore[arg-type]
+        lexical_repository=lexical_repository,  # type: ignore[arg-type]
     )
 
 
@@ -111,8 +111,8 @@ def service(
         planner or OfflinePlanner(),
         tools or ToolRegistry([]),
         experiment=experiment,
-        mcp=mcp, # type: ignore[arg-type]
-        planner_resolver=planner_resolver, # type: ignore[arg-type]
+        mcp=mcp,  # type: ignore[arg-type]
+        planner_resolver=planner_resolver,  # type: ignore[arg-type]
     )
 
 
@@ -138,7 +138,7 @@ class BrokenRepository:
 
 
 def event_types(response: object) -> list[str]:
-    return [event.eventType for event in response.audit_events] # type: ignore[attr-defined]
+    return [event.eventType for event in response.audit_events]  # type: ignore[attr-defined]
 
 
 async def test_answer_with_context_returns_citation_and_ok_status() -> None:
@@ -252,7 +252,7 @@ async def test_history_truncation_is_reported() -> None:
 
 
 async def test_retrieval_unavailable_is_mapped_to_503() -> None:
-    retrieval = RetrievalService(BrokenRepository(), OfflineEmbeddingProvider()) # type: ignore[arg-type]
+    retrieval = RetrievalService(BrokenRepository(), OfflineEmbeddingProvider())  # type: ignore[arg-type]
     with pytest.raises(AgentError) as captured:
         await service(retrieval=retrieval).ask(make_request())
     assert captured.value.code == "AGT-UPSTREAM-001"
@@ -515,7 +515,7 @@ async def test_experiment_exhaustion_soft_degrades_before_any_retrieval() -> Non
 
     ledger = InMemoryExperimentBudgetStore(1, 200_000)
     assert await ledger.authorize_call(1) is True
-    retrieval = RetrievalService(ForbiddenRepository(), OfflineEmbeddingProvider()) # type: ignore[arg-type]
+    retrieval = RetrievalService(ForbiddenRepository(), OfflineEmbeddingProvider())  # type: ignore[arg-type]
     result = await service(retrieval=retrieval, experiment=ledger).ask(make_request())
 
     assert result.budget_status == "BUDGET_EXHAUSTED"
@@ -544,7 +544,7 @@ async def test_experiment_ledger_read_failure_fails_closed_to_503() -> None:
         async def settle_call(self, reserved: int, actual: int):
             raise AssertionError("no call may follow a refused pre-check")
 
-    retrieval = RetrievalService(ForbiddenRepository(), OfflineEmbeddingProvider()) # type: ignore[arg-type]
+    retrieval = RetrievalService(ForbiddenRepository(), OfflineEmbeddingProvider())  # type: ignore[arg-type]
     with pytest.raises(AgentError) as captured:
         await service(retrieval=retrieval, experiment=Unreadable()).ask(make_request())
     assert captured.value.code == "AGT-UPSTREAM-001"
@@ -577,7 +577,7 @@ async def test_startup_publishes_the_experiment_limits_through_the_service() -> 
 
 
 async def test_startup_without_a_ledger_never_publishes() -> None:
-    """离线组合（experiment=None）必须在触碰 Redis 之前返回，否则 的零写键就破了。"""
+    """离线组合（experiment=None）必须在触碰 Redis 之前返回，否则  的零写键就破了。"""
 
     await service(experiment=None).publish_experiment_limits()
 

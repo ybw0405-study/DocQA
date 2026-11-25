@@ -140,8 +140,8 @@ describe('documents store', () => {
       }),
     );
 
-    await documents.setFilters(filters({ q: ' 梯度下降 ', tag: '考研数学' }));
-    await documents.setFilters(filters({ q: ' ', tag: '' }));
+    await documents.setFilters(filters({ q: '  梯度下降  ', tag: '考研数学' }));
+    await documents.setFilters(filters({ q: '   ', tag: '' }));
 
     expect(sent).toEqual(['梯度下降|考研数学', 'no-q|no-tag']);
     expect(documents.filter.q).toBeNull();
@@ -257,7 +257,7 @@ describe('documents store', () => {
   });
 
   it('renames through PATCH with only the contract field and backfills the row', async () => {
-    const ok = await documents.rename(FIRST_ID, ' 第三章笔记 ');
+    const ok = await documents.rename(FIRST_ID, '  第三章笔记  ');
 
     expect(ok).toBe(true);
     expect(callLog.documentOps).toHaveLength(1);
@@ -270,7 +270,7 @@ describe('documents store', () => {
   });
 
   it('rejects a blank or over-long title without spending a request', async () => {
-    expect(await documents.rename(FIRST_ID, ' ')).toBe(false);
+    expect(await documents.rename(FIRST_ID, '   ')).toBe(false);
     expect(documents.detail).toContain('不能为空');
     expect(await documents.rename(FIRST_ID, '标'.repeat(121))).toBe(false);
     expect(documents.detail).toContain('120');
@@ -280,7 +280,7 @@ describe('documents store', () => {
   });
 
   it('normalizes tags before submitting them and keeps what the server echoes', async () => {
-    const ok = await documents.replaceTags(FIRST_ID, [' 考研 数学 ', '错题整理']);
+    const ok = await documents.replaceTags(FIRST_ID, ['  考研 数学 ', '错题整理']);
 
     expect(ok).toBe(true);
     expect(callLog.documentOps[0].method).toBe('PUT');
@@ -294,7 +294,7 @@ describe('documents store', () => {
     expect(documents.detail).toContain('重复');
     expect(await documents.replaceTags(FIRST_ID, Array.from({ length: 21 }, (_, i) => `标签${i}`))).toBe(false);
     expect(documents.detail).toContain('20');
-    expect(await documents.replaceTags(FIRST_ID, [' '])).toBe(false);
+    expect(await documents.replaceTags(FIRST_ID, ['   '])).toBe(false);
     expect(documents.detail).toContain('空白');
 
     expect(callLog.documentOps).toHaveLength(0);

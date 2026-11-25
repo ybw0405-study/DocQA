@@ -207,7 +207,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         print(f"judge: queries={payload['query_count']} mean_faithfulness={payload['mean_faithfulness']}")
         for item in payload["per_query"]:
-            print(f" {item['query_id']:<14} faithfulness={item['faithfulness']:.2f} {item['reason']}")
+            print(f"  {item['query_id']:<14} faithfulness={item['faithfulness']:.2f}  {item['reason']}")
         print(f"gate={payload['gate']} passed={payload['passed']}")
     return 0 if payload["passed"] else 1
 

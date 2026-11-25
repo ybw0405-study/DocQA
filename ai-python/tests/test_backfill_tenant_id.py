@@ -135,7 +135,7 @@ def test_load_mapping_accepts_both_shapes_and_rejects_blank_tenants(tmp_path: Pa
     assert load_mapping(wrapped) == {DOC_B: TENANT_B}
 
     blank = tmp_path / "blank.json"
-    blank.write_text(json.dumps({DOC_A: " "}), encoding="utf-8")
+    blank.write_text(json.dumps({DOC_A: "   "}), encoding="utf-8")
     with pytest.raises(BackfillError, match="blank tenantId"):
         load_mapping(blank)
 

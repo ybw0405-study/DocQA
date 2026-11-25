@@ -37,7 +37,7 @@ const reminders = useRemindersStore();
 const { secondsLeft, waiting } = useRetryWindow(() => reminders.retryAfterSeconds);
 
 /**
- * 终态两步确认的第一击。契约 规定 `COMPLETED` / `CANCELLED` 没有出边，
+ * 终态两步确认的第一击。契约  规定 `COMPLETED` / `CANCELLED` 没有出边，
  * 误点只能靠「重建一条」挽回，所以这两击之间必须让确认文案与「不可回退」同时出现在这一行上。
  */
 const pendingTarget = ref<{ reminderId: string; status: ReminderStatus } | null>(null);

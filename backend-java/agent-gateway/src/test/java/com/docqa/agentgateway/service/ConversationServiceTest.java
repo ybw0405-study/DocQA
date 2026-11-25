@@ -101,7 +101,7 @@ class ConversationServiceTest {
     @Test
     void rejectsBlankTitle() {
         assertThatThrownBy(() -> service.create(
-                USER_ID, KEY, new CreateConversationRequest(" ", null)))
+                USER_ID, KEY, new CreateConversationRequest("   ", null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AGT_VALIDATION_001);

@@ -74,7 +74,7 @@ def _connected_peer(response: httpx.Response) -> str | None:
         return None
     try:
         address = stream.get_extra_info("server_addr")
-    except Exception: # pragma: no cover - backend specific
+    except Exception:  # pragma: no cover - backend specific
         return None
     if isinstance(address, tuple) and address:
         return str(address[0])

@@ -44,7 +44,7 @@ describe('adminUsage store', () => {
   });
 
   it('normalises a blank window back to the server default', async () => {
-    await store.applyWindow({ from: ' ', to: '' });
+    await store.applyWindow({ from: '  ', to: '' });
 
     expect(lastSearch()).toBe('?bucket=day&topUsers=10');
     expect(store.from).toBeNull();

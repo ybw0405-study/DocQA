@@ -71,10 +71,10 @@ export function updateReminderStatus(
 /**
  * 三个 part 的形态就是服务端的判据，两处不能想当然：
  * - 文件包成 `text/calendar` 的 Blob。内核对 `.ics` 给出的类型不一，`text/plain` 这类会被 415
- * 直接拒掉，而契约允许的是 `text/calendar` / `application/octet-stream` / 空值；
- * 文件名只作展示，服务端不消费。
+ *   直接拒掉，而契约允许的是 `text/calendar` / `application/octet-stream` / 空值；
+ *   文件名只作展示，服务端不消费。
  * - 两个文本字段按字符串 append。字符串形态不会产生 Part 级 `Content-Type`，
- * 这正是契约要求的「普通表单字段」；写成 Blob 会让服务端把它们当消息体去选转换器，直接 500。
+ *   这正是契约要求的「普通表单字段」；写成 Blob 会让服务端把它们当消息体去选转换器，直接 500。
  */
 export function buildScheduleImportForm(form: ScheduleImportForm): FormData {
   const data = new FormData();

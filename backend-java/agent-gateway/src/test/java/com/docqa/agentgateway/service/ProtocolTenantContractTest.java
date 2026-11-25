@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  */
 class ProtocolTenantContractTest {
 
-    private static final Pattern FIELD_LINE = Pattern.compile("^ ([a-z][a-z0-9_]*):", Pattern.MULTILINE);
+    private static final Pattern FIELD_LINE = Pattern.compile("^    ([a-z][a-z0-9_]*):", Pattern.MULTILINE);
     private static final Pattern ALIAS = Pattern.compile("alias=\"([A-Za-z][A-Za-z0-9]*)\"");
     private static final Set<String> EXPECTED = Set.of(
             "protocolVersion",
@@ -62,8 +62,8 @@ class ProtocolTenantContractTest {
         String body = bodyBetween(
                 readRepoFile("ai-python/src/docqa_ai/protocol/models.py"),
                 "class AgentAskRequest(StrictModel):",
-                "\n @field_validator");
-        Matcher field = Pattern.compile("^ tenant_id:.*Field\\(alias=\"tenantId\"\\)", Pattern.MULTILINE)
+                "\n    @field_validator");
+        Matcher field = Pattern.compile("^    tenant_id:.*Field\\(alias=\"tenantId\"\\)", Pattern.MULTILINE)
                 .matcher(body);
         assertThat(field.find()).as("Python 侧 tenant_id 必须声明为必填字段").isTrue();
         assertThat(field.group()).as("Python 侧 tenant_id 不得带默认值").doesNotContain("default");
@@ -73,7 +73,7 @@ class ProtocolTenantContractTest {
         String body = bodyBetween(
                 readRepoFile("ai-python/src/docqa_ai/protocol/models.py"),
                 "class AgentAskRequest(StrictModel):",
-                "\n @field_validator");
+                "\n    @field_validator");
         Set<String> fields = new TreeSet<>();
         Matcher lines = FIELD_LINE.matcher(body);
         while (lines.find()) {

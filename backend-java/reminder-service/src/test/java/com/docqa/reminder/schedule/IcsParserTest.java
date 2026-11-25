@@ -419,7 +419,7 @@ class IcsParserTest {
         expectFields(event("UID:" + "x".repeat(256),
                 "SUMMARY:线性代数",
                 "DTSTART;TZID=Asia/Shanghai:20260907T080000"), "file.line.4", "file.line.3");
-        expectFields(event("UID: ",
+        expectFields(event("UID:  ",
                 "SUMMARY:线性代数",
                 "DTSTART;TZID=Asia/Shanghai:20260907T080000"), "file.line.4", "file.line.3");
     }

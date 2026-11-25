@@ -4,7 +4,7 @@ updates:
   # - 每个生态按月检查，最多同时 2 个 PR；
   # - 次版本/补丁版本按生态聚合成一个 PR；
   # - Maven / pip / npm 忽略主版本升级（由维护者手工评估），
-  # GitHub Actions 的主版本升级仍自动跟进。
+  #   GitHub Actions 的主版本升级仍自动跟进。
   - package-ecosystem: "maven"
     directory: "/backend-java"
     schedule:

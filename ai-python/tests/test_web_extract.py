@@ -66,7 +66,7 @@ def test_empty_body_returns_empty_page() -> None:
 
 
 def test_plain_text_extraction_normalizes_whitespace() -> None:
-    page = extract_plain(b"line one\r\n\n\n\nline two\t\tend", "text/plain", max_chars=100)
+    page = extract_plain(b"line   one\r\n\n\n\nline two\t\tend", "text/plain", max_chars=100)
     assert page.text == "line one\n\nline two end"
 
 

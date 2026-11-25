@@ -1,6 +1,6 @@
 name: eval-nightly
 
-# nightly 真模型质量门禁：真实 embedding/rerank 检索 eval + 自建 LLM judge
+#  nightly 真模型质量门禁：真实 embedding/rerank 检索 eval + 自建 LLM judge
 # 逐回答 faithfulness 评分（均值 >= 0.8 才通过），JSON 报告上传 artifact 供审计。
 # 离线确定性基线由 ci.yml python job 的 eval 步骤负责，本 workflow 只在有真实
 # 密钥时运行；workflow_dispatch 供首跑手动冒烟。刻意不引 RAGAS（见 ai-python/README.md）。
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version-file: .python-version # 单一来源
+          python-version-file: .python-version  # 单一来源
           cache: pip
           cache-dependency-path: ai-python/requirements.lock.txt
       - name: Install (locked + verified hashes)

@@ -62,7 +62,7 @@ def context(**overrides: object) -> PlanContext:
         "tool_specs": (),
     }
     data.update(overrides)
-    return PlanContext(**data) # type: ignore[arg-type]
+    return PlanContext(**data)  # type: ignore[arg-type]
 
 
 def block(index: int, content: str = "context content") -> ContextBlock:
@@ -396,7 +396,7 @@ async def test_unavailable_rate_limiter_fails_closed() -> None:
         PlannerOutput(kind="final", answer="not executed", token_in=1, token_out=1),
     )
     store = budget_store()
-    result = await graph(planner, store=store, rate_limiter=BrokenLimiter()).run( # type: ignore[arg-type]
+    result = await graph(planner, store=store, rate_limiter=BrokenLimiter()).run(  # type: ignore[arg-type]
         context(allowed_tools=("calculator",))
     )
     assert result.tool_executions[0].success is False
@@ -422,7 +422,7 @@ async def test_tool_metrics_are_recorded_per_outcome() -> None:
         PlannerOutput(kind="tool", tool_name="calculator", tool_input="2+3"),
         PlannerOutput(kind="final", answer="done", token_in=1, token_out=1),
     )
-    result = await graph(planner, metrics=metrics).run(context(allowed_tools=("calculator",))) # type: ignore[arg-type]
+    result = await graph(planner, metrics=metrics).run(context(allowed_tools=("calculator",)))  # type: ignore[arg-type]
     assert result.answer == "done"
     assert metrics.calls == [("calculator", "builtin", "success")]
     assert metrics.latencies[0][0:2] == ("calculator", "builtin")

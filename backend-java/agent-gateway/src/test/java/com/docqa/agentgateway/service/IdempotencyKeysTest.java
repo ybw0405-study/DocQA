@@ -18,7 +18,7 @@ class IdempotencyKeysTest {
 
     @Test
     void trimsSurroundingWhitespace() {
-        assertThat(IdempotencyKeys.validate(" request-key-01 ")).isEqualTo("request-key-01");
+        assertThat(IdempotencyKeys.validate("  request-key-01  ")).isEqualTo("request-key-01");
     }
 
     @Test

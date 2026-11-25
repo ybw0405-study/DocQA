@@ -223,7 +223,7 @@ describe('reminders store', () => {
   });
 
   it('omits an empty description instead of submitting an empty string into the fingerprint', async () => {
-    store.patchForm({ kind: 'DEADLINE', timezone: 'UTC', title: '测验', description: ' ', dueAt: '2026-11-01T01:30' });
+    store.patchForm({ kind: 'DEADLINE', timezone: 'UTC', title: '测验', description: '   ', dueAt: '2026-11-01T01:30' });
     await store.submitReminder();
     expect(callLog.reminderBodies[0]).not.toHaveProperty('description');
 

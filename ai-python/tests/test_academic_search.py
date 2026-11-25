@@ -15,7 +15,7 @@ Handler = Callable[[httpx.Request], httpx.Response]
 OPENALEX_JSON = {
     "results": [
         {
-            "title": " Attention Is All You Need ",
+            "title": "  Attention Is All You Need  ",
             "publication_year": 2017,
             "doi": "https://doi.org/10.1000/xyz",
             "authorships": [

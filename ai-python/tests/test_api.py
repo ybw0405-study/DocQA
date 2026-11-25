@@ -132,7 +132,7 @@ async def test_default_redis_client_decodes_hash_fields() -> None:
 
 async def test_success_response_uses_camel_case_contract() -> None:
     fake = FakeService()
-    app = create_app(make_settings(), agent_service=fake) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=fake)  # type: ignore[arg-type]
     async with client_for(app) as client:
         response = await client.post("/agent/ask", json=request_payload())
     assert response.status_code == 200
@@ -187,7 +187,7 @@ async def test_protocol_violations_return_422_problem_detail(
     expected_field: str,
 ) -> None:
     fake = FakeService()
-    app = create_app(make_settings(), agent_service=fake) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=fake)  # type: ignore[arg-type]
     async with client_for(app) as client:
         response = await client.post("/agent/ask", content=body, headers={"Content-Type": content_type})
     assert response.status_code == 422
@@ -255,7 +255,7 @@ async def test_kill_switch_returns_503_with_audit_event() -> None:
 
 async def test_deadline_error_is_mapped_to_504() -> None:
     fake = FakeService(error=deadline_exceeded(trace_id=TRACE_ID))
-    app = create_app(make_settings(), agent_service=fake) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=fake)  # type: ignore[arg-type]
     async with client_for(app) as client:
         response = await client.post("/agent/ask", json=request_payload())
     assert response.status_code == 504
@@ -264,7 +264,7 @@ async def test_deadline_error_is_mapped_to_504() -> None:
 
 async def test_unhandled_error_is_sanitized() -> None:
     fake = FakeService(error=RuntimeError("secret dsn"))
-    app = create_app(make_settings(), agent_service=fake) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=fake)  # type: ignore[arg-type]
     async with client_for(app) as client:
         response = await client.post("/agent/ask", json=request_payload())
     assert response.status_code == 500
@@ -278,7 +278,7 @@ async def test_traceparent_header_continues_the_trace() -> None:
     tracer, provider = build_tracing(settings, exporter=exporter)
     app = create_app(
         settings,
-        agent_service=FakeService(), # type: ignore[arg-type]
+        agent_service=FakeService(),  # type: ignore[arg-type]
         tracer=tracer,
         tracer_provider=provider,
         span_exporter=exporter,
@@ -303,7 +303,7 @@ async def test_missing_traceparent_annotates_the_expected_trace_id() -> None:
     tracer, provider = build_tracing(settings, exporter=exporter)
     app = create_app(
         settings,
-        agent_service=FakeService(), # type: ignore[arg-type]
+        agent_service=FakeService(),  # type: ignore[arg-type]
         tracer=tracer,
         tracer_provider=provider,
         span_exporter=exporter,
@@ -320,7 +320,7 @@ async def test_trace_mismatch_is_annotated_on_the_span() -> None:
     tracer, provider = build_tracing(settings, exporter=exporter)
     app = create_app(
         settings,
-        agent_service=FakeService(), # type: ignore[arg-type]
+        agent_service=FakeService(),  # type: ignore[arg-type]
         tracer=tracer,
         tracer_provider=provider,
         span_exporter=exporter,

@@ -175,13 +175,13 @@ jobs:
             esac
             echo "${image}@${digest}" | tee -a digests.txt
           }
-          build_one java-service user-service user-service
+          build_one java-service user-service      user-service
           build_one java-service document-service document-service
           build_one java-service reminder-service reminder-service
           build_one java-service-nonweb audit-service audit-service
-          build_one java-service agent-gateway agent-gateway
-          build_one ai-python "" ai-python
-          build_one frontend "" frontend
+          build_one java-service agent-gateway    agent-gateway
+          build_one ai-python     ""              ai-python
+          build_one frontend      ""              frontend
           test -s digests.txt
           {
             echo '### 镜像 digest 清单'

@@ -137,7 +137,7 @@ class AuthServiceTest {
         when(userRepository.findCredentialsByUsername(TenantContext.DEFAULT_TENANT_ID, "zhang.wei"))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.login(new LoginRequest(" Zhang.Wei ", PASSWORD), IP))
+        assertThatThrownBy(() -> authService.login(new LoginRequest("  Zhang.Wei ", PASSWORD), IP))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USR_AUTH_001));
     }
@@ -464,7 +464,7 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(credentials));
 
         IssuedSession session =
-                authService.login(new LoginRequest(USERNAME, SECOND_PASSWORD, " ACME "), IP);
+                authService.login(new LoginRequest(USERNAME, SECOND_PASSWORD, "  ACME  "), IP);
 
         JwtIdentity identity = jwtService.verify(session.access().accessToken());
         assertThat(identity.tenantId()).isEqualTo(SECOND_TENANT);

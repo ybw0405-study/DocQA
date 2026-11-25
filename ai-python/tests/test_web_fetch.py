@@ -57,12 +57,12 @@ async def test_client_without_a_resolver_still_checks_dns(monkeypatch: pytest.Mo
     finally:
         await client.aclose()
     assert "条件概率描述已知信息后的不确定性" in result.observation
-    assert calls == ["example.com", "example.com"] # 预检一次，robots.txt 目标再解析一次
+    assert calls == ["example.com", "example.com"]  # 预检一次，robots.txt 目标再解析一次
 
 
 async def test_fetches_html_and_wraps_as_untrusted() -> None:
     handler, requests = handler_with_robots()
-    client = make_client(handler) # type: ignore[arg-type]
+    client = make_client(handler)  # type: ignore[arg-type]
     try:
         result = await WebFetchTool(client).run("https://example.com/page", tool_context())
     finally:
@@ -78,7 +78,7 @@ async def test_fetches_html_and_wraps_as_untrusted() -> None:
 async def test_robots_cache_hits_are_counted_without_a_second_request() -> None:
     handler, requests = handler_with_robots()
     hits: list[int] = []
-    client = make_client(handler, on_cache_hit=lambda: hits.append(1)) # type: ignore[arg-type]
+    client = make_client(handler, on_cache_hit=lambda: hits.append(1))  # type: ignore[arg-type]
     try:
         await WebFetchTool(client).run("https://example.com/page", tool_context())
         await WebFetchTool(client).run("https://example.com/page", tool_context())
@@ -90,7 +90,7 @@ async def test_robots_cache_hits_are_counted_without_a_second_request() -> None:
 
 async def test_robots_disallow_blocks_before_the_page_request() -> None:
     handler, requests = handler_with_robots("User-agent: *\nDisallow: /page\n")
-    client = make_client(handler) # type: ignore[arg-type]
+    client = make_client(handler)  # type: ignore[arg-type]
     try:
         with pytest.raises(ToolError, match="rejected"):
             await WebFetchTool(client).run("https://example.com/page", tool_context())
@@ -113,7 +113,7 @@ async def test_robots_server_error_is_fail_closed() -> None:
 
 async def test_redirect_is_followed_and_revalidated() -> None:
     handler, requests = handler_with_robots()
-    client = make_client(handler) # type: ignore[arg-type]
+    client = make_client(handler)  # type: ignore[arg-type]
     try:
         result = await WebFetchTool(client).run("https://example.com/start", tool_context())
     finally:
@@ -166,7 +166,7 @@ async def test_redirect_budget_is_enforced() -> None:
 
 async def test_non_2xx_status_is_a_tool_error() -> None:
     handler, _ = handler_with_robots()
-    client = make_client(handler) # type: ignore[arg-type]
+    client = make_client(handler)  # type: ignore[arg-type]
     try:
         with pytest.raises(ToolError, match="HTTP 404"):
             await WebFetchTool(client).run("https://example.com/missing", tool_context())
@@ -176,7 +176,7 @@ async def test_non_2xx_status_is_a_tool_error() -> None:
 
 async def test_only_html_and_text_are_accepted() -> None:
     handler, _ = handler_with_robots()
-    client = make_client(handler) # type: ignore[arg-type]
+    client = make_client(handler)  # type: ignore[arg-type]
     try:
         with pytest.raises(ToolError, match="HTML or plain text"):
             await WebFetchTool(client).run("https://example.com/binary", tool_context())
@@ -329,7 +329,7 @@ def _peer_handler(address: str) -> Handler:
 
 async def test_connection_landing_on_a_private_peer_is_rejected() -> None:
     # 预检解析到公网，但真正连上的是内网地址，即 DNS rebinding 的 TOCTOU（S7b3-M2）。
-    client = make_client(_peer_handler("10.0.0.7")) # type: ignore[arg-type]
+    client = make_client(_peer_handler("10.0.0.7"))  # type: ignore[arg-type]
     try:
         with pytest.raises(FetchRejected, match="connection peer"):
             await client.get("https://example.com/page")
@@ -338,7 +338,7 @@ async def test_connection_landing_on_a_private_peer_is_rejected() -> None:
 
 
 async def test_public_peer_is_accepted() -> None:
-    client = make_client(_peer_handler("93.184.216.34")) # type: ignore[arg-type]
+    client = make_client(_peer_handler("93.184.216.34"))  # type: ignore[arg-type]
     try:
         response = await client.get("https://example.com/page")
     finally:
@@ -347,7 +347,7 @@ async def test_public_peer_is_accepted() -> None:
 
 
 async def test_operator_allow_private_endpoints_skip_the_peer_check() -> None:
-    client = make_client(_peer_handler("127.0.0.1"), allow_private=True) # type: ignore[arg-type]
+    client = make_client(_peer_handler("127.0.0.1"), allow_private=True)  # type: ignore[arg-type]
     try:
         response = await client.get("https://example.com/page")
     finally:

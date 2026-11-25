@@ -142,7 +142,7 @@ class VectorChangeWorker:
                 span.set_status(Status(StatusCode.ERROR, "publish-failed"))
                 await self._release(message_id)
                 return HandleOutcome.RETRY
-            except Exception: # noqa: BLE001 - return the message to the broker without leaking details
+            except Exception:  # noqa: BLE001 - return the message to the broker without leaking details
                 span.set_attribute("vector_change.status", "RETRY")
                 span.set_status(Status(StatusCode.ERROR, "unexpected"))
                 log_event(

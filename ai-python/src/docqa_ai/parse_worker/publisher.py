@@ -50,7 +50,7 @@ class RocketMqEventProducer:
     """One producer, one send convention: documentId as key plus trace properties."""
 
     def __init__(self, namesrv: str, producer_group: str, *, timeout_ms: int = 3000) -> None:
-        from rocketmq.client import Producer # optional extra; imported lazily
+        from rocketmq.client import Producer  # optional extra; imported lazily
 
         self._producer = Producer(producer_group)
         self._producer.set_name_server_address(namesrv)
@@ -62,7 +62,7 @@ class RocketMqEventProducer:
             await asyncio.to_thread(self._send, topic, body, key, trace_id)
         except PublishError:
             raise
-        except Exception as exc: # noqa: BLE001 - client/C++ errors are mapped to retry semantics
+        except Exception as exc:  # noqa: BLE001 - client/C++ errors are mapped to retry semantics
             raise PublishError("event publish failed") from exc
 
     def _send(self, topic: str, body: str, key: str, trace_id: str) -> None:

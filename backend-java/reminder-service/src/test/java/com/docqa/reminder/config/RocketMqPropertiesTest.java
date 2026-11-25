@@ -28,7 +28,7 @@ class RocketMqPropertiesTest {
     @Test
     void rejectsABlankConsumerGroupBecauseTheConsumerCannotStartWithoutOne() {
         RocketMqProperties properties = validProperties();
-        properties.setConsumerGroup(" ");
+        properties.setConsumerGroup("  ");
 
         assertThat(validator.validate(properties))
                 .extracting(violation -> violation.getPropertyPath().toString())

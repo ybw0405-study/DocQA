@@ -35,12 +35,12 @@ import org.springframework.stereotype.Component;
  * ICS 课表解析器。判据只有一条：<strong>影响触发时刻的属性一律严格，其余一律忽略</strong>。
  *
  * <ul>
- * <li>严格：{@code UID}、{@code DTSTART}、{@code RRULE}、{@code EXDATE}、{@code SEQUENCE}
- * 的形态与取值非法即 422；{@code RDATE} 与 {@code RECURRENCE-ID} 会改变 occurrence 集合但本服务
- * 不展开它们，因此点名拒绝（附属性名与物理行号），而不是静默忽略后算出一套错课表。</li>
- * <li>忽略：{@code VTIMEZONE}、{@code VALARM}、{@code LOCATION}、{@code DTEND}/{@code DURATION}、
- * {@code PRODID}、{@code CALSCALE}、{@code METHOD}、{@code X-*} 等。教务导出文件里这些组件极多，
- * 逐条拒绝会让导入永远走不通，而它们不参与触发时刻。{@code LOCATION} 丢失已在 CR 登记。</li>
+ *   <li>严格：{@code UID}、{@code DTSTART}、{@code RRULE}、{@code EXDATE}、{@code SEQUENCE}
+ *       的形态与取值非法即 422；{@code RDATE} 与 {@code RECURRENCE-ID} 会改变 occurrence 集合但本服务
+ *       不展开它们，因此点名拒绝（附属性名与物理行号），而不是静默忽略后算出一套错课表。</li>
+ *   <li>忽略：{@code VTIMEZONE}、{@code VALARM}、{@code LOCATION}、{@code DTEND}/{@code DURATION}、
+ *       {@code PRODID}、{@code CALSCALE}、{@code METHOD}、{@code X-*} 等。教务导出文件里这些组件极多，
+ *       逐条拒绝会让导入永远走不通，而它们不参与触发时刻。{@code LOCATION} 丢失已在 CR 登记。</li>
  * </ul>
  *
  * <p>文本按 UTF-8 <strong>逐物理行严格解码</strong>：允许一个起始 BOM，出现非法字节序列直接拒绝，

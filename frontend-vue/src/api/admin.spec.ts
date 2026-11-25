@@ -105,7 +105,7 @@ describe('admin api', () => {
   });
 
   it('rejects an invented version field because the contract accepts no more than one key', async () => {
-    // 的反证： 遗留注释里的「version 乐观锁」在交付契约上不存在，多一个键就是 400。
+    //  的反证： 遗留注释里的「version 乐观锁」在交付契约上不存在，多一个键就是 400。
     const invented = { killSwitchActive: true, version: 3 } as unknown as UpdateAiControlsRequest;
 
     const error = await expectApiError(updateAiControls(invented));
@@ -200,7 +200,7 @@ describe('admin api', () => {
 
     const error = await expectApiError(updateAiControls({ killSwitchActive: true }));
 
-    // 的真实形态：先写 Redis 再插审计，500 不等于回滚，调用方只能重读。
+    //  的真实形态：先写 Redis 再插审计，500 不等于回滚，调用方只能重读。
     expect(error.status).toBe(500);
     expect(error.code).toBe('COM-INTERNAL-001');
     expect(adminStubState.killSwitch.active).toBe(true);

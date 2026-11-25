@@ -20,7 +20,7 @@
     端点/令牌/DSN 全部由调用方提供。
 
 运行：
-  python drill_loadtest_pgpool.py # dry-run（默认）
+  python drill_loadtest_pgpool.py                          # dry-run（默认）
   python drill_loadtest_pgpool.py --execute --ask-url http://127.0.0.1:8000/agent/ask \
       --dsn postgresql://docqa:xxx@127.0.0.1:5432/docqa_vec --internal-token xxx \
       --concurrency 10 50 100 200 --duration 30 --max-pg-connections 40 --report out.json
@@ -44,7 +44,7 @@ METRICS = [
     "ask_error_rate",
     "throughput_rps",
     "pg_app_connections_peak",
-    "pg_app_connections_vs_2x_concurrency", # 未接线的特征：~2*并发
+    "pg_app_connections_vs_2x_concurrency",  # 未接线的特征：~2*并发
     "pool_exhausted_errors",
 ]
 
@@ -72,7 +72,7 @@ class LoadResult:
 def sample_pg_connections(dsn: str) -> int | None:
     """采样 docqa 应用连接数；psycopg 不可用时返回 None（调用方需 WARN）。"""
     try:
-        import psycopg # noqa: PLC0415
+        import psycopg  # noqa: PLC0415
     except ImportError:
         return None
     try:
@@ -81,7 +81,7 @@ def sample_pg_connections(dsn: str) -> int | None:
                 cur.execute("SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() "
                             "AND application_name LIKE 'docqa%';")
                 return int(cur.fetchone()[0])
-    except Exception: # noqa: BLE001
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -93,7 +93,7 @@ def one_request(url: str, body: dict, headers: dict, timeout: float) -> tuple[bo
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             resp.read()
             return (200 <= resp.status < 300), (time.perf_counter() - t0) * 1000
-    except Exception: # noqa: BLE001
+    except Exception:  # noqa: BLE001
         return False, (time.perf_counter() - t0) * 1000
 
 
@@ -156,7 +156,7 @@ def run(args: argparse.Namespace) -> int:
         for c in args.concurrency:
             r.rows.append({"concurrency": c, "dry_run": True,
                            "would_assert": f"pg_app_connections_peak <= {args.max_pg_connections} 且 < 2*{c}"})
-            print(f" [dry-run] concurrency={c}: 登记压测级别，未发请求、未连 PG")
+            print(f"  [dry-run] concurrency={c}: 登记压测级别，未发请求、未连 PG")
         r.dump(args.report)
         print("\n骨架自检完成；本机未做真实压测，无实测数值。加 --execute 才会真实打流。")
         return 0

@@ -314,7 +314,7 @@ def test_ocr_page_count_mismatch_is_treated_as_empty() -> None:
     buffer = io.BytesIO()
     writer.write(buffer)
 
-    ocr = _FakeOcr(["只有一页"]) # PDF 有两页
+    ocr = _FakeOcr(["只有一页"])  # PDF 有两页
     with pytest.raises(ParseJobError) as captured:
         DocumentParser(ocr=ocr).parse(buffer.getvalue(), PDF, "a.pdf")
     assert captured.value.code == INVALID_DOCUMENT
@@ -364,7 +364,7 @@ async def test_redis_idempotency_state_machine() -> None:
             raise RedisError("down")
 
     with pytest.raises(IdempotencyUnavailable):
-        await RedisIdempotencyStore(FailingRedis()).begin("m2") # type: ignore[arg-type]
+        await RedisIdempotencyStore(FailingRedis()).begin("m2")  # type: ignore[arg-type]
 
 
 def test_content_hash_shape_matches_java_expectations() -> None:

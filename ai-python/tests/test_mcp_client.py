@@ -65,7 +65,7 @@ class FakeServer:
 def client(handler: Callable[[httpx.Request], httpx.Response], **overrides: object) -> McpHttpClient:
     options: dict[str, object] = {"transport": httpx.MockTransport(handler)}
     options.update(overrides)
-    return McpHttpClient(URL, **options) # type: ignore[arg-type]
+    return McpHttpClient(URL, **options)  # type: ignore[arg-type]
 
 
 def methods(server: FakeServer) -> list[str]:
@@ -93,7 +93,7 @@ async def test_list_tools_initializes_session_and_filters_invalid_definitions() 
         assert len(definitions[0].description) == 200
         assert definitions[0].required_arguments == ("q", "limit")
         assert methods(server) == ["initialize", "notifications/initialized", "tools/list"]
-        assert server.requests[0]["params"]["protocolVersion"] == MCP_PROTOCOL_VERSION # type: ignore[index]
+        assert server.requests[0]["params"]["protocolVersion"] == MCP_PROTOCOL_VERSION  # type: ignore[index]
         assert "id" not in server.requests[1]
         assert server.headers[2]["Mcp-Session-Id"] == "sess-1"
 
@@ -121,7 +121,7 @@ async def test_call_tool_joins_text_blocks_and_counts_dropped_content() -> None:
         assert result.dropped_blocks == 1
         call = server.requests[-1]
         assert call["method"] == "tools/call"
-        assert call["params"] == {"name": "lookup", "arguments": {"q": "python"}} # type: ignore[index]
+        assert call["params"] == {"name": "lookup", "arguments": {"q": "python"}}  # type: ignore[index]
     finally:
         await mcp.aclose()
 

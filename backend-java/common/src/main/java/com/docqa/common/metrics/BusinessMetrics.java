@@ -21,10 +21,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p><b>命名约定（Micrometer → Prometheus 的两个后缀规则）</b>，这是本类最容易写错的地方：
  *
  * <ul>
- * <li>Counter 若名字不以 {@code _total} 结尾，导出时会被追加上 {@code _total}；本类统一写成
- * 文档里的完整名（带 {@code _total}），既不会再被追加，也与 §4.3 的告警表达式逐字一致。
- * <li>Timer 的导出名 = Micrometer 名 + baseTimeUnit 后缀（{@code _seconds}）。因此 Timer 的
- * Micrometer 名必须**不带** {@code _seconds}，否则真实序列会变成 {@code _seconds_seconds}。
+ *   <li>Counter 若名字不以 {@code _total} 结尾，导出时会被追加上 {@code _total}；本类统一写成
+ *       文档里的完整名（带 {@code _total}），既不会再被追加，也与 §4.3 的告警表达式逐字一致。
+ *   <li>Timer 的导出名 = Micrometer 名 + baseTimeUnit 后缀（{@code _seconds}）。因此 Timer 的
+ *       Micrometer 名必须**不带** {@code _seconds}，否则真实序列会变成 {@code _seconds_seconds}。
  * </ul>
  *
  * <p>Gauge 与 DistributionSummary 不做后缀改写，写文档名即可。

@@ -87,14 +87,14 @@ def build_service(
         budget_store(),
         StaticKillSwitch(kill),
         retrieval or RetrievalService(InMemoryVectorRepository(), OfflineEmbeddingProvider()),
-        planner, # type: ignore[arg-type]
+        planner,  # type: ignore[arg-type]
         tools or ToolRegistry([]),
         experiment=experiment,
     )
 
 
 async def collect(service: AgentAskService, request: object, deadline: Deadline | None = None) -> list[AskStreamEvent]:
-    return [event async for event in service.ask_stream(request, deadline=deadline)] # type: ignore[arg-type]
+    return [event async for event in service.ask_stream(request, deadline=deadline)]  # type: ignore[arg-type]
 
 
 # ---------- provider 层（astream） ----------
@@ -181,7 +181,7 @@ async def test_openai_planner_astream_parses_sse_frames_into_single_delta() -> N
     assert events[1].output is not None
     assert events[1].output.kind == "final"
     assert events[1].output.answer == "流式答案"
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 async def test_openai_planner_astream_tool_action_emits_no_delta() -> None:
@@ -208,7 +208,7 @@ async def test_openai_planner_astream_emits_incremental_deltas_as_answer_streams
     assert "".join(deltas) == "流式答案"
     assert len(deltas) >= 2
     assert events[-1].kind == "final"
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 async def test_openai_planner_astream_decodes_escape_split_across_chunks() -> None:
@@ -220,7 +220,7 @@ async def test_openai_planner_astream_decodes_escape_split_across_chunks() -> No
     events = [event async for event in planner.astream(_stream_context(), 5.0)]
     deltas = [event.text for event in events if event.kind == "delta"]
     assert "".join(deltas) == "流式"
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 async def test_openai_planner_astream_recovers_when_action_follows_answer() -> None:
@@ -232,7 +232,7 @@ async def test_openai_planner_astream_recovers_when_action_follows_answer() -> N
     events = [event async for event in planner.astream(_stream_context(), 5.0)]
     deltas = [event.text for event in events if event.kind == "delta"]
     assert "".join(deltas) == "先答案"
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 async def test_openai_planner_astream_reads_usage_frame_after_empty_choices() -> None:
@@ -250,7 +250,7 @@ async def test_openai_planner_astream_reads_usage_frame_after_empty_choices() ->
     output = events[-1].output
     assert output is not None
     assert (output.token_in, output.token_out) == (777, 88)
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 async def test_openai_planner_astream_falls_back_to_estimate_without_usage() -> None:
@@ -267,7 +267,7 @@ async def test_openai_planner_astream_falls_back_to_estimate_without_usage() -> 
     assert output.token_in > 0
     assert output.token_out > 0
     assert (output.token_in, output.token_out) != (777, 88)
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 async def test_openai_planner_astream_drops_stream_options_when_provider_rejects_it() -> None:
@@ -293,7 +293,7 @@ async def test_openai_planner_astream_drops_stream_options_when_provider_rejects
     assert "stream_options" in seen[0]
     assert "stream_options" not in seen[1]
     await client.aclose()
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 async def test_openai_planner_astream_malformed_frame_is_unavailable() -> None:
@@ -301,7 +301,7 @@ async def test_openai_planner_astream_malformed_frame_is_unavailable() -> None:
     with pytest.raises(PlannerUnavailable):
         async for _ in planner.astream(_stream_context(), 5.0):
             pass
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 async def test_openai_planner_astream_non_2xx_is_unavailable() -> None:
@@ -309,7 +309,7 @@ async def test_openai_planner_astream_non_2xx_is_unavailable() -> None:
     with pytest.raises(PlannerUnavailable):
         async for _ in planner.astream(_stream_context(), 5.0):
             pass
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 async def test_openai_planner_astream_empty_content_is_output_invalid() -> None:
@@ -317,7 +317,7 @@ async def test_openai_planner_astream_empty_content_is_output_invalid() -> None:
     with pytest.raises(PlannerOutputInvalid):
         async for _ in planner.astream(_stream_context(), 5.0):
             pass
-    await planner._client.aclose() # type: ignore[union-attr]
+    await planner._client.aclose()  # type: ignore[union-attr]
 
 
 # ---------- 服务层（ask_stream） ----------
@@ -328,7 +328,7 @@ async def test_ask_stream_emits_single_delta_then_done() -> None:
     events = await collect(service, make_request())
     assert [event.kind for event in events] == ["delta", "done"]
     delta, done = events
-    assert delta.text == done.response.answer # type: ignore[union-attr]
+    assert delta.text == done.response.answer  # type: ignore[union-attr]
     assert done.response is not None
     assert done.response.protocol_version == PROTOCOL_VERSION
     assert done.response.trace_id == TRACE_ID
@@ -346,11 +346,11 @@ async def test_ask_stream_audit_event_types_match_sync_path() -> None:
     stream_events = await collect(stream_service, make_request())
     done = stream_events[-1]
     assert done.kind == "done"
-    assert [event.eventType for event in done.response.audit_events] == [ # type: ignore[union-attr]
+    assert [event.eventType for event in done.response.audit_events] == [  # type: ignore[union-attr]
         event.eventType for event in sync_response.audit_events
     ]
     sync_completed = sync_response.audit_events[-1]
-    stream_completed = done.response.audit_events[-1] # type: ignore[union-attr]
+    stream_completed = done.response.audit_events[-1]  # type: ignore[union-attr]
     assert stream_completed.payloadRedacted["chunkCount"] == sync_completed.payloadRedacted["chunkCount"]
 
 
@@ -393,7 +393,7 @@ class _DeadlineThenToolPlanner:
         self.rounds += 1
         if self.rounds == 1:
             yield PlannerStreamEvent(kind="delta", text="部分回答")
-            self._advance() # type: ignore[operator]
+            self._advance()  # type: ignore[operator]
             yield PlannerStreamEvent(
                 kind="final",
                 output=PlannerOutput(kind="tool", tool_name="calculator", tool_input="1+2"),
@@ -421,12 +421,12 @@ async def test_ask_stream_deadline_exceeded_after_deltas_raises_complete_error()
         question="计算 1+2，然后继续讲 GIL",
         piiMaskedQuestion="计算 1+2，然后继续讲 GIL",
     )
-    deadline = Deadline(5000, clock=clock) # 到期于 6.0，第一轮后被推到 11.0
+    deadline = Deadline(5000, clock=clock)  # 到期于 6.0，第一轮后被推到 11.0
     events: list[AskStreamEvent] = []
     with pytest.raises(AgentError) as raised:
         async for event in service.ask_stream(request, deadline=deadline):
             events.append(event)
-    assert [event.kind for event in events] == ["delta"] # 软停止前已发出的 delta 不回收
+    assert [event.kind for event in events] == ["delta"]  # 软停止前已发出的 delta 不回收
     assert raised.value.code == "AGT-UPSTREAM-002"
     assert raised.value.audit_events
     assert any(event.eventType == "AGENT_DEADLINE_EXCEEDED" for event in raised.value.audit_events)
@@ -487,7 +487,7 @@ def _client(app: object) -> httpx.AsyncClient:
 
 async def test_stream_endpoint_rejects_legacy_protocol_with_422_json() -> None:
     fake = StreamFakeService()
-    app = create_app(make_settings(), agent_service=fake) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=fake)  # type: ignore[arg-type]
     async with _client(app) as client:
         response = await client.post("/agent/ask/stream", json=request_payload())
     assert response.status_code == 422
@@ -501,7 +501,7 @@ async def test_stream_endpoint_rejects_legacy_protocol_with_422_json() -> None:
 
 async def test_stream_endpoint_streams_delta_and_done_frames() -> None:
     fake = StreamFakeService()
-    app = create_app(make_settings(), agent_service=fake) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=fake)  # type: ignore[arg-type]
     async with _client(app) as client:
         response = await client.post(
             "/agent/ask/stream",
@@ -523,7 +523,7 @@ async def test_stream_endpoint_streams_delta_and_done_frames() -> None:
 
 async def test_stream_endpoint_converts_service_error_into_error_frame() -> None:
     fake = StreamFakeService(error=kill_switch_open(trace_id=TRACE_ID))
-    app = create_app(make_settings(), agent_service=fake) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=fake)  # type: ignore[arg-type]
     async with _client(app) as client:
         response = await client.post(
             "/agent/ask/stream",
@@ -540,7 +540,7 @@ async def test_stream_endpoint_converts_service_error_into_error_frame() -> None
 
 async def test_stream_endpoint_rejects_non_json_content_type_before_sse() -> None:
     fake = StreamFakeService()
-    app = create_app(make_settings(), agent_service=fake) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=fake)  # type: ignore[arg-type]
     async with _client(app) as client:
         response = await client.post(
             "/agent/ask/stream",
@@ -557,7 +557,7 @@ async def test_sync_endpoint_still_accepts_protocol_10() -> None:
         async def ask(self, request: object, *, deadline: object = None) -> AgentAskResponse:
             return _stream_response()
 
-    app = create_app(make_settings(), agent_service=SyncFake()) # type: ignore[arg-type]
+    app = create_app(make_settings(), agent_service=SyncFake())  # type: ignore[arg-type]
     async with _client(app) as client:
         response = await client.post("/agent/ask", json=request_payload())
     assert response.status_code == 200

@@ -48,9 +48,9 @@ CONSTRAINT_KEYWORDS = (
 KEYWORD_LINE = re.compile(
     r"^(\s+)(" + "|".join(CONSTRAINT_KEYWORDS) + r"):\s*(.*)$"
 )
-SCHEMA_LINE = re.compile(r"^ ([A-Za-z][A-Za-z0-9_]*):\s*$")
-SECTION_LINE = re.compile(r"^ ([A-Za-z][A-Za-z0-9_]*):\s*$")
-FIELD_LINE = re.compile(r"^ ([A-Za-z][A-Za-z0-9_]*):\s*$")
+SCHEMA_LINE = re.compile(r"^    ([A-Za-z][A-Za-z0-9_]*):\s*$")
+SECTION_LINE = re.compile(r"^  ([A-Za-z][A-Za-z0-9_]*):\s*$")
+FIELD_LINE = re.compile(r"^        ([A-Za-z][A-Za-z0-9_]*):\s*$")
 LIST_ITEM = re.compile(r"^\s+- (.+?)\s*$")
 
 
@@ -71,11 +71,11 @@ def parse_contract(path: Path) -> dict[str, Any]:
     """解析 components.schemas 结构 + 扫描全文约束。只依赖缩进约定，不引入 PyYAML。
 
     约束登记表必须覆盖**全文**（paths / parameters / schemas 段都有约束），因此约束扫描
-    遍历整个文件；只有 `` schemas:`` 区段内才解析 properties / required / enum 结构，
+    遍历整个文件；只有 ``  schemas:`` 区段内才解析 properties / required / enum 结构，
     用于 springdoc diff 与 Pydantic 对账。
     """
     lines = path.read_text(encoding="utf-8").splitlines()
-    if " schemas:" not in lines:
+    if "  schemas:" not in lines:
         raise ValueError("openapi-java.yaml 缺少 components.schemas 区段")
 
     schemas: dict[str, Any] = {}
@@ -83,11 +83,11 @@ def parse_contract(path: Path) -> dict[str, Any]:
     current_schema: str | None = None
     current_field = ""
     in_schemas = False
-    pending_list_key: tuple[str, str] | None = None # ("required" | "enum", owner)
+    pending_list_key: tuple[str, str] | None = None  # ("required" | "enum", owner)
 
     for index, line in enumerate(lines):
         line_no = index + 1
-        if line == " schemas:":
+        if line == "  schemas:":
             in_schemas = True
             continue
         if in_schemas and SECTION_LINE.match(line):
@@ -136,7 +136,7 @@ def parse_contract(path: Path) -> dict[str, Any]:
             continue
 
         # required: 列表头是 6 空格且不在 CONSTRAINT_KEYWORDS 里，单独识别。
-        if re.match(r"^ required:\s*$", line):
+        if re.match(r"^      required:\s*$", line):
             current_field = ""
             pending_list_key = ("required", "")
             continue
@@ -162,7 +162,7 @@ def parse_contract(path: Path) -> dict[str, Any]:
             continue
 
         # 6 空格的 properties:/description: 等会结束当前字段上下文。
-        if re.match(r"^ [A-Za-z]", line):
+        if re.match(r"^      [A-Za-z]", line):
             current_field = ""
             pending_list_key = None
 
@@ -281,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
         drifts, common = diff_springdoc(contract, args.springdoc_spec)
         print(f"[contract] springdoc diff: 共同 schema={common} drift={len(drifts)}")
         for drift in drifts[:20]:
-            print(f" - {drift}")
+            print(f"  - {drift}")
         if drifts:
             problems.append(f"springdoc spec 与 yaml 有 {len(drifts)} 处字段漂移")
         if common == 0:

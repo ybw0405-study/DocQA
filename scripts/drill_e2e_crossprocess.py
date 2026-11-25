@@ -16,7 +16,7 @@
   * 本文件为新增脚手架，不修改任何现有源码 / 脚本 / 配置。
 
 运行：
-  python drill_e2e_crossprocess.py # dry-run（默认，安全）
+  python drill_e2e_crossprocess.py                       # dry-run（默认，安全）
   python drill_e2e_crossprocess.py --execute \
       --java-base-url http://127.0.0.1:8080 --ai-base-url http://127.0.0.1:8000 \
       --internal-token <token> --tenant-a <uuid> --tenant-b <uuid> --report out.json
@@ -32,17 +32,17 @@ import urllib.request
 from dataclasses import dataclass, field
 
 # TODO(校准)：以下路径按真实 OpenAPI / 路由替换；骨架不假设具体版本。
-PATH_UPLOAD = "/api/documents" # Java 控制面：上传并触发 parse-requested
-PATH_ASK = "/agent/ask" # ai-python：RAG 问答
-PATH_READY = "/health/ready" # readiness 探针（探 PG + Redis）
+PATH_UPLOAD = "/api/documents"          # Java 控制面：上传并触发 parse-requested
+PATH_ASK = "/agent/ask"                 # ai-python：RAG 问答
+PATH_READY = "/health/ready"            # readiness 探针（探 PG + Redis）
 
 STAGES = [
-    "preflight", # 端点 / 令牌 / 两租户可达性
-    "upload_document", # 控制面上传，触发带 tenantId 的 parse-requested
-    "wait_indexed", # 等 PG 向量行出现且 tenant_id 非空（真实库查询）
-    "ask_same_tenant", # 同租户问答，断言引用命中
-    "ask_cross_tenant", # 异租户问答，断言 0 引用
-    "missing_tenant_gate", # 缺 tenantId 信封的写路径被边界拒收
+    "preflight",            # 端点 / 令牌 / 两租户可达性
+    "upload_document",      # 控制面上传，触发带 tenantId 的 parse-requested
+    "wait_indexed",         # 等 PG 向量行出现且 tenant_id 非空（真实库查询）
+    "ask_same_tenant",      # 同租户问答，断言引用命中
+    "ask_cross_tenant",     # 异租户问答，断言 0 引用
+    "missing_tenant_gate",  # 缺 tenantId 信封的写路径被边界拒收
     "report",
 ]
 
@@ -65,7 +65,7 @@ class Result:
 
     def add(self, stage: str, ok: bool, detail: str) -> None:
         self.checks.append({"stage": stage, "ok": ok, "detail": detail})
-        print(f" [{'PASS' if ok else 'FAIL'}] {stage}: {detail}")
+        print(f"  [{'PASS' if ok else 'FAIL'}] {stage}: {detail}")
 
     def dump(self, path: str | None) -> dict:
         passed = sum(1 for c in self.checks if c["ok"])
@@ -94,7 +94,7 @@ def http_json(method: str, url: str, body: dict | None, headers: dict, timeout: 
             return resp.status, (json.loads(raw) if raw.strip().startswith(("{", "[")) else {"raw": raw})
     except urllib.error.HTTPError as exc:
         return exc.code, {"error": exc.read().decode("utf-8", "replace")}
-    except Exception as exc: # noqa: BLE001 - 骨架需把网络异常转成失败项
+    except Exception as exc:  # noqa: BLE001 - 骨架需把网络异常转成失败项
         return -1, {"error": repr(exc)}
 
 
@@ -108,7 +108,7 @@ def run(args: argparse.Namespace) -> int:
     print("阶段:", " -> ".join(STAGES))
     print("断言:")
     for a in ASSERTIONS:
-        print(" -", a)
+        print("  -", a)
 
     if not args.execute:
         for s in STAGES:
@@ -128,8 +128,8 @@ def run(args: argparse.Namespace) -> int:
     r.add("upload_document", 200 <= code < 300 and bool(doc_id), f"HTTP {code}, documentId={doc_id!r}")
 
     # TODO(wait_indexed)：真实实现应查询 PG（DOCQA_AI_PG_DSN），断言
-    # SELECT count(*) FROM chunk_embedding_1024 WHERE document_id=%s AND tenant_id=%s
-    # 且 tenant_id <> ''。骨架不内嵌 DB 依赖，标记为待接线。
+    #   SELECT count(*) FROM chunk_embedding_1024 WHERE document_id=%s AND tenant_id=%s
+    #   且 tenant_id <> ''。骨架不内嵌 DB 依赖，标记为待接线。
     r.add("wait_indexed", False, "TODO: 接真实 PG 查询/轮询，本骨架不内嵌 DB 客户端")
 
     ask_body = {"tenantId": args.tenant_a, "question": "drill probe?", "documentScopes": [doc_id] if doc_id else []}
@@ -143,7 +143,7 @@ def run(args: argparse.Namespace) -> int:
     r.add("ask_cross_tenant", code == 200 and cites_cross == 0, f"HTTP {code}, references={cites_cross}")
 
     # TODO(missing_tenant_gate)：向 MQ 投一条不带 tenantId 的 parse-requested，
-    # 断言 worker 落 DOC-TENANT-001 / INVALID 且 PG 零行写入。需 MQ admin 端点。
+    #   断言 worker 落 DOC-TENANT-001 / INVALID 且 PG 零行写入。需 MQ admin 端点。
     r.add("missing_tenant_gate", False, "TODO: 接真实 MQ 投递与 PG 零行断言")
 
     rep = r.dump(args.report)

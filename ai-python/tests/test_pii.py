@@ -109,7 +109,7 @@ def test_v2_bank_card_idempotent() -> None:
     assert mask_text(first.masked).masked == first.masked
 
 
-@pytest.mark.parametrize("value", [None, "", " ", "正常文本"])
+@pytest.mark.parametrize("value", [None, "", "   ", "正常文本"])
 def test_empty_and_plain_text(value: str | None) -> None:
     result = mask_text(value)
     assert result.count == 0

@@ -362,7 +362,7 @@ class DocumentServiceTest {
         when(documentRepository.updateTitle(TENANT_ID, DOCUMENT_ID, USER_ID, "高等数学·第三章笔记")).thenReturn(1);
 
         DocumentStatusData data = documentService.rename(
-                USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY, new DocumentRenameRequest(" 高等数学·第三章笔记 "));
+                USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY, new DocumentRenameRequest("  高等数学·第三章笔记 "));
 
         assertThat(data.title()).isEqualTo("高等数学·第三章笔记");
         assertThat(data.fileName()).isEqualTo("notes.pdf");
@@ -372,7 +372,7 @@ class DocumentServiceTest {
     @Test
     void renameRejectsBlankOrOverlongTitlesBeforeTouchingTheDatabase() {
         assertThatThrownBy(() -> documentService.rename(
-                        USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY, new DocumentRenameRequest(" ")))
+                        USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY, new DocumentRenameRequest("   ")))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.COM_VALIDATION_001);
@@ -417,7 +417,7 @@ class DocumentServiceTest {
                 USER_ID,
                 DOCUMENT_ID,
                 IDEMPOTENCY_KEY,
-                new DocumentTagsUpdateRequest(List.of(" 考研 数学 ", "错题本")));
+                new DocumentTagsUpdateRequest(List.of(" 考研   数学 ", "错题本")));
 
         verify(tagRepository).replaceLinks(TENANT_ID, DOCUMENT_ID, List.of(firstId, secondId), NOW);
         assertThat(data.tags()).containsExactly("考研 数学", "错题本");
@@ -446,7 +446,7 @@ class DocumentServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.COM_VALIDATION_001);
         assertThatThrownBy(() -> documentService.replaceTags(
-                        USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY, new DocumentTagsUpdateRequest(List.of(" "))))
+                        USER_ID, DOCUMENT_ID, IDEMPOTENCY_KEY, new DocumentTagsUpdateRequest(List.of("  "))))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.COM_VALIDATION_001);

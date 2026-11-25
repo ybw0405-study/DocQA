@@ -168,7 +168,7 @@ async def test_command_with_residual_pii_is_refused_and_nothing_is_stored() -> N
 async def test_empty_fact_is_not_stored() -> None:
     store = memory_store()
     result = await service(store, planner=ForbiddenPlanner(), retrieval=ForbiddenRetrieval()).ask(
-        command_request(" ")
+        command_request("   ")
     )
     assert "未写入" in result.answer
     assert await store.list_facts(TENANT_ID, USER_ID) == ()
@@ -192,7 +192,7 @@ async def test_command_with_missing_budget_state_fails_closed() -> None:
 
 
 async def test_store_write_failure_maps_to_upstream_unavailable() -> None:
-    store = MemoryStore(BrokenBackend()) # type: ignore[arg-type]
+    store = MemoryStore(BrokenBackend())  # type: ignore[arg-type]
     with pytest.raises(AgentError) as captured:
         await service(store).ask(command_request("一条事实"))
     assert captured.value.code == "AGT-UPSTREAM-001"
@@ -223,7 +223,7 @@ async def test_memory_cannot_change_allowed_tools_or_citations() -> None:
 
 
 async def test_store_read_failure_maps_to_upstream_unavailable() -> None:
-    store = MemoryStore(BrokenBackend()) # type: ignore[arg-type]
+    store = MemoryStore(BrokenBackend())  # type: ignore[arg-type]
     with pytest.raises(AgentError) as captured:
         await service(store).ask(make_request())
     assert captured.value.code == "AGT-UPSTREAM-001"
@@ -333,7 +333,7 @@ def _app(memory: MemoryStore | None, *, token: str = "") -> object:
 
 
 def _client(app: object) -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test") # type: ignore[arg-type]
+    return httpx.AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test")  # type: ignore[arg-type]
 
 
 async def test_internal_endpoints_require_the_internal_token() -> None:

@@ -256,7 +256,7 @@ async def test_metrics_endpoint_serves_prometheus_text_from_process_registry() -
 
 async def test_business_port_never_exposes_metrics_even_when_enabled() -> None:
     # 主端口无论 metrics_exposed 取值都不再有 /metrics（方案 4.2 步 3 的隔离语义）。
-    app = create_app(make_settings(metrics_exposed=True), agent_service=object()) # type: ignore[arg-type]
+    app = create_app(make_settings(metrics_exposed=True), agent_service=object())  # type: ignore[arg-type]
 
     async with client_for(app) as client:
         response = await client.get("/metrics")

@@ -7,8 +7,8 @@
 # 本文件为新增脚手架，不修改任何现有源码 / 脚本 / 配置 / ops/**。
 #
 # 用法（真实环境）：
-# promtool check rules drill_slo_alerts.yaml
-# 把 prometheus.rules 段挂到 rule_files；slo / error_budget 段供文档与看板消费。
+#   promtool check rules drill_slo_alerts.yaml
+#   把 prometheus.rules 段挂到 rule_files；slo / error_budget 段供文档与看板消费。
 # =============================================================================
 
 slo:

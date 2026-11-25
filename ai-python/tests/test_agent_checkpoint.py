@@ -63,7 +63,7 @@ def context(**overrides: object) -> PlanContext:
         "tool_specs": (),
     }
     data.update(overrides)
-    return PlanContext(**data) # type: ignore[arg-type]
+    return PlanContext(**data)  # type: ignore[arg-type]
 
 
 def retrieval() -> RetrievalService:
@@ -128,7 +128,7 @@ def make_graph(
     sink: list[str] | None = None,
 ) -> AgentGraph:
     return AgentGraph(
-        planner, # type: ignore[arg-type]
+        planner,  # type: ignore[arg-type]
         ToolRegistry([tool]),
         budget_store(),
         Deadline(5000),
@@ -154,7 +154,7 @@ def make_service(
         budget_store(),
         StaticKillSwitch(False),
         retrieval(),
-        planner, # type: ignore[arg-type]
+        planner,  # type: ignore[arg-type]
         tools or ToolRegistry([]),
         checkpointer=saver,
         redis=redis,
@@ -259,7 +259,7 @@ async def test_service_resume_continues_rounds_and_deletes_thread_on_completion(
     with pytest.raises(AgentError) as raised:
         await service1.ask(request)
     assert raised.value.code == "AGT-INTERNAL-001"
-    assert await redis.get(LOCK_KEY) is None # 失败也释放单飞锁
+    assert await redis.get(LOCK_KEY) is None  # 失败也释放单飞锁
 
     planner2 = ScriptedPlanner(final_output())
     service2 = make_service(planner2, saver=saver, redis=redis, tools=tools)
@@ -289,7 +289,7 @@ async def test_fingerprint_mismatch_deletes_thread_and_runs_fresh() -> None:
     assert response.answer == "新问题的答案"
     assert planner2.calls[0].round_number == 1
     assert planner2.calls[0].observations == ()
-    assert tool.calls == 1 # 旧 thread 被删，崩溃的工具调用不再续跑
+    assert tool.calls == 1  # 旧 thread 被删，崩溃的工具调用不再续跑
 
 
 async def test_persisted_token_cap_stops_resume_without_llm_calls() -> None:
@@ -343,7 +343,7 @@ async def test_held_lock_fails_through_existing_upstream_mapping() -> None:
     assert raised.value.code == "AGT-UPSTREAM-001"
     assert any(event.eventType == "AGENT_FAILED" for event in raised.value.audit_events)
     assert planner.calls == []
-    assert await redis.get(LOCK_KEY) == "another-trace" # 不碰他人持有的锁
+    assert await redis.get(LOCK_KEY) == "another-trace"  # 不碰他人持有的锁
 
 
 async def test_ask_stream_resume_rebinds_sink_and_keeps_delta_done_contract() -> None:

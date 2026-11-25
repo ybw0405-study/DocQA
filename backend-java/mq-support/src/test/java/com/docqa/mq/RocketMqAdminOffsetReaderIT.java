@@ -17,7 +17,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
  *
  * <pre>{@code
  * DOCQA_MQ_IT=true DOCQA_ROCKETMQ_NAMESRV=127.0.0.1:9876 \
- * mvn -pl mq-support test -Dtest=RocketMqAdminOffsetReaderIT
+ *   mvn -pl mq-support test -Dtest=RocketMqAdminOffsetReaderIT
  * }</pre>
  *
  * <p>判据刻意宽松：只要求「连得上、能解析、lag 非负」。lag 的具体数值取决于本机积压，

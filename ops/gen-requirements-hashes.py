@@ -2,8 +2,8 @@
 """生成 ai-python/requirements.lock.txt（精确版本 + 真实 --hash，可复现脚本）。
 
 用法（仓库根目录）：
-    python ops/gen-requirements-hashes.py # 重新生成锁文件
-    python ops/gen-requirements-hashes.py --check # 只校验，不写回
+    python ops/gen-requirements-hashes.py            # 重新生成锁文件
+    python ops/gen-requirements-hashes.py --check   # 只校验，不写回
 
 版本来源：本机 ai-python/.venv/Lib/site-packages/*.dist-info（即已跑过
 738 passed / 3 skipped 的那套依赖），排除 pip / setuptools / wheel / 项目本体。
@@ -91,7 +91,7 @@ def render(pins: list[tuple[str, str]]) -> str:
         lines.append(f"{name}=={version}{marker} \\")
         for index, digest in enumerate(hashes):
             tail = " \\" if index < len(hashes) - 1 else ""
-            lines.append(f" --hash=sha256:{digest}{tail}")
+            lines.append(f"    --hash=sha256:{digest}{tail}")
     return "\n".join(lines) + "\n"
 
 

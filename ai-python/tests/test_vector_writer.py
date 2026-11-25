@@ -131,7 +131,7 @@ async def test_replace_deletes_scope_then_inserts_parameterized_rows(monkeypatch
             vector_writer.vector_literal(expected.embedding),
             json.dumps(expected.metadata, ensure_ascii=False, separators=(",", ":")),
             VERSION,
-            TENANT, # J2：写侧落真实租户，读侧 WHERE tenant_id = <真实UUID> 才可能命中
+            TENANT,  # J2：写侧落真实租户，读侧 WHERE tenant_id = <真实UUID> 才可能命中
         )
 
 
@@ -325,7 +325,7 @@ async def test_delete_without_tenant_is_rejected_before_connecting(monkeypatch: 
     assert calls == []
 
 
-@pytest.mark.parametrize("blank", [None, "", " "])
+@pytest.mark.parametrize("blank", [None, "", "   "])
 async def test_blank_tenant_never_becomes_an_empty_column_value(
     monkeypatch: pytest.MonkeyPatch, blank: str | None
 ) -> None:
