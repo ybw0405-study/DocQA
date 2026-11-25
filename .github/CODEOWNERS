@@ -8,9 +8,9 @@
 # 启用 required_approving_review_count=1 + require_code_owner_reviews=true，
 # 启用步骤见 CONTRIBUTING.md「分支与评审」。
 #
-# 诚实边界：两个账号由同一自然人持有，属形式上的第二道门禁而非独立复核；
-# 真正的把关来自 required_status_checks 与发布 runbook。PR 作者不能批准自己的 PR，
-# 因此 ybw0405-study 开的 PR 必须由 Y-super000 批准。
+# 评审边界：单人维护仓库，第二个账号仅用于满足分支保护的「非作者批准」要求，
+# 不构成独立复核；真正的把关来自 required_status_checks 与发布 runbook。
+# PR 作者不能批准自己的 PR，因此 ybw0405-study 开的 PR 由 Y-super000 批准。
 
 * @ybw0405-study @Y-super000
 
