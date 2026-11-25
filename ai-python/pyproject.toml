@@ -68,6 +68,8 @@ packages = ["src/docqa_ai"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# 显式固定，避免 pytest-asyncio 升级后默认 fixture loop scope 漂移（并消除未设置告警）
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q"

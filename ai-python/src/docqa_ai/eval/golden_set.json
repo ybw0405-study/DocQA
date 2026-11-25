@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "name": "DocQA 可溯源法规语料黄金集",
+  "scope": "ai-python/src/docqa_ai/eval/corpus.py 中 document_id=real-legal 的 8 个真实法规条文块",
+  "source_policy": "每条查询必须能由对应法规条文原文直接回答；查询是同一事实的不同表述，不引入语料之外的事实。条款来源随每条查询标注，便于人工复核。",
+  "limitations": "语料为公开法律法规条文的节选片段，覆盖劳动法、民法典、个人所得税法、道路交通安全法四个主题；样本量小且主题集中，只能用于链路回归与表述鲁棒性观察，不能证明跨域泛化能力。",
+  "chunks": [
+    {"index": 0, "statute": "《中华人民共和国劳动合同法》", "article": "第四十七条", "topic": "经济补偿按工作年限折算，六个月以上不满一年按一年，不满六个月按半个月"},
+    {"index": 1, "statute": "《中华人民共和国民法典》", "article": "第一千零六十四条", "topic": "共同签名或事后追认等共同意思表示所负债务属于夫妻共同债务"},
+    {"index": 2, "statute": "《中华人民共和国个人所得税法》", "article": "综合所得税率条款", "topic": "综合所得适用百分之三至百分之四十五的超额累进税率"},
+    {"index": 3, "statute": "《中华人民共和国道路交通安全法》", "article": "第九十一条第一款", "topic": "饮酒后驾驶机动车处暂扣六个月驾驶证并处一千至二千元罚款"},
+    {"index": 4, "statute": "《中华人民共和国劳动合同法》", "article": "第八十七条", "topic": "违法解除或终止劳动合同按第四十七条经济补偿标准的二倍支付赔偿金"},
+    {"index": 5, "statute": "《中华人民共和国道路交通安全法》", "article": "第九十一条第二款", "topic": "醉酒驾驶机动车约束至酒醒、吊销驾驶证、追究刑责、五年内不得重新取得"},
+    {"index": 6, "statute": "《中华人民共和国民法典》", "article": "第一千零八十九条", "topic": "离婚时夫妻共同债务共同偿还，共同财产不足时协议或由法院判决"},
+    {"index": 7, "statute": "《中华人民共和国个人所得税法》", "article": "第六条", "topic": "居民个人综合所得以年收入额减除六万元及专项扣除后的余额为应纳税所得额"}
+  ],
+  "queries": [
+    {"query_id": "gold-01", "question": "工作满六个月不满一年，经济补偿怎么算？", "relevant": [0], "variant": "原文问法", "source": "劳动合同法第四十七条"},
+    {"query_id": "gold-02", "question": "干了八个月被辞退，公司要补几个月工资？", "relevant": [0], "variant": "口语化", "source": "劳动合同法第四十七条"},
+    {"query_id": "gold-03", "question": "经济补偿按工作年限怎么折算？", "relevant": [0], "variant": "术语替换", "source": "劳动合同法第四十七条"},
+    {"query_id": "gold-04", "question": "不满六个月离职有半个月工资的补偿吗？", "relevant": [0], "variant": "部分信息", "source": "劳动合同法第四十七条"},
+
+    {"query_id": "gold-05", "question": "哪些债务属于夫妻共同债务？", "relevant": [1], "variant": "原文问法", "source": "民法典第一千零六十四条"},
+    {"query_id": "gold-06", "question": "夫妻一方事后追认的债务算共同债务吗？", "relevant": [1], "variant": "部分信息", "source": "民法典第一千零六十四条"},
+    {"query_id": "gold-07", "question": "两个人一起签字的借款属于共同债务吗？", "relevant": [1], "variant": "口语化", "source": "民法典第一千零六十四条"},
+    {"query_id": "gold-08", "question": "共同意思表示所负的债务怎么认定？", "relevant": [1], "variant": "术语替换", "source": "民法典第一千零六十四条"},
+
+    {"query_id": "gold-09", "question": "个人所得税综合所得的税率是多少？", "relevant": [2], "variant": "原文问法", "source": "个人所得税法（综合所得税率条款）"},
+    {"query_id": "gold-10", "question": "综合所得适用的是比例税率还是累进税率？", "relevant": [2], "variant": "术语替换", "source": "个人所得税法（综合所得税率条款）"},
+    {"query_id": "gold-11", "question": "个税最高一档税率是百分之多少？", "relevant": [2], "variant": "部分信息", "source": "个人所得税法（综合所得税率条款）"},
+    {"query_id": "gold-12", "question": "综合所得的税率区间是多少到多少？", "relevant": [2], "variant": "口语化", "source": "个人所得税法（综合所得税率条款）"},
+
+    {"query_id": "gold-13", "question": "饮酒驾驶机动车怎么处罚？", "relevant": [3], "variant": "原文问法", "source": "道路交通安全法第九十一条第一款"},
+    {"query_id": "gold-14", "question": "酒驾被查到驾驶证会暂扣多久？", "relevant": [3], "variant": "口语化", "source": "道路交通安全法第九十一条第一款"},
+    {"query_id": "gold-15", "question": "饮酒后开车的罚款金额范围是多少？", "relevant": [3], "variant": "部分信息", "source": "道路交通安全法第九十一条第一款"},
+    {"query_id": "gold-16", "question": "暂扣六个月机动车驾驶证是针对哪种违法行为？", "relevant": [3], "variant": "反向问法", "source": "道路交通安全法第九十一条第一款"},
+
+    {"query_id": "gold-17", "question": "公司违法解除劳动合同应该赔几倍补偿？", "relevant": [4], "variant": "原文问法", "source": "劳动合同法第八十七条"},
+    {"query_id": "gold-18", "question": "用人单位违法终止劳动合同的赔偿标准是什么？", "relevant": [4], "variant": "术语替换", "source": "劳动合同法第八十七条"},
+    {"query_id": "gold-19", "question": "违法辞退是按经济补偿的几倍支付赔偿金？", "relevant": [4], "variant": "口语化", "source": "劳动合同法第八十七条"},
+    {"query_id": "gold-20", "question": "二倍赔偿金依据哪一条的经济补偿标准？", "relevant": [4], "variant": "反向问法", "source": "劳动合同法第八十七条"},
+
+    {"query_id": "gold-21", "question": "醉酒驾驶机动车会被怎么处罚？", "relevant": [5], "variant": "原文问法", "source": "道路交通安全法第九十一条第二款"},
+    {"query_id": "gold-22", "question": "醉驾多久之内不能重新考驾照？", "relevant": [5], "variant": "口语化", "source": "道路交通安全法第九十一条第二款"},
+    {"query_id": "gold-23", "question": "醉酒驾驶是否要追究刑事责任？", "relevant": [5], "variant": "部分信息", "source": "道路交通安全法第九十一条第二款"},
+    {"query_id": "gold-24", "question": "吊销驾驶证并约束至酒醒适用于饮酒还是醉酒？", "relevant": [5], "variant": "易混淆对照", "source": "道路交通安全法第九十一条第二款"},
+
+    {"query_id": "gold-25", "question": "离婚时夫妻共同债务怎么偿还？", "relevant": [6], "variant": "原文问法", "source": "民法典第一千零八十九条"},
+    {"query_id": "gold-26", "question": "共同财产不够还债，离婚时债务怎么处理？", "relevant": [6], "variant": "口语化", "source": "民法典第一千零八十九条"},
+    {"query_id": "gold-27", "question": "离婚时共同债务协议不成由谁判？", "relevant": [6], "variant": "部分信息", "source": "民法典第一千零八十九条"},
+    {"query_id": "gold-28", "question": "夫妻共同债务在离婚时由一方承担还是共同偿还？", "relevant": [6], "variant": "易混淆对照", "source": "民法典第一千零八十九条"},
+
+    {"query_id": "gold-29", "question": "综合所得每年的基本减除费用是多少？", "relevant": [7], "variant": "原文问法", "source": "个人所得税法第六条"},
+    {"query_id": "gold-30", "question": "居民个人综合所得计算应纳税所得额时先扣多少钱？", "relevant": [7], "variant": "术语替换", "source": "个人所得税法第六条"},
+    {"query_id": "gold-31", "question": "六万元减除费用适用于哪类所得？", "relevant": [7], "variant": "反向问法", "source": "个人所得税法第六条"},
+    {"query_id": "gold-32", "question": "专项附加扣除是在哪个环节减掉的？", "relevant": [7], "variant": "部分信息", "source": "个人所得税法第六条"}
+  ],
+  "negative_queries": [
+    {"query_id": "neg-gold-01", "question": "工伤认定的具体标准是什么？", "reason": "语料未包含工伤保险相关条文"},
+    {"query_id": "neg-gold-02", "question": "如何申请发明专利？", "reason": "语料未包含专利法相关条文"},
+    {"query_id": "neg-gold-03", "question": "住房公积金贷款额度怎么计算？", "reason": "语料未包含住房公积金相关条文"},
+    {"query_id": "neg-gold-04", "question": "商标注册需要提交哪些材料？", "reason": "语料未包含商标法相关条文"},
+    {"query_id": "neg-gold-05", "question": "不动产登记簿由谁保管？", "reason": "语料未包含不动产登记相关条文"}
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "scope": "offline-feature-hashing retrieval (encode -> cosine -> top5 sort)",
+  "disclaimer": "单机本地基线，不含 HTTP / 数据库 / LLM / 网络；不是线上生产指标",
+  "environment": {
+    "python": "3.14.7",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+    "cpu_count": 16,
+    "candidate_chunks": 8,
+    "query_pool": 32,
+    "warmup": 100
+  },
+  "runs": [
+    {
+      "workers": 1,
+      "iterations": 2000,
+      "errors": 0,
+      "elapsed_s": 2.447,
+      "qps": 817.3,
+      "latency_ms": {
+        "mean": 1.222,
+        "p50": 1.143,
+        "p95": 1.764,
+        "p99": 2.005,
+        "max": 3.758
+      }
+    },
+    {
+      "workers": 4,
+      "iterations": 2000,
+      "errors": 0,
+      "elapsed_s": 3.062,
+      "qps": 653.2,
+      "latency_ms": {
+        "mean": 5.852,
+        "p50": 1.516,
+        "p95": 32.056,
+        "p99": 125.345,
+        "max": 295.329
+      }
+    },
+    {
+      "workers": 8,
+      "iterations": 2000,
+      "errors": 0,
+      "elapsed_s": 2.858,
+      "qps": 699.9,
+      "latency_ms": {
+        "mean": 10.825,
+        "p50": 1.417,
+        "p95": 48.023,
+        "p99": 297.814,
+        "max": 526.256
+      }
+    }
+  ]
+}

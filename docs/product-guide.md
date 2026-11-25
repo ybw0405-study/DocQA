@@ -48,7 +48,7 @@
 >
 > 要获得真实的语义检索 + 生成式回答，需把 `DOCQA_EMBEDDING_PROVIDER` / `DOCQA_LLM_PROVIDER` /
 > `DOCQA_RERANK_PROVIDER` 切到真实 provider（`openai` / `dashscope`）并配置 `DOCQA_EXPERIMENT_BUDGET > 0`
-> （详见 [`docs/02-design/cross-language-protocol.md`](docs/02-design/cross-language-protocol.md) 的 S6 里程碑）。
+> （详见 [`docs/02-design/cross-language-protocol.md`](02-design/cross-language-protocol.md) 的 S6 里程碑）。
 > 这不是缺陷，而是当前**明确未完成的边界**，请勿把「CI 全绿」误读为「已具备语义问答能力」。
 
 ## 为什么是 DocQA
@@ -99,7 +99,7 @@ flowchart LR
     GW --> MQ
 ```
 
-各服务职责、依赖方向与目录说明见 [docs/00-infra/maven-modules.md](docs/00-infra/maven-modules.md)。
+各服务职责、依赖方向与目录说明见 [docs/00-infra/maven-modules.md](00-infra/maven-modules.md)。
 
 ### 部署网络边界（必读）
 
@@ -193,7 +193,7 @@ powershell -File scripts/verify-all.ps1 -Offline  # Windows PowerShell 5.1
 
 ### 本地启动
 
-完整顺序、端口与环境变量清单见 [docs/00-infra/getting-started.md](docs/00-infra/getting-started.md)。
+完整顺序、端口与环境变量清单见 [docs/00-infra/getting-started.md](00-infra/getting-started.md)。
 以下脚本全部按自身位置推导仓库根，**没有 `<repo>` 占位符，目录改名后也不用改命令**。
 
 前置：安装并启动 **Docker Desktop**（`docker info` 可正常返回）。在仓库根目录开一个 PowerShell：
@@ -216,7 +216,7 @@ Copy-Item ops/env/local.env.example ops/env/local.env   # 按需填写口令
 避免解析到 IPv6 后白等一次重试）。
 
 常用选项：`-NoBuild` 跳过构建（jar 已最新时）、`-InfraOnly` 只起中间件、`-SkipGrants` 跳过授权重放。
-分步手动启动与故障排查见 [getting-started.md](docs/00-infra/getting-started.md)。
+分步手动启动与故障排查见 [getting-started.md](00-infra/getting-started.md)。
 
 > 历史方案（WSL 中间件 + 开机自启，`docs/00-infra/` 下的 `prepare-local-stack.sh` /
 > `start-local.ps1` 等）已退役，仅保留作回滚参考，见 getting-started.md 后半部分。
@@ -226,23 +226,23 @@ Copy-Item ops/env/local.env.example ops/env/local.env   # 按需填写口令
 所有连接串与凭据的唯一事实来源是 `ops/env/local.env`（gitignored，模板见
 `ops/env/local.env.example`），由 `start-dev.ps1` 注入**进程作用域**，不写 Windows
 全局环境变量；仓库内不含任何真实凭据。变量清单见
-[getting-started.md](docs/00-infra/getting-started.md#环境变量)。
+[getting-started.md](00-infra/getting-started.md#环境变量)。
 
 ## 文档
 
 | 文档 | 内容 |
 |---|---|
-| [docs/README.md](docs/README.md) | 文档总索引 |
-| [getting-started.md](docs/00-infra/getting-started.md) | 本地启动、端口、环境变量、故障排查 |
-| [maven-modules.md](docs/00-infra/maven-modules.md) | Java 模块职责与依赖边界 |
-| [archunit-rules.md](docs/00-infra/archunit-rules.md) | 架构约束与 ArchUnit 规则 |
-| [git-workflow.md](docs/00-infra/git-workflow.md) | 分支模型、提交规范、PR 检查项 |
-| [rollback-runbook.md](docs/00-infra/rollback-runbook.md) | 版本回退、迁移兼容性与向量索引回退预案 |
-| [storage.md](docs/02-design/storage.md) | 表结构、索引与向量存储 |
-| [openapi-java.yaml](docs/02-design/openapi-java.yaml) | Java 对外接口契约（当前 2.6.0） |
-| [cross-language-protocol.md](docs/02-design/cross-language-protocol.md) | Java ↔ Python 治理协议 |
-| [saas-kernel-upgrade.md](docs/02-design/saas-kernel-upgrade.md) | SaaS 内核升级方案与 P1-B 落地记录 |
-| [saas-tenant-decisions.md](docs/02-design/saas-tenant-decisions.md) | 多租户遗留决策清单（D1～D6） |
+| [docs/README.md](README.md) | 文档总索引 |
+| [getting-started.md](00-infra/getting-started.md) | 本地启动、端口、环境变量、故障排查 |
+| [maven-modules.md](00-infra/maven-modules.md) | Java 模块职责与依赖边界 |
+| [archunit-rules.md](00-infra/archunit-rules.md) | 架构约束与 ArchUnit 规则 |
+| [git-workflow.md](00-infra/git-workflow.md) | 分支模型、提交规范、PR 检查项 |
+| [rollback-runbook.md](00-infra/rollback-runbook.md) | 版本回退、迁移兼容性与向量索引回退预案 |
+| [storage.md](02-design/storage.md) | 表结构、索引与向量存储 |
+| [openapi-java.yaml](02-design/openapi-java.yaml) | Java 对外接口契约（当前 2.6.0） |
+| [cross-language-protocol.md](02-design/cross-language-protocol.md) | Java ↔ Python 治理协议 |
+| [saas-kernel-upgrade.md](02-design/saas-kernel-upgrade.md) | SaaS 内核升级方案与 P1-B 落地记录 |
+| [saas-tenant-decisions.md](02-design/saas-tenant-decisions.md) | 多租户遗留决策清单（D1～D6） |
 
 ### 版本号说明
 
@@ -256,14 +256,14 @@ Copy-Item ops/env/local.env.example ops/env/local.env   # 按需填写口令
 
 欢迎提交 Issue 与 Pull Request。开始之前请阅读：
 
-- [CONTRIBUTING.md](CONTRIBUTING.md)：开发环境、分支与提交规范、PR 清单
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)：社区行为准则
-- [SUPPORT.md](SUPPORT.md)：提问渠道与信息准备
+- [CONTRIBUTING.md](../CONTRIBUTING.md)：开发环境、分支与提交规范、PR 清单
+- [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)：社区行为准则
+- [SUPPORT.md](../SUPPORT.md)：提问渠道与信息准备
 
 ## 安全
 
-请勿在公开 Issue 中披露安全漏洞，报告流程见 [SECURITY.md](SECURITY.md)。
+请勿在公开 Issue 中披露安全漏洞，报告流程见 [SECURITY.md](../SECURITY.md)。
 
 ## 许可证
 
-[Apache License 2.0](LICENSE) © 2026 ybw0405-study
+[Apache License 2.0](../LICENSE) © 2026 ybw0405-study
