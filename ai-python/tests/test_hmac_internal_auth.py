@@ -29,12 +29,12 @@ TOKEN = "unit-test-internal-token"
 def _hmac_app() -> object:
     return create_app(
         make_settings(internal_token=SecretStr(TOKEN), internal_hmac_secret=SecretStr(SECRET)),
-        agent_service=object(), # type: ignore[arg-type]
+        agent_service=object(),  # type: ignore[arg-type]
     )
 
 
 def _client(app: object) -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test") # type: ignore[arg-type]
+    return httpx.AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test")  # type: ignore[arg-type]
 
 
 # ── 签名规范串：时间戳 + method + path + body ────────────────────────────────
@@ -157,7 +157,7 @@ async def test_signed_post_body_is_replayed_to_the_endpoint() -> None:
 
 async def test_static_token_compat_remains_when_hmac_is_not_configured() -> None:
     # 兼容期回归：未配 HMAC secret 时，上一轮的静态 token 白名单行为逐字节不变。
-    app = create_app(make_settings(internal_token=SecretStr(TOKEN)), agent_service=object()) # type: ignore[arg-type]
+    app = create_app(make_settings(internal_token=SecretStr(TOKEN)), agent_service=object())  # type: ignore[arg-type]
     async with _client(app) as client:
         assert (await client.get("/openapi.json")).status_code == 401
         assert (await client.get("/openapi.json", headers={"x-internal-token": TOKEN})).status_code == 200
@@ -167,7 +167,7 @@ async def test_static_token_compat_remains_when_hmac_is_not_configured() -> None
 
 
 def test_main_app_has_no_metrics_route() -> None:
-    app = create_app(make_settings(metrics_exposed=True), agent_service=object()) # type: ignore[arg-type]
+    app = create_app(make_settings(metrics_exposed=True), agent_service=object())  # type: ignore[arg-type]
     paths = {getattr(route, "path", "") for route in app.routes}
     assert "/metrics" not in paths
 
@@ -181,7 +181,7 @@ def test_metrics_app_exposes_only_the_prometheus_endpoint() -> None:
 
 def test_metrics_defaults_are_loopback_distinct_and_disabled() -> None:
     settings = Settings(_env_file=None)
-    assert settings.metrics_exposed is False # 生产默认不暴露，语义不变
+    assert settings.metrics_exposed is False  # 生产默认不暴露，语义不变
     assert settings.metrics_host == "127.0.0.1"
     assert settings.metrics_port != settings.api_port
 
@@ -202,6 +202,4 @@ def test_cross_validate_java_vector() -> None:
     )
     assert headers[TIMESTAMP_HEADER] == "1700000000"
     assert headers[NONCE_HEADER] == "nonce-fixed-001"
-    assert headers[SIGNATURE_HEADER] == (
-        "472e26a3a1140e812d3f6d39eca02a8ceee8beb22727dccf83313bce2f49e44f"
-    )
+    assert headers[SIGNATURE_HEADER] == ("472e26a3a1140e812d3f6d39eca02a8ceee8beb22727dccf83313bce2f49e44f")

@@ -143,9 +143,7 @@ async def _run_query(
     # 全语料 scope：查询在单文档内有黄金答案，但候选池混入干扰文档，
     # 召回/排序必须能顶住跨文档 hard negative 的稀释才算真本事。
     result = await service.retrieve(question, scopes)
-    returned: list[ChunkRef] = [
-        (str(chunk.document_id), chunk.chunk_index) for chunk in result.chunks
-    ]
+    returned: list[ChunkRef] = [(str(chunk.document_id), chunk.chunk_index) for chunk in result.chunks]
     relevant_refs = [(str(indexed.document_id), idx) for idx in relevant]
     return compute_metrics(query_id, question, returned, relevant_refs, ks=_KS)
 
@@ -219,9 +217,7 @@ async def run_eval() -> dict[str, Any]:
     for doc in corpus:
         idx = indexed[doc.document_id]
         for query in doc.queries:
-            qr = await _run_query(
-                query.question, query.query_id, query.relevant, idx, scopes, service
-            )
+            qr = await _run_query(query.question, query.query_id, query.relevant, idx, scopes, service)
             results.append(qr)
 
     negative: list[dict[str, Any]] = []
@@ -237,9 +233,7 @@ async def run_eval() -> dict[str, Any]:
     payload["reranker"] = getattr(reranker, "model", "none")
     payload["negative_query_count"] = len(negative)
     payload["negative_false_positive_rate"] = (
-        round(sum(1 for n in negative if n["false_positive"]) / len(negative), 4)
-        if negative
-        else 0.0
+        round(sum(1 for n in negative if n["false_positive"]) / len(negative), 4) if negative else 0.0
     )
     payload["negative_mean_top_score"] = (
         round(sum(n["top_score"] for n in negative) / len(negative), 4) if negative else 0.0

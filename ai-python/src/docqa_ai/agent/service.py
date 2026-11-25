@@ -329,7 +329,7 @@ class AgentAskService:
             )
         except AgentError:
             raise
-        except Exception as exc: # noqa: BLE001 - 统一映射到脱敏 ProblemDetail
+        except Exception as exc:  # noqa: BLE001 - 统一映射到脱敏 ProblemDetail
             raise _map_agent_error(collector, request, exc, deadline) from exc
 
     async def _prepare(
@@ -774,7 +774,7 @@ class AgentAskService:
             raise
         except AgentError:
             raise
-        except Exception as exc: # noqa: BLE001 - 与同步路径共用同一映射
+        except Exception as exc:  # noqa: BLE001 - 与同步路径共用同一映射
             raise _map_agent_error(collector, request, exc, deadline) from exc
 
     def _validate_request_pii(self, request: AgentAskRequest, collector: AuditCollector) -> str:
