@@ -35,6 +35,10 @@ LangGraph 决策循环 + pgvector 混合检索（向量 + 词法）+ rerank + �
 黄金集（30~50 条）扩充中，offline/real 对照表见
 [docs/02-design/retrieval-eval.md](docs/02-design/retrieval-eval.md)。
 
+> 口径说明：recall 系列在全语料 scope（含跨文档干扰文档）下测得，未启用词法通道（纯向量 + rerank）；
+> faithfulness 的 judge 与生成模型当前同源（qwen-plus），self-judging 存在系统性宽容偏差，
+> 独立 judge 模型的对照结果将随黄金集扩充一并更新。
+
 > **开箱默认离线**：`offline` provider 为特征哈希向量 + 抽取式回答 + noop rerank，
 > 零外呼、零成本，但**不是语义检索**。切真需设 `DOCQA_AI_EMBEDDING_PROVIDER` /
 > `DOCQA_AI_LLM_PROVIDER` / `DOCQA_AI_RERANK_PROVIDER`（前缀是 `DOCQA_AI_`）并配
@@ -119,7 +123,7 @@ Docker 多阶段 + GHCR / GitHub Actions 三端门禁 + 真库契约测试。
 ## 已知限制与取舍
 
 - **扫描件 / 图片型 PDF 暂不支持**：解析器覆盖文本型 PDF / Word / PPTX / TXT，无 OCR 引擎，扫描件需先经 OCR 转文本再导入。
-- **分片上传支持并发分片合并，暂不支持断点续传**（断网重连需重新开始）。
+- **断点续传依赖分片会话有效期**：上传中断后重连可续传（复用未过期分片会话、自动补签缺失分片）；会话过期后需重新发起。
 - 默认离线占位、LangGraph 两节点循环的依赖取舍、RAG 正文纯文本渲染（零 XSS 面）等逐条说明见
 [产品指南](docs/product-guide.md)与 [docs/02-design/](docs/02-design/)。
 迁移注释中的历史阶段代号见 [索引](docs/02-design/migration-comment-codes.md)。
