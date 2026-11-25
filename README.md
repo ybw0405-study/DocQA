@@ -18,21 +18,21 @@ LangGraph 决策循环 + pgvector 混合检索（向量 + 词法）+ rerank + �
 工具调用协议支持 json / native tool_calls 双通道（`DOCQA_AI_TOOL_PROTOCOL`，默认 json）。
 附带课表导入与提醒等学习工作台功能（见[产品指南](docs/product-guide.md)）。
 
-## 真实模型评测（2026-11-24，DashScope）
+## 真实模型评测（2026-11-25，DashScope，跨文档）
 
 | 指标 | 数值 | 口径 |
 |---|---|---|
-| recall@1 | 0.976 | **自建 21 题标注集**（合成 8 主题 + 劳动法 6 细粒度块 + 真实法条 8 块），`text-embedding-v3` + `gte-rerank-v2`；样本小，不代表泛化能力 |
+| recall@1 | 0.929 | **自建 21 题标注集 + 2 份跨文档干扰文档 + 3 条负例**，`text-embedding-v3` + `gte-rerank-v2`；样本小，不代表泛化能力 |
 | recall@3 / @5 | 1.0 / 1.0 | 同上 |
-| MRR / nDCG@5 | 1.0 / 0.996 | 同上；含同法条「饮酒 vs 醉酒」「补偿 vs 双倍赔偿」细粒度排序压力对 |
+| MRR / nDCG@5 | 0.976 / 0.979 | 同上；跨文档 hard negative 下 `labor-q2`「经济补偿」被干扰块挤下 R@1（正确块落 top2） |
 | faithfulness 均分 | 1.0（门禁 ≥ 0.8） | LLM judge，生成 + 引用核对（nightly 真模型） |
-| recall@1（离线基线） | 0.833 | 特征哈希向量（`eval/baselines/retrieval.json`），与语义检索不同空间，仅作链路回归基线 |
+| recall@1（离线基线） | 0.786 | 特征哈希向量（`eval/baselines/retrieval.json`），与语义检索不同空间，仅作链路回归基线 |
 
 复现：`python -m docqa_ai.eval --suite all`（真实 provider 环境变量见下）；
-2026-11-24 本地真实复现与 nightly 同口径一致。
-**数据集仍是内置标注集、样本量不足以证明泛化能力**；评测目前是每查询在单文档 scope 内检索，
-候选池无干扰文档，测不到跨文档召回这一 RAG 难点。真实 PDF 课件黄金集（30~50 条含「文档无答案」
-负例）与跨文档 hard negative 扩充中，负例误判率与 offline/real 对照表会更新到
+2026-11-25 本地真实复现与 nightly 同口径一致。
+**数据集仍是内置标注集、样本量不足以证明泛化能力**；评测已覆盖跨文档召回（候选池混入
+干扰文档）与「文档无答案」负例（3 条，观察误召回率与 top_score 分布）。真实 PDF 课件
+黄金集（30~50 条）扩充中，offline/real 对照表见
 [docs/02-design/retrieval-eval.md](docs/02-design/retrieval-eval.md)。
 
 > **开箱默认离线**：`offline` provider 为特征哈希向量 + 抽取式回答 + noop rerank，

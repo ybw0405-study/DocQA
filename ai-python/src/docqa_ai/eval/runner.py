@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from docqa_ai.eval.corpus import CorpusDocument, load_corpus
+from docqa_ai.eval.corpus import CorpusDocument, load_corpus, load_negative_queries
 from docqa_ai.eval.metrics import ChunkRef, QueryResult, compute_metrics, evaluate_queries
 from docqa_ai.protocol.models import DocumentScope
 from docqa_ai.providers.embeddings import (
@@ -43,6 +43,10 @@ LOGGER = logging.getLogger(__name__)
 _KS = (1, 3, 5)
 _DEFAULT_VERSION = "v1"
 _DEFAULT_DIMENSIONS = 1024
+# 负例的观察性分界（非硬门禁）：命中分数低于它视为「无答案」。离线哈希下负例
+# top_score 落在 0.10~0.22；真实语义模型下会抬到 0.4~0.63（语义把不相关主题也关联了）。
+# 无答案的最终判定在 nightly LLM judge 层，检索层负例只观察分数分布，不进 baseline 门禁。
+_NEGATIVE_MIN_SCORE = 0.5
 
 
 def _build_embedder() -> Any:
@@ -133,12 +137,40 @@ async def _run_query(
     query_id: str,
     relevant: tuple[int, ...],
     indexed: _IndexedDoc,
+    scopes: Sequence[DocumentScope],
     service: RetrievalService,
 ) -> QueryResult:
-    result = await service.retrieve(question, [indexed.scope])
-    returned: list[ChunkRef] = [(str(indexed.document_id), chunk.chunk_index) for chunk in result.chunks]
+    # 全语料 scope：查询在单文档内有黄金答案，但候选池混入干扰文档，
+    # 召回/排序必须能顶住跨文档 hard negative 的稀释才算真本事。
+    result = await service.retrieve(question, scopes)
+    returned: list[ChunkRef] = [
+        (str(chunk.document_id), chunk.chunk_index) for chunk in result.chunks
+    ]
     relevant_refs = [(str(indexed.document_id), idx) for idx in relevant]
     return compute_metrics(query_id, question, returned, relevant_refs, ks=_KS)
+
+
+async def _run_negative_query(
+    question: str,
+    query_id: str,
+    scopes: Sequence[DocumentScope],
+    service: RetrievalService,
+) -> dict[str, Any]:
+    """「文档无答案」负例：正确行为是返回空，误召回任何块都算一次 false positive。
+
+    检索层 min_score=0 时总返回 top_k，因此负例不能拿「返回非空」当误召回；
+    按置信度门禁（_NEGATIVE_MIN_SCORE）过滤后仍有块存活，才算真误召回，
+    同时报告 top_score 反映 embedding 空间对「有/无答案」的区分度。
+    """
+    result = await service.retrieve(question, scopes)
+    kept = [chunk for chunk in result.chunks if chunk.score >= _NEGATIVE_MIN_SCORE]
+    return {
+        "query_id": query_id,
+        "question": question,
+        "returned": [(str(chunk.document_id), chunk.chunk_index) for chunk in result.chunks],
+        "top_score": round(result.top_score, 4),
+        "false_positive": len(kept) > 0,
+    }
 
 
 async def index_corpus(
@@ -180,12 +212,21 @@ async def run_eval() -> dict[str, Any]:
         embedding_dimensions=_DEFAULT_DIMENSIONS,
     )
 
+    # 所有文档共用同一候选池：查询在单文档有黄金答案，但跨文档干扰块一起参与召回。
+    scopes = [idx.scope for idx in indexed.values()]
+
     results: list[QueryResult] = []
     for doc in corpus:
         idx = indexed[doc.document_id]
         for query in doc.queries:
-            qr = await _run_query(query.question, query.query_id, query.relevant, idx, service)
+            qr = await _run_query(
+                query.question, query.query_id, query.relevant, idx, scopes, service
+            )
             results.append(qr)
+
+    negative: list[dict[str, Any]] = []
+    for nq in load_negative_queries():
+        negative.append(await _run_negative_query(nq.question, nq.query_id, scopes, service))
 
     await _maybe_aclose(embedder)
     await _maybe_aclose(reranker)
@@ -194,6 +235,16 @@ async def run_eval() -> dict[str, Any]:
     payload = summary.to_dict()
     payload["embedding"] = getattr(embedder, "model", "unknown")
     payload["reranker"] = getattr(reranker, "model", "none")
+    payload["negative_query_count"] = len(negative)
+    payload["negative_false_positive_rate"] = (
+        round(sum(1 for n in negative if n["false_positive"]) / len(negative), 4)
+        if negative
+        else 0.0
+    )
+    payload["negative_mean_top_score"] = (
+        round(sum(n["top_score"] for n in negative) / len(negative), 4) if negative else 0.0
+    )
+    payload["negative_per_query"] = negative
     return payload
 
 
@@ -227,6 +278,15 @@ def _render_table(payload: dict[str, Any]) -> str:
         lines.append(
             f" {hit1} {q['query_id']:<14} R@1={q['recall_at_k'].get('1', 0):.2f} MRR={q['mrr']:.2f} {q['question']}"
         )
+    lines.append("-" * 72)
+    lines.append(
+        f"负例（文档无答案，观察指标）: 误召回率 {payload.get('negative_false_positive_rate', 0):.3f}"
+        f" / 平均 top_score {payload.get('negative_mean_top_score', 0):.3f}"
+        f"（{payload.get('negative_query_count', 0)} 条）"
+    )
+    for n in payload.get("negative_per_query", []):
+        mark = "✗ 误召回" if n["false_positive"] else "✓ 无答案"
+        lines.append(f" {mark} {n['query_id']:<14} top_score={n.get('top_score', 0):.3f}  {n['question']}")
     lines.append("=" * 72)
     return "\n".join(lines)
 
@@ -237,11 +297,14 @@ _BASELINE_EPSILON = 1e-9
 
 
 def _retrieval_floors(payload: dict[str, Any]) -> dict[str, Any]:
+    # 负例只锁数量（增删负例必须重录基线）；误召回率/top_score 是观察指标，
+    # 与 provider（离线哈希 vs 真实语义）强相关，不做硬门禁。
     return {
         "query_count": payload["query_count"],
         "recall_at_k": payload["recall_at_k"],
         "mrr": payload["mrr"],
         "ndcg_at_k": payload["ndcg_at_k"],
+        "negative_query_count": payload["negative_query_count"],
     }
 
 
@@ -277,6 +340,12 @@ def baseline_violations(suite: str, payload: dict[str, Any], *, baseline_dir: Pa
                     violations.append(f"{metric}@{k} 回归: 基线 {floor}，当前 {current}")
         if payload["mrr"] < baseline["mrr"] - _BASELINE_EPSILON:
             violations.append(f"mrr 回归: 基线 {baseline['mrr']}，当前 {payload['mrr']}")
+        # 负例只锁数量：误召回率/top_score 随 provider 变化，是观察指标不是门禁。
+        if payload["negative_query_count"] != baseline.get("negative_query_count"):
+            violations.append(
+                f"negative_query_count 漂移: 基线 {baseline.get('negative_query_count')}，"
+                f"当前 {payload['negative_query_count']}"
+            )
         return violations
     if [case["case_id"] for case in payload["cases"]] != baseline["cases"]:
         violations.append("agent 用例集与基线不一致（增删用例必须同步重录基线）")

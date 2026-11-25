@@ -21,8 +21,8 @@ from docqa_ai.eval.metrics import compute_metrics, evaluate_queries
 
 def test_corpus_has_expected_coverage() -> None:
     docs = load_corpus()
-    # 8 跨主题 + 1 劳动法细粒度 + 1 真实条文
-    assert len(docs) == 10
+    # 8 跨主题 + 1 劳动法细粒度 + 1 真实条文 + 2 跨文档干扰（无查询，只作候选池）
+    assert len(docs) == 12
     total_queries = sum(len(d.queries) for d in docs)
     assert total_queries == 21
 
@@ -110,10 +110,13 @@ def test_real_provider_semantic_quality_smoke(monkeypatch: pytest.MonkeyPatch) -
 
     payload = asyncio.run(run_eval())
 
-    assert payload["recall_at_k"]["1"] >= 0.95
-    assert payload["mrr"] == 1.0
+    # 跨文档 hard negative 下，真实语义模型仍显著优于离线哈希（0.786），但不再是满分。
+    assert payload["recall_at_k"]["1"] >= 0.9
+    assert payload["mrr"] >= 0.95
 
     # 决定性证据：语义模型把离线哈希下 R@1=0 的同主题细粒度查询拉到 1.0
     by_id = {q["query_id"]: q for q in payload["per_query"]}
     assert by_id["labor-q1"]["recall_at_k"]["1"] == 1.0
-    assert by_id["labor-q2"]["recall_at_k"]["1"] == 1.0
+    # labor-q2「经济补偿」被 distractor-labor「主动辞职无需补偿」干扰，R@1 不再保证，
+    # 但正确块必须仍在 top3 内（这是跨文档 hard negative 的真实压力，不是回归）。
+    assert by_id["labor-q2"]["recall_at_k"]["3"] == 1.0
