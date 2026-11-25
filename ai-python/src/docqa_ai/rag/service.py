@@ -279,10 +279,16 @@ class RetrievalService:
             with self._tracer.start_as_current_span("rag.rerank") as rerank_span:
                 rerank_span.set_attribute("reranker", RERANKER_NAME)
                 ranked = sorted(candidates, key=lambda item: -lexical_coverage(item.content, lexical.surfaces))
-                kept = ranked[:output_limit]
+                # rerank 前先留一个比 output_limit 更大的候选池，让 rerank 能从更大范围
+                # 捞回被向量/词法排序误杀的块；rerank provider 的 top_n=len(pool) 全量返回。
+                # 池大小取 output_limit 的 3 倍且不少于 12，受候选总数与 rerank 批量上限约束。
+                pool_size = min(len(ranked), max(output_limit * 3, 12))
+                kept = ranked[:pool_size]
+                rerank_span.set_attribute("retrieval.rerank_pool", len(kept))
                 rerank_span.set_attribute("retrieval.kept", len(kept))
+                rerank_span.set_attribute("retrieval.output_limit", output_limit)
                 rerank_span.set_attribute("retrieval.dropped", len(ranked) - len(kept))
-                # 掩码提到名次决定之前发生。它本来就要对 kept 逐篇做，换的只是时机，
+                # 掩码提到名次决定之前发生。它本来就要对候选逐篇做，换的只是时机，
                 # 因此外发给第三方的每一串正文都已经过 `pii-v2`；落库与对外的 content 仍是掩码后的同一份。
                 masked_items = [mask_text(candidate.content) for candidate in kept]
                 order, rerank_fallback = await self._rerank(question, masked_items, rerank_span, deadline)
@@ -293,7 +299,9 @@ class RetrievalService:
             chunks: list[RetrievedChunk] = []
             categories: set[str] = set()
             masked_chunks = 0
-            for position, source in enumerate(order):
+            # rerank 正常返回时按 rerank 次序取前 output_limit；降级时 order 为 0..len-1，
+            # 取前 output_limit 即融合次序的 top_k（与 final 一致）。
+            for position, source in enumerate(order[:output_limit]):
                 candidate = kept[source]
                 masked = masked_items[source]
                 if masked.count:
