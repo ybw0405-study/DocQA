@@ -36,15 +36,15 @@ def canonical(method: str, path: str, timestamp: str, nonce: str, body: bytes) -
     )
 
 
-def sign(secret: str, method: str, path: str, body: bytes = b"", *,
-         timestamp: int | None = None, nonce: str | None = None) -> dict[str, str]:
+def sign(
+    secret: str, method: str, path: str, body: bytes = b"", *, timestamp: int | None = None, nonce: str | None = None
+) -> dict[str, str]:
     """调用方（Java 网关 / 测试）生成三个请求头。nonce 默认随机生成。"""
     import uuid
+
     issued_at = str(int(time.time()) if timestamp is None else timestamp)
     n = nonce or uuid.uuid4().hex
-    digest = hmac.new(
-        secret.encode("utf-8"), canonical(method, path, issued_at, n, body), hashlib.sha256
-    ).hexdigest()
+    digest = hmac.new(secret.encode("utf-8"), canonical(method, path, issued_at, n, body), hashlib.sha256).hexdigest()
     return {TIMESTAMP_HEADER: issued_at, SIGNATURE_HEADER: digest, NONCE_HEADER: n}
 
 
