@@ -79,11 +79,11 @@ public class DocumentReconciliationJob {
                     document.id(),
                     document.pendingIndexVersion(),
                     updated);
-            // DQ-2：Python 可能已把 pending 版本的向量写进 PG，而 parse.completed 丢失。
+            // Python 可能已把 pending 版本的向量写进 PG，而 parse.completed 丢失。
             // 只回滚 MySQL 会把这批向量永久留在数据面；回滚成功时补发一次带租户信封的版本删除。
             if (updated > 0 && document.pendingIndexVersion() != null
                     && !document.pendingIndexVersion().isBlank()) {
-                // DQ-1：先落 outbox 再发消息；发布失败时任务仍在表里，下轮重投。
+                // 先落 outbox 再发消息；发布失败时任务仍在表里，下轮重投。
                 cleanupTasks.enqueue(
                         entry.tenantId(),
                         document.id(),
@@ -123,7 +123,7 @@ public class DocumentReconciliationJob {
     }
 
     /**
-     * DQ-1：重投「已发布但尚未收到成功确认」的旧版本删除。
+     * 重投「已发布但尚未收到成功确认」的旧版本删除。
      *
      * <p>覆盖三种以前会永久残留孤儿向量的情形：发布时 MQ 抛错、消费端回 FAILED、
      * 以及消息本身丢失/进程重启。只有 {@link VectorChangeResultHandler} 收到

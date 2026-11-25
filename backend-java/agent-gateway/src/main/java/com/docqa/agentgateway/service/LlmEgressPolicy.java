@@ -78,7 +78,7 @@ public class LlmEgressPolicy {
         if (!hostAllowed(host, properties.getAllowedHosts())) {
             throw new EgressRejected("URL host is outside the configured allowlist");
         }
-        // P1-5：校验期解析一次 DNS 并固定结果，出网时用这个 IP 直连，
+        // DNS rebinding 防护：校验期解析一次 DNS 并固定结果，出网时用这个 IP 直连，
         // 避免「校验时公网 IP、连接时改指内网」的 DNS rebinding（TOCTOU）。
         String pinnedIp = null;
         if (!properties.isAllowPrivate()) {

@@ -150,7 +150,7 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.COM_NOT_FOUND_001, null, List.of(), request);
     }
 
-    /** R-02：框架级客户端拒绝（方法/媒体类型）不再落 500 兜底，按 4xx 登记码返回。 */
+    /** 框架级客户端拒绝（方法/媒体类型）不再落 500 兜底，按 4xx 登记码返回。 */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ProblemDetail> handleMethodNotSupported(
             HttpRequestMethodNotSupportedException exception,

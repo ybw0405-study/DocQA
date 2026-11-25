@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.Status;
 
-/** DQ-3 后半：readiness 探针的四种行为，纯逻辑、不需要真实 MQ / MinIO。 */
+/** readiness 探针的四种行为，纯逻辑、不需要真实 MQ / MinIO。 */
 class DependencyHealthIndicatorTest {
 
     @Test

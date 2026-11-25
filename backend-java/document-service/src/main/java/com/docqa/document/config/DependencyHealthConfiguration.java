@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * DQ-3 后半：把 MQ / MinIO 两个真实依赖注册成 HealthIndicator，交由 readiness 组引用。
+ * 把 MQ / MinIO 两个真实依赖注册成 HealthIndicator，交由 readiness 组引用。
  *
  * <p>bean 名以 {@code HealthIndicator} 结尾，Spring Boot 的 HealthContributorRegistry 会去掉
  * 该后缀得到 contributor 名 {@code mq} / {@code minio}，与 application.yml readiness 组的

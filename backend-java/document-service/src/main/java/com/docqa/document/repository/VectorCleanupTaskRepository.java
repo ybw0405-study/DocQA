@@ -8,7 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * DQ-1：待确认向量删除的持久化 outbox。
+ * 待确认向量删除的持久化 outbox。
  *
  * <p>与 {@link DocumentRepository} 分开是为了不把「重投队列」塞进文档状态机：
  * 一个文档可能因多次重建而同时存在多个待清理版本，且文档本身可能已经软删/不存在。

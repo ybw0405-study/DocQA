@@ -81,7 +81,7 @@ public class ParseResultConsumer implements MessageListenerConcurrently {
                         message.getTopic(),
                         message.getMsgId(),
                         ex);
-                // P1-8：释放原子占位，否则重投会被当成「已处理」跳过，消息永久丢失
+                // 失败时释放原子占位，否则重投会被当成「已处理」跳过，消息永久丢失
                 idempotencyMarker.release(message.getTopic(), message.getMsgId());
                 // 本次返回 RECONSUME_LATER 之后，broker 会把消费次数 +1 再重投；
                 // 一旦达到 maxReconsumeTimes 就改投 DLQ，因此「本次是最后一次重投」即为毒消息。

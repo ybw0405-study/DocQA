@@ -634,7 +634,7 @@ public class DocumentService {
     private SessionPlan createSession(DocumentRow document, UploadPlan plan) {
         Instant now = clock.instant();
         // 断点续传：复用「未过期且分片参数一致」的旧 session，只补签缺失分片；
-        // 否则新建 multipart 并 abort 旧 session 的孤儿分片（C-3）。
+        // 否则新建 multipart 并 abort 旧 session 的孤儿分片。
         Optional<UploadSession> existing = uploadSessionStore.find(document.id());
         boolean reusable = existing.isPresent()
                 && existing.get().expiresAt().isAfter(now)
@@ -712,7 +712,7 @@ public class DocumentService {
                         ErrorCode.DOC_CONFLICT_001,
                         "上传会话已过期，请重新初始化上传。"));
         if (!session.expiresAt().isAfter(clock.instant())) {
-            // 过期会话：先 abort MinIO 未完成的分片再删会话，避免悬挂分片累积（C-3）。
+            // 过期会话：先 abort MinIO 未完成的分片再删会话，避免悬挂分片累积。
             abortQuietly(session.objectKey(), session.minioUploadId());
             deleteSessionQuietly(uploadId);
             throw new BusinessException(ErrorCode.DOC_CONFLICT_001, "上传会话已过期，请重新初始化上传。");

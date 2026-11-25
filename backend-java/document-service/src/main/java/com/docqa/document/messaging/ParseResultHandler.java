@@ -154,7 +154,7 @@ public class ParseResultHandler {
         LOGGER.info("Document indexed: documentId={}, chunks={}", document.id(), chunks.size());
         metrics.documentParse(parseDuration(document, now), "INDEXED");
         if (outcome.obsoleteIndexVersion() != null) {
-            // DQ-1：先把「待确认删除」持久化，再发消息。发布失败 / 消费端 FAILED /
+            // 先把「待确认删除」持久化，再发消息。发布失败 / 消费端 FAILED /
             // 进程重启都不再让旧版本向量永久残留 —— 对账任务会按 outbox 重投。
             cleanupTasks.enqueue(
                     tenantId,

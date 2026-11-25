@@ -36,7 +36,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
- * 跨越真实过滤器链的鉴权取证（{@code } 在文档服务的推广位，）。
+ * 跨越真实过滤器链的鉴权取证（文档服务的推广位）。
  *
  * <p>本模块既有控制器测试是 standalone MockMvc 并显式 {@code .requestAttr(...)} 注入用户身份，
  * 等于绕过了 {@link JwtAuthenticationFilter}：过滤器写不进属性时那些用例照样绿。这里用真实 Web

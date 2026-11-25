@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  * 单一维度塌缩都不会把配额退化成全局。原始地址与用户名都不进 Redis，只写 SHA-256 前缀。
  *
  * <p>INCR 与 EXPIRE 放在同一段 Lua 里：非原子的「首次 INCR 成功、随后 EXPIRE 失败」会让
- * key 永远没有 TTL，注册配额被永久耗尽（C-1）。
+ * key 永远没有 TTL，注册配额被永久耗尽。
  */
 @Component
 public class RegistrationRateLimiter {

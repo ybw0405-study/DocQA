@@ -74,7 +74,7 @@ public class VectorChangeResultHandler {
         UUID tenantId = found.get().tenantId();
         DocumentRow document = found.get().document();
         if (!event.completed()) {
-            // DQ-1：修复前这里只打日志就 return，handle() 仍无条件 markProcessed，
+            // 修复前这里只打日志就 return，handle() 仍无条件 markProcessed，
             // 于是失败的删除确认被永久 ACK，孤儿向量再无任何重投机会。
             // 抛回 consumer 由 RECONSUME_LATER 有限次重投（最终进 DLQ 供运维介入），
             // 且不写幂等标记，避免「处理过」掩盖一次真正失败的删除。
@@ -92,7 +92,7 @@ public class VectorChangeResultHandler {
                             + ", errorCode=" + event.errorCode());
         }
         if (operation == VectorChangeOperation.DELETE_VERSION) {
-            // DQ-1：只有真正删成功才出队。FAILED 走上面的异常分支，outbox 行保留，
+            // 只有真正删成功才出队。FAILED 走上面的异常分支，outbox 行保留，
             // 由 republishPendingVectorCleanups() 有限次重投，不会永久残留孤儿向量。
             if (event.indexVersion() != null && !event.indexVersion().isBlank()) {
                 cleanupTasks.remove(
