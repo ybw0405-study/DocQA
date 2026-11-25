@@ -22,7 +22,9 @@
 # 并在行尾以注释保留原 tag，便于人工升级时核对。升级镜像须重新取 digest
 # 并同步本文件；docker 目录已纳入 dependabot 的 docker 生态跟踪。
 
-name: docqa-infra
+# 与 app.yml 统一项目名：否则 start-dev.ps1 分两步启动时 infra 落在
+# "docqa-infra"、app 落在 "docqa"，容器名冲突且网络隔离（P0-3 修复）。
+name: docqa
 
 # LangFuse web 与 worker 共用的存储/队列连接面；锚点避免两份 env 各自漂移。
 x-langfuse-shared-env: &langfuse-shared-env
@@ -69,6 +71,7 @@ services:
       - --log-bin-trust-function-creators=1
     volumes:
       - mysql-data:/var/lib/mysql
+      - ../db/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
       interval: 3s

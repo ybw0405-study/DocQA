@@ -252,7 +252,12 @@ if ($health -ne 'healthy') { throw 'MySQL 未在 3 分钟内就绪；docker logs
 Write-Host '==> [3.5/8] 预建 MQ topic（消费端 readiness 依赖路由存在）'
 $namesrvPort = Get-Conf 'DOCQA_ROCKETMQ_NAMESRV_PORT'
 $topics = @('parse-requested', 'parse-completed', 'parse-failed',
-            'vector-change-requested', 'vector-change-completed', 'audit-event')
+            'vector-change-requested', 'vector-change-completed', 'audit-event',
+            # examineConsumeStats 读位点时会查 %RETRY%<group> 路由；冷启动无重试消息时
+            # topic 不存在 → CODE 17 → document-service 的 mq health indicator 误判 DOWN。
+            '%RETRY%document-service-parse-result', '%RETRY%document-vector-result',
+            '%RETRY%audit-service-audit-event', '%RETRY%reminder-service-reminder-due',
+            '%RETRY%ai-python-parse-worker', '%RETRY%ai-python-vector-worker')
 foreach ($t in $topics) {
     $ok = $false
     foreach ($i in 1..18) {
@@ -272,6 +277,64 @@ foreach ($t in $topics) {
 #    docker top / 容器内 ps 里是明文可见的。
 # -----------------------------------------------------------------------------
 $accountHost = '%'
+# 幂等建库兜底：infra 的 initdb 只对「全新空卷」生效；若卷已初始化过但库不存在
+# （例如旧卷迁移、initdb 挂载前创建的数据卷），授权重放会撞 ERROR 1049 直接中断。
+# CREATE DATABASE 不可重复执行，故先查 information_schema 再建。
+# 用 -e MYSQL_PWD 直接传给 mysql，不套 sh -c：三层引号（PowerShell→argv→sh）会把
+# -e "SQL ... 'docqa' ..." 的内层引号吃掉，导致 SQL 语法错或退出码非 0。
+$dbRootPw = Get-Conf 'DOCQA_DB_PASSWORD'
+$dbCheck = @(
+    '-e', "MYSQL_PWD=$dbRootPw", 'docqa-mysql', 'mysql', '-N', '-B', '-uroot',
+    '-e', "SELECT 1 FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='docqa';"
+)
+$dbExists = docker exec @dbCheck 2>$null
+if ("$dbExists" -notmatch '1') {
+    Write-Host '==> [3.8/8] docqa 库不存在，幂等创建'
+    $dbCreate = @(
+        '-e', "MYSQL_PWD=$dbRootPw", 'docqa-mysql', 'mysql', '-uroot',
+        '-e', 'CREATE DATABASE IF NOT EXISTS docqa CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+    )
+    docker exec @dbCreate 2>$null | Out-Null
+    # 建完立即重查，以库是否真实存在为准（不信可能被警告污染的 $LASTEXITCODE）
+    $dbExists = docker exec @dbCheck 2>$null
+    if ("$dbExists" -notmatch '1') { throw '创建 docqa 库失败；docker logs docqa-mysql 查看。' }
+}
+# 冷启动空库时预建 Flyway 账本表，打破授权循环依赖：
+# document-service 内嵌 Flyway 用 ss_migrator 账号读/写 flyway_schema_history，
+# 而该账号的授权由下面的重放步骤下发——账本表不存在 → 授权被过滤 → Flyway 读不到账本
+# → document-service 起不来 → grants-finalize 永远等不到它 healthy。这里用 root 幂等建
+# 一张结构对齐 Flyway 10.x 的空表（CREATE TABLE IF NOT EXISTS 不碰已存在的表），
+# 让它进入 $existingTables 从而拿到 GRANT，循环即解开。
+$historyCheck = @(
+    '-e', "MYSQL_PWD=$dbRootPw", 'docqa-mysql', 'mysql', '-N', '-B', '-uroot',
+    '-e', "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA='docqa' AND TABLE_NAME='flyway_schema_history';"
+)
+$historyExists = docker exec @historyCheck 2>$null
+if ("$historyExists" -notmatch '1') {
+    Write-Host '==> [3.9/8] 预建 flyway_schema_history（解开迁移账号授权循环依赖）'
+    $historyDdl = @'
+CREATE TABLE IF NOT EXISTS `flyway_schema_history` (
+  `installed_rank` int NOT NULL,
+  `version` varchar(50) DEFAULT NULL,
+  `description` varchar(200) NOT NULL,
+  `type` varchar(20) NOT NULL,
+  `script` varchar(1000) NOT NULL,
+  `checksum` int DEFAULT NULL,
+  `installed_by` varchar(100) NOT NULL,
+  `installed_on` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `execution_time` int NOT NULL,
+  `success` tinyint(1) NOT NULL,
+  PRIMARY KEY (`installed_rank`),
+  KEY `flyway_schema_history_s_idx` (`success`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+'@
+    $historyCreate = @(
+        '-e', "MYSQL_PWD=$dbRootPw", 'docqa-mysql', 'mysql', '-uroot', 'docqa', '-e', $historyDdl
+    )
+    docker exec @historyCreate 2>$null | Out-Null
+    $historyExists = docker exec @historyCheck 2>$null
+    if ("$historyExists" -notmatch '1') { throw '预建 flyway_schema_history 失败；docker logs docqa-mysql 查看。' }
+}
 if (-not $SkipGrants) {
     Write-Host '==> [4/8] 幂等重放最小权限授权'
     $tplPath = Join-Path $root 'ops/sql/least-privilege.sql.tmpl'
@@ -290,7 +353,13 @@ if (-not $SkipGrants) {
     )
     $deferredTables = @()
     $keptLines = New-Object System.Collections.Generic.List[string]
-    foreach ($line in ($sql -split "`r?`n")) {
+    # 模板里的 GRANT 存在跨行写法（如 flyway_schema_history 那条：GRANT 权限在上一行、
+    # ON `docqa`.`table` 在下一行）。按单行匹配会漏掉这些语句，空库重放时撞 ERROR 1146。
+    # 先把跨行语句折叠为单行再判断，确保每条 GRANT 都经过「表是否存在」过滤。
+    $folded = [regex]::Replace($sql, '(?ms)^GRANT\b.*?;', {
+        param($m) ($m.Value -replace '\s*\r?\n\s*', ' ')
+    })
+    foreach ($line in ($folded -split "`r?`n")) {
         if ($line -match '^GRANT\s.+ON\s+`docqa`\.`([A-Za-z0-9_]+)`') {
             $table = $Matches[1]
             if ($existingTables -contains $table) {
