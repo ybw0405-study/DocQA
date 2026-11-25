@@ -46,6 +46,22 @@ server {
         try_files $uri =404;
     }
 
+    # ── 分片上传同源通道：前端把 MinIO 预签名 PUT 地址改写成同源桶路径 ──
+    # 桶名与 public/config.js 的 storageBucket、后端 MinioProperties.bucket 保持一致。
+    # Host 必须保持后端签名时的 minio:9100，否则 MinIO 校验签名会失败。
+    location /docqa-documents/ {
+        proxy_pass http://minio:9100;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host minio:9100;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        client_max_body_size 64m;
+        proxy_read_timeout 300s;
+    }
+
     # ── API 反代（容器化部署）：前端 axios/fetch 用相对 /api/v1 ─────────
     # SSE（问答流式）要求关闭代理缓冲，否则逐 token 变成整段到达。
     location /api/ {
