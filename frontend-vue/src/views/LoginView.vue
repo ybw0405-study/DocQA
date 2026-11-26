@@ -6,6 +6,8 @@ import AppAlert from '../components/ui/AppAlert.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import BaseCard from '../components/ui/BaseCard.vue';
 import BaseField from '../components/ui/BaseField.vue';
+import InkIcon from '../components/design/InkIcon.vue';
+import PaperStack from '../components/design/PaperStack.vue';
 import { safeInternalPath } from '../router/redirect';
 import { useAuthStore } from '../stores/auth';
 import { PASSWORD_CHANGED_NOTICE } from '../utils/display';
@@ -116,27 +118,31 @@ async function submit(): Promise<void> {
       左栏是「这是什么产品」的说明书，不是营销位：三条都是系统真实具备的能力，
       用编号 + 一条发丝线排成规格表，避免堆图标与形容词。
     -->
-    <section class="login__intro">
+    <section class="login__intro ink-reveal is-in">
       <p class="login__eyebrow">
-        DOCQA · 智能学习助手
+        壹 / INK &amp; PAPER · 入馆凭证
       </p>
       <p class="login__claim">
-        把课程资料<br>变成能追问的知识
+        把课程资料<br>变成能<em>追问</em>的知识
       </p>
+      <p class="ink-en">Read · Ask · Recall</p>
       <dl class="login__spec">
         <div>
           <dt>01</dt>
-          <dd>文档解析与段落级检索</dd>
+          <dd><InkIcon name="scroll" :size="16" />文档解析与段落级检索</dd>
         </div>
         <div>
           <dt>02</dt>
-          <dd>带引用的问答，受预算与内容边界约束</dd>
+          <dd><InkIcon name="citation" :size="16" />带引用的问答，受预算与内容边界约束</dd>
         </div>
         <div>
           <dt>03</dt>
-          <dd>课表导入与到点提醒</dd>
+          <dd><InkIcon name="bell" :size="16" />课表导入与到点提醒</dd>
         </div>
       </dl>
+      <div class="login__paper-wrap">
+        <PaperStack compact />
+      </div>
     </section>
     <BaseCard
       :title="isRegister ? '注册' : '登录'"

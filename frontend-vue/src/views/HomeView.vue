@@ -9,6 +9,8 @@ import AppAlert from '../components/ui/AppAlert.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import BaseCard from '../components/ui/BaseCard.vue';
 import BaseField from '../components/ui/BaseField.vue';
+import InkIcon from '../components/design/InkIcon.vue';
+import PaperStack from '../components/design/PaperStack.vue';
 import { useRetryWindow } from '../composables/useRetryWindow';
 import { useAuthStore } from '../stores/auth';
 import { useConversationsStore } from '../stores/conversations';
@@ -237,12 +239,50 @@ async function submit(): Promise<void> {
 <template>
   <!--
     首页先回答「我现在手头有什么」，再谈账户设置。
-    之前这一屏只有身份五字段，一进来像在看一份接口回包。
+    卷首用纸叠与三格读数把这一屏变成书房桌面，而不是接口回包。
   -->
+  <section class="ink-hero ink-reveal is-in">
+    <div class="ink-hero__grid">
+      <div>
+        <p class="ink-kicker">卷首 / WORKBENCH</p>
+        <h2 class="ink-title">
+          书案已开，<em>手头的事</em>都在这里
+        </h2>
+        <p class="ink-en">The reading room is open.</p>
+        <p class="ink-sub">
+          文档、会话与提醒按同一张书桌陈列。先回看最近动作，再决定要翻开哪一页。
+        </p>
+        <div class="ink-meta">
+          <div class="ink-meta__cell">
+            <b>{{ documents.items.length }}<i>份</i></b>
+            <span>DOCUMENTS</span>
+          </div>
+          <div class="ink-meta__cell">
+            <b>{{ conversations.items.length }}<i>席</i></b>
+            <span>CONVERSATIONS</span>
+          </div>
+          <div class="ink-meta__cell">
+            <b>{{ reminders.items.length }}<i>条</i></b>
+            <span>REMINDERS</span>
+          </div>
+        </div>
+      </div>
+      <div class="ink-hero__visual">
+        <PaperStack />
+      </div>
+    </div>
+  </section>
+
+  <header class="ink-section-head ink-reveal">
+    <span class="ink-section-head__no">壹</span>
+    <h2>最近活动</h2>
+    <p class="ink-section-head__aside">三条一栏，只做回看；完整列表与筛选在各自主页面。</p>
+  </header>
+
   <BaseCard
     title="最近活动"
     :level="1"
-    class="workbench"
+    class="workbench ink-reveal"
   >
     <div class="workbench__grid">
       <section class="workbench__lane">
@@ -315,6 +355,37 @@ async function submit(): Promise<void> {
       </section>
     </div>
   </BaseCard>
+
+  <div class="ink-arts ink-reveal">
+    <article class="ink-art">
+      <p class="ink-art__num">壹</p>
+      <p class="ink-art__ico"><InkIcon name="book" :size="20" /></p>
+      <h3>摊开资料</h3>
+      <p>上传课程资料，段落级索引让每一句都能被找到。</p>
+      <p class="ink-art__fn">SOURCE · <b>PARAGRAPH INDEX</b></p>
+    </article>
+    <article class="ink-art">
+      <p class="ink-art__num">贰</p>
+      <p class="ink-art__ico"><InkIcon name="question" :size="20" /></p>
+      <h3>带据追问</h3>
+      <p>回答旁留脚注位，命中段落与相关度一并摊在纸上。</p>
+      <p class="ink-art__fn">ANSWER · <b>WITH CITATIONS</b></p>
+    </article>
+    <article class="ink-art">
+      <p class="ink-art__num">叁</p>
+      <p class="ink-art__ico"><InkIcon name="bell" :size="20" /></p>
+      <h3>到点提醒</h3>
+      <p>导入课表后按本地时区排程，待触发与已暂停各有归宿。</p>
+      <p class="ink-art__fn">SCHEDULE · <b>LOCAL TIMEZONE</b></p>
+    </article>
+    <article class="ink-art">
+      <p class="ink-art__num">肆</p>
+      <p class="ink-art__ico"><InkIcon name="seal" :size="20" /></p>
+      <h3>守住边界</h3>
+      <p>预算、引用与审批写在同一本账上，结论可逐条核对。</p>
+      <p class="ink-art__fn">GUARD · <b>AUDITABLE</b></p>
+    </article>
+  </div>
 
   <!--
     用量带只给管理员：普通账号没有 `/admin/ai/usage` 的读权限，

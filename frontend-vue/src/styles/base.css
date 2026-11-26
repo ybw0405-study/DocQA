@@ -3,7 +3,8 @@
  * 页面级类一律在 components.css，工具类在 utilities.css，色值只能来自 tokens.css 的语义别名。
  *
  * 外框形态：顶部一条 56px 的命令条 + 左侧 84px 的工具轨（仅登录后出现），内容区右移。
- * 不用阴影与浮动卡片承重——层级由「底色亮度差 + 1px 发丝线」表达，滚动时版面不抖动。
+ * 墨与纸书房：标题宋体、正文无衬线、标注等宽；层级由「纸色差 + 1px 发丝线」表达。
+ * 朱砂只出现在当前导航、主按钮与引用标记，不参与大面积填充。
  */
 * {
   box-sizing: border-box;
@@ -13,7 +14,7 @@ body {
   margin: 0;
   min-height: 100vh;
   background-color: var(--color-bg);
-  /* 顶部一层极淡的径向提亮：让内容区像放在台面上，而不是贴在纯色板面上。 */
+  /* 顶部一层极淡的纸色晕染：让内容区像摊开的书页，而不是贴在纯色板面上。 */
   background-image: radial-gradient(1200px 420px at 50% -12%, var(--color-bg-grid), transparent 68%);
   background-repeat: no-repeat;
   color: var(--color-text);
@@ -34,9 +35,10 @@ h1,
 h2,
 h3 {
   margin: 0 0 var(--space-5);
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-weight: 700;
   line-height: var(--leading-tight);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
 }
 
 h1 {
@@ -90,37 +92,45 @@ a:hover {
 
 .app-header__brand {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-4);
-  font-size: var(--text-md);
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: 700;
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
-/* 品牌标记：4 格点阵里只亮一格，等于「正在运行」的最小表达，不用图形素材。 */
+/* 朱砂闲章：品牌标记是一枚微微歪斜的印章，不用图形素材。 */
 .app-header__mark {
   position: relative;
   display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: var(--border-width) solid var(--color-border-strong);
-  background-image:
-    linear-gradient(var(--color-border-strong), var(--color-border-strong)),
-    linear-gradient(var(--color-border-strong), var(--color-border-strong));
-  background-size: 1px 100%, 100% 1px;
-  background-position: 50% 0, 0 50%;
-  background-repeat: no-repeat;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-serif);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  transform: rotate(-3deg);
 }
 
 .app-header__mark::after {
-  content: '';
+  content: '文';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: var(--dot-size);
-  height: var(--dot-size);
-  background: var(--color-primary);
+  inset: 0;
+}
+
+/* 英文副题用衬线斜体，作为品牌标记下方的题跋。 */
+.app-header__edition {
+  font-family: var(--font-en);
+  font-style: italic;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-faint);
 }
 
 .app-header__nav {

@@ -49,9 +49,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <div class="ink-reading">
+  <header class="ink-section-head ink-reveal">
+    <span class="ink-section-head__no">贰</span>
+    <h2>阅读室</h2>
+    <p class="ink-section-head__aside">一问一答都留出处；生成中的行不写成已落库的记录。</p>
+  </header>
+
   <BaseCard
     title="问答"
     :level="1"
+    class="ink-reveal"
   >
     <div class="ask__new">
       <BaseField label="新会话标题（可留空）">
@@ -258,5 +266,6 @@ onBeforeUnmount(() => {
         :trace-id="conversations.traceId"
       />
     </BaseCard>
+  </div>
   </div>
 </template>

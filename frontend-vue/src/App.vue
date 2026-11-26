@@ -53,6 +53,9 @@ const accountNav: readonly NavItem[] = [
   },
 ];
 
+/** 书房横幅：用两条相同轨道做无缝滚动，纯文本不抢焦点。 */
+const tickerItems = ['INK & PAPER / 墨与纸', '把资料摊开', '让追问有据', '到点自会响', 'READ · ASK · RECALL'] as const;
+
 const auth = useAuthStore();
 const router = useRouter();
 const isAuthenticated = computed(() => auth.isAuthenticated);
@@ -101,6 +104,7 @@ async function onSignOut(): Promise<void> {
           aria-hidden="true"
         />
         DocQA
+        <span class="app-header__edition">· Ink &amp; Paper</span>
       </span>
       <nav class="app-header__nav">
         <!-- 主题开关与登录态无关：匿名访客也要能选。 -->
@@ -135,6 +139,23 @@ async function onSignOut(): Promise<void> {
         >登录</RouterLink>
       </nav>
     </header>
+
+    <div
+      class="ink-ticker"
+      aria-hidden="true"
+    >
+      <div class="ink-ticker__track">
+        <span
+          v-for="copy in 2"
+          :key="copy"
+        >
+          <template
+            v-for="(item, index) in tickerItems"
+            :key="`${copy}-${index}`"
+          ><i>✦</i>{{ item }}</template>
+        </span>
+      </div>
+    </div>
 
     <nav
       v-if="isAuthenticated"

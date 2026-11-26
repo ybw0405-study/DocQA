@@ -122,9 +122,17 @@ watch(() => uploads.indexedCount, (n, o) => {
 </script>
 
 <template>
+  <div class="ink-documents">
+  <header class="ink-section-head ink-reveal">
+    <span class="ink-section-head__no">叁</span>
+    <h2>文档架</h2>
+    <p class="ink-section-head__aside">每一份资料都有状态、索引版本与出处；书脊可悬停翻检。</p>
+  </header>
+
   <BaseCard
     title="文档"
     :level="1"
+    class="ink-reveal"
   >
     <UploadPanel />
   </BaseCard>
@@ -446,4 +454,5 @@ watch(() => uploads.indexedCount, (n, o) => {
       已显示全部 {{ documents.items.length }} 条。
     </p>
   </BaseCard>
+  </div>
 </template>
