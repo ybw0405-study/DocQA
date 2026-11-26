@@ -4,8 +4,8 @@ import { useInkTilt } from '../../composables/useInkMotion';
 /** 3D 纸叠：三张书页层叠，鼠标移动时倾斜、悬停时散开。 */
 withDefaults(defineProps<{ compact?: boolean }>(), { compact: false });
 const { target } = useInkTilt(9);
-// 字符串 ref 只在模板里使用，显式读取一次避免类型检查报未使用。
-void target;
+// 模板里通过字符串 ref 绑定，显式读一次值避免类型检查报未使用。
+void target.value;
 </script>
 
 <template>
