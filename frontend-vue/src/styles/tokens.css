@@ -3,50 +3,49 @@
  * 组件层只允许消费语义别名（--color-* 与下面四组刻度），裸色值只在本文件出现，
  * 由 tests/design-tokens.spec.ts 逐文件对账。
  *
- * 视觉取向：冷控台（Cold Console）。近黑底 + 单一冷青强调 + 发丝线分隔，
- * 不用阴影承重、不用圆角堆叠、不用渐变填充——层级靠亮度差与线宽差表达。
- * 强调色只出现在三处：当前导航、主按钮描边、状态点。全部色阶都经过 AA 正文对比度校验。
+ * 视觉取向：墨与纸书房（Ink & Paper）。宣纸底 + 朱砂红 + 发丝线；
+ * 层级靠纸色差与线宽差表达，不用阴影承重、不用大圆角、不用渐变填充。
+ * 标题是宋体，正文无衬线，仪表标注用等宽；朱砂只出现在主按钮、焦点与引用上。
+ * 「gray / teal / red / amber」是令牌守卫约定的原始色阶槽位名，
+ * 其取值已按墨纸主题重新映射（teal 槽位 = 朱砂，gray 槽位 = 宣纸/墨）。
  */
 :root {
-  /*
-   * 原始色阶只保留被语义层真正消费的档位：令牌层每多一档，就多一个「看起来可用、
-   * 实际上没人用」的诱惑，守卫也会因为死令牌直接红。
-   */
-  --gray-0: #ffffff;
-  --gray-25: #fafbfc;
-  --gray-50: #f2f3f5;
-  --gray-100: #e8eaee;
-  --gray-200: #d3d7df;
-  --gray-300: #aeb5c0;
-  --gray-400: #8f97a4;
-  --gray-500: #6d7583;
-  --gray-600: #565e6b;
-  --gray-750: #2b313b;
-  --gray-800: #20252d;
-  --gray-900: #12161c;
-  --gray-925: #0d1015;
-  --gray-975: #07080b;
+  /* 宣纸与墨：从最亮的卡片纸到最深的夜读底 */
+  --gray-0: #FCF9F3;
+  --gray-25: #F2ECDF;
+  --gray-50: #F7F3EA;
+  --gray-100: #EFE9DC;
+  --gray-200: #DDD5C5;
+  --gray-300: #C9BFA9;
+  --gray-400: #8C8577;
+  --gray-500: #6F685B;
+  --gray-600: #514B40;
+  --gray-750: #3B362C;
+  --gray-800: #29251E;
+  --gray-900: #1C1A15;
+  --gray-925: #16140F;
+  --gray-975: #100E0A;
 
-  /* 冷青：全站唯一强调色族。#00e5ff 只用于暗底，浅底一律降到 --teal-700 才够 AA。 */
-  --teal-100: #d6f8ff;
-  --teal-300: #5fe2f7;
-  --teal-500: #00e5ff;
-  --teal-700: #006e7a;
-  --teal-800: #05505a;
-  --teal-950: #03191d;
+  /* 朱砂：浅色主题用深印泥 #C8401F 保证 AA，暗色主题用亮印泥 #E87354 */
+  --teal-100: #F2E0D8;
+  --teal-300: #E87354;
+  --teal-500: #E87354;
+  --teal-700: #C8401F;
+  --teal-800: #8E3A22;
+  --teal-950: #2A140E;
 
-  /* 危险：偏橙的红，避免与强调青在色环上打成互补对比而显得刺眼。 */
-  --red-100: #ffe0dc;
-  --red-400: #ff6b63;
-  --red-700: #a52a22;
-  --red-900: #3a1210;
+  /* 危险：比朱砂更沉的赭红，只用于失败与删除 */
+  --red-100: #F3DED7;
+  --red-400: #D65A3A;
+  --red-700: #9A2F1B;
+  --red-900: #2E100B;
 
-  /* 警告：琥珀。只用于「需要注意但没坏」的状态，不参与品牌表达。 */
-  --amber-100: #fff0d1;
-  --amber-300: #ffcc70;
-  --amber-700: #855400;
-  --amber-800: #523400;
-  --amber-950: #1b1204;
+  /* 警告：旧纸封蜡的琥珀，只用于「需要注意但没坏」 */
+  --amber-100: #F5EAD2;
+  --amber-300: #D6A848;
+  --amber-700: #7A5409;
+  --amber-800: #503703;
+  --amber-950: #1F1506;
 
   /* ---- 语义颜色：浅色为缺省值，暗色在下方两处覆盖 ---- */
   --color-bg: var(--gray-50);
@@ -64,7 +63,7 @@
   --color-danger: var(--red-700);
   --color-danger-soft: var(--red-100);
   --color-on-danger: var(--gray-0);
-  --color-ok-text: var(--teal-700);
+  --color-ok-text: var(--teal-800);
   --color-ok-border: var(--teal-300);
   --color-ok-bg: var(--teal-100);
   --color-warn-text: var(--amber-700);
@@ -72,8 +71,10 @@
   --color-warn-bg: var(--amber-100);
 
   /* ---- 排版 ---- */
-  /* 不引网络字体：首屏多一次阻塞请求，而 Inter 缺失时回落到系统无衬线也不破坏版式。 */
+  /* 不引网络字体：首屏多一次阻塞请求，且 CSP 的 font-src 只允许同源。 */
   --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --font-serif: 'Noto Serif SC', 'Songti SC', 'SimSun', Georgia, serif;
+  --font-en: 'Fraunces', Georgia, serif;
   --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Menlo, Consolas, monospace;
   --text-micro: 10px;
   --text-xs: 11px;
@@ -84,9 +85,9 @@
   --text-2xl: 26px;
   --text-3xl: 34px;
   --leading-tight: 1.3;
-  --leading-base: 1.6;
+  --leading-base: 1.7;
   /* 仪表标签的字距：小字号全大写时字距必须拉开，否则读起来是挤在一起的一团。 */
-  --tracking-label: 0.12em;
+  --tracking-label: 0.16em;
 
   /* ---- 间距：4 的倍数，避免出现 5/7/9 这类无法归一的碎值 ---- */
   --space-1: 2px;
@@ -104,7 +105,15 @@
   /* ---- 结构 ---- */
   --border-width: 1px;
   --border-width-accent: 2px;
-  --radius: 2px;
+  /* 墨纸卡片的圆角：卡片 4px、印章 3px，不堆叠大圆角 */
+  --radius: 4px;
+  /* 硬投影：像一叠纸放在书桌上，只给正文卡片，不给控件 */
+  --shadow-hard: 6px 6px 0 var(--color-border);
+  /* 纸叠的抬升投影：只给 3D 纸页，避免普通控件也浮起来 */
+  --shadow-paper: 0 18px 44px var(--color-border-strong);
+  /* 纸叠倾斜角的静态缺省值；指针移动时由脚本写同名属性，CSS 只负责消费 */
+  --ink-tilt-x: 0deg;
+  --ink-tilt-y: 0deg;
   /* 触控目标下限：小尺寸控件（图标按钮、复选框行）不得低于它 */
   --tap-target: 32px;
   --focus-ring-width: 2px;

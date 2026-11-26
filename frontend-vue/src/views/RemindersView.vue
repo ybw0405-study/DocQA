@@ -7,6 +7,7 @@ import BaseButton from '../components/ui/BaseButton.vue';
 import BaseCard from '../components/ui/BaseCard.vue';
 import BaseField from '../components/ui/BaseField.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
+import InkIcon from '../components/design/InkIcon.vue';
 import SkeletonBlock from '../components/ui/SkeletonBlock.vue';
 import { useRetryWindow } from '../composables/useRetryWindow';
 import { allowedTargets, useRemindersStore } from '../stores/reminders';
@@ -131,6 +132,13 @@ onMounted(() => {
 </script>
 
 <template>
+  <div class="ink-reminders">
+  <header class="ink-section-head ink-reveal">
+    <span class="ink-section-head__no">叁</span>
+    <h2>提醒簿</h2>
+    <p class="ink-section-head__aside">左页看规则，右页写规则；到点自会响。</p>
+  </header>
+
   <BaseCard
     title="提醒"
     :level="1"
@@ -265,10 +273,18 @@ onMounted(() => {
       </ul>
     </div>
 
-    <EmptyState
+    <div
       v-if="reminders.listLoaded && reminders.items.length === 0"
-      :text="EMPTY_STATE_TEXT.remindersFiltered"
-    />
+      class="reminders__empty"
+    >
+      <span class="reminders__empty-seal" aria-hidden="true"><InkIcon name="bell" :size="28" /></span>
+      <strong>这一页还是空的</strong>
+      <EmptyState :text="EMPTY_STATE_TEXT.remindersFiltered" />
+      <ol>
+        <li>右页填一条截止提醒，或用课表导入批量生成。</li>
+        <li>下次触发时间由服务端按 RRULE 与时区算出。</li>
+      </ol>
+    </div>
     <BaseButton
       v-if="reminders.canLoadMore"
       @click="reminders.loadListMore()"
@@ -418,9 +434,12 @@ onMounted(() => {
     />
   </BaseCard>
 
-  <!-- 课表导入落库的就是看板上的课程类规则，与看板同页才能立刻看到写入结果。 -->
-  <ScheduleImportPanel />
+  <div class="ink-reminders__lower">
+    <!-- 课表导入落库的就是看板上的课程类规则，与看板同页才能立刻看到写入结果。 -->
+    <ScheduleImportPanel />
 
-  <!-- 通知是「已经响过的提醒」，与看板同页才能就地标记已读，并按 reminderId 对照看板行的提前量。 -->
-  <NotificationPanel />
+    <!-- 通知是「已经响过的提醒」，与看板同页才能就地标记已读，并按 reminderId 对照看板行的提前量。 -->
+    <NotificationPanel />
+  </div>
+  </div>
 </template>
